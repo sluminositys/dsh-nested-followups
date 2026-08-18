@@ -48,6 +48,7 @@ export const projectionDiagnosticSchema = z.object({
     'anchor-missing',
     'anchor-range-invalid',
     'seed-length-mismatch',
+    'branch-tool-event',
   ]),
   message: z.string(),
   branchId: identifier.optional(),

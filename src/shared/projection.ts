@@ -8,6 +8,7 @@ export type ProjectionDiagnosticCode =
   | 'anchor-missing'
   | 'anchor-range-invalid'
   | 'seed-length-mismatch'
+  | 'branch-tool-event'
 
 export interface ProjectionDiagnostic {
   code: ProjectionDiagnosticCode

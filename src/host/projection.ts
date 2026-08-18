@@ -1,4 +1,4 @@
-import type { ContentBlock } from '@deepseek-ai/dsh-llm/types'
+import { BlockAssembler, type ContentBlock } from '@deepseek-ai/dsh-llm'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 
 import type {
@@ -28,11 +28,13 @@ export interface SessionLogSnapshot {
 }
 
 interface VisibleMessage {
-  event: SessionEvent<'user/message' | 'assistant/message'>
   role: 'user' | 'assistant'
   messageId: string
   turn: number | undefined
+  seq: number
+  time: number
   text: string
+  state: MessageNodeState
 }
 
 function eventOrder(left: SessionEvent, right: SessionEvent): number {
@@ -79,13 +81,19 @@ function turnState(
   return kind === 'completed' || kind === 'max-tokens' ? 'complete' : 'error'
 }
 
-function visibleMessages(events: readonly SessionEvent[], minimumSeq: number): {
-  messages: VisibleMessage[]
-  endings: Map<number, SessionEvent<'turn/end'>>
-} {
+function visibleMessages(events: readonly SessionEvent[], minimumSeq: number): VisibleMessage[] {
   const ordered = [...events].sort(eventOrder)
   const endings = new Map<number, SessionEvent<'turn/end'>>()
   const turnAtUserEvent = new Map<number, number>()
+  const completedSteps = new Set<string>()
+  const streamingSteps = new Map<string, {
+    turn: number
+    step: number
+    seq: number
+    time: number
+    chunks: number
+    assembler: BlockAssembler
+  }>()
   let currentTurn: number | undefined
 
   for (const event of ordered) {
@@ -97,6 +105,38 @@ function visibleMessages(events: readonly SessionEvent[], minimumSeq: number): {
       endings.set(event.data.turn, event)
       if (currentTurn === event.data.turn) currentTurn = undefined
     }
+    if (event.type === 'assistant/message') {
+      completedSteps.add(`${event.data.turn}:${event.data.step}`)
+    }
+    if (event.type === 'step/start') {
+      streamingSteps.set(`${event.data.turn}:${event.data.step}`, {
+        turn: event.data.turn,
+        step: event.data.step,
+        seq: event.seq,
+        time: event.time,
+        chunks: 0,
+        assembler: new BlockAssembler(),
+      })
+    }
+    if (event.type === 'assistant/chunk') {
+      const key = `${event.data.turn}:${event.data.step}`
+      const current = streamingSteps.get(key) ?? {
+        turn: event.data.turn,
+        step: event.data.step,
+        seq: event.seq,
+        time: event.time,
+        chunks: 0,
+        assembler: new BlockAssembler(),
+      }
+      try {
+        current.assembler.push(event.data.chunk)
+      } catch {
+        // A corrupted or future chunk kind must not make the entire tree
+        // unreadable. The durable assistant/message remains authoritative.
+      }
+      current.chunks += 1
+      streamingSteps.set(key, current)
+    }
   }
 
   const messages: VisibleMessage[] = []
@@ -105,25 +145,53 @@ function visibleMessages(events: readonly SessionEvent[], minimumSeq: number): {
     if (event.type === 'user/message') {
       if (event.data.source.kind !== 'user') continue
       messages.push({
-        event,
         role: 'user',
         messageId: String(event.data.id),
         turn: turnAtUserEvent.get(event.seq),
+        seq: event.seq,
+        time: event.time,
         text: sourceText(event.data.content),
+        state: 'complete',
       })
       continue
     }
     if (event.type === 'assistant/message') {
       messages.push({
-        event,
         role: 'assistant',
         messageId: String(event.data.message.id),
         turn: event.data.turn,
+        seq: event.seq,
+        time: event.time,
         text: sourceText(event.data.message.content),
+        state: turnState(event.data.turn, endings),
       })
     }
   }
-  return { messages, endings }
+  for (const [key, partial] of streamingSteps) {
+    if (completedSteps.has(key) || partial.seq < minimumSeq) continue
+    let text = ''
+    try {
+      text = sourceText(partial.assembler.blocks())
+    } catch {
+      // A malformed or future block kind remains an empty live placeholder;
+      // the durable final assistant/message is still authoritative.
+    }
+    messages.push({
+      role: 'assistant',
+      messageId: `stream-${partial.turn}-${partial.step}`,
+      turn: partial.turn,
+      seq: partial.seq,
+      time: partial.time,
+      text,
+      state: endings.has(partial.turn)
+        ? 'error'
+        : partial.chunks === 0
+          ? 'queued'
+          : 'streaming',
+    })
+  }
+  messages.sort((left, right) => left.seq - right.seq)
+  return messages
 }
 
 function nodesForSession(
@@ -133,7 +201,7 @@ function nodesForSession(
   log: SessionLogSnapshot,
   minimumSeq: number,
 ): MessageNodeView[] {
-  const { messages, endings } = visibleMessages(log.events, minimumSeq)
+  const messages = visibleMessages(log.events, minimumSeq)
   const localTurns = new Map<number, number>()
   let nextLocalTurn = 1
   for (const message of messages) {
@@ -153,15 +221,15 @@ function nodesForSession(
       branchId,
       sessionId: log.sessionId,
       messageId: message.messageId,
-      seq: message.event.seq,
+      seq: message.seq,
       role: message.role,
       ...(message.turn === undefined ? {} : { turnId: `${log.sessionId}:${message.turn}` }),
       branchPath: Object.freeze(path),
       localTurnIndex,
-      time: message.event.time,
+      time: message.time,
       text: message.text,
-      summary: summarizeMessage(message.text, message.role),
-      state: turnState(message.turn, endings),
+      summary: message.text.length === 0 ? '' : summarizeMessage(message.text, message.role),
+      state: message.state,
     }
   })
 }
@@ -300,6 +368,17 @@ export function projectConversationTree(
           branchId: branch.branchId,
           sessionId: branch.sessionId,
           message: `branch metadata seed length ${branch.seedLength} does not match session header ${log.seedLength}`,
+        })
+      }
+      const unexpectedToolEvent = log.events.find(event =>
+        event.seq >= branch.seedLength
+        && (event.type === 'tool/call' || event.type === 'tool/result'))
+      if (unexpectedToolEvent !== undefined) {
+        diagnostics.push({
+          code: 'branch-tool-event',
+          branchId: branch.branchId,
+          sessionId: branch.sessionId,
+          message: `chat-only branch '${branch.branchId}' contains unexpected tool event '${unexpectedToolEvent.type}' at seq ${unexpectedToolEvent.seq}`,
         })
       }
       branchNodes = nodesForSession(tree.treeId, branch.branchId, branchPath, log, branch.seedLength)

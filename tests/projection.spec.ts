@@ -8,6 +8,10 @@ import {
 import type { BranchRecord, TreeRecord } from '../src/shared/types.ts'
 import { pluginContext, textTurn } from './fixtures/session-events.ts'
 
+function sessionEvent(value: unknown): import('@deepseek-ai/dsh-session/types').SessionEvent {
+  return value as import('@deepseek-ai/dsh-session/types').SessionEvent
+}
+
 const tree: TreeRecord = {
   treeId: 'tree-1',
   rootSessionId: 'root',
@@ -254,5 +258,128 @@ describe('conversation tree projection', () => {
     )
 
     expect(projection.nodes.some(node => node.messageId === 'context-1')).toBe(false)
+  })
+
+  it('projects a stable queued and streaming assistant node until the durable message commits', () => {
+    const prefix = rootEvents.slice(0, branchOne.seedLength)
+    const turnStart = sessionEvent({
+      type: 'turn/start',
+      seq: 12,
+      time: 2_000,
+      data: { turn: 3 },
+    })
+    const user = sessionEvent({
+      type: 'user/message',
+      seq: 13,
+      time: 2_001,
+      data: {
+        id: 'branch-stream-q1',
+        role: 'user',
+        content: [{ type: 'text', text: 'Explain this' }],
+        source: { kind: 'user' },
+      },
+      surfaceOp: 'append',
+    })
+    const stepStart = sessionEvent({
+      type: 'step/start',
+      seq: 14,
+      time: 2_002,
+      data: { turn: 3, step: 1 },
+    })
+    const queuedEvents = [...prefix, turnStart, user, stepStart]
+    const queuedLogs = logs({ branchOneEvents: queuedEvents as typeof branchOneEvents })
+    const queued = projectConversationTree(tree, [branchOne], queuedLogs)
+    const queuedBranch = queued.nodes.filter(node => node.branchId === branchOne.branchId)
+
+    expect(queuedBranch).toEqual([
+      expect.objectContaining({ messageId: 'branch-stream-q1', state: 'complete' }),
+      expect.objectContaining({ messageId: 'stream-3-1', state: 'queued', text: '' }),
+    ])
+
+    const streamingEvents = [
+      ...queuedEvents,
+      sessionEvent({
+        type: 'assistant/chunk',
+        seq: 15,
+        time: 2_003,
+        data: { turn: 3, step: 1, chunk: { type: 'block-start', index: 0, blockType: 'text' } },
+      }),
+      sessionEvent({
+        type: 'assistant/chunk',
+        seq: 16,
+        time: 2_004,
+        data: { turn: 3, step: 1, chunk: { type: 'text-delta', index: 0, text: 'Partial answer' } },
+      }),
+    ]
+    const streamingLogs = logs({ branchOneEvents: streamingEvents as typeof branchOneEvents })
+    const streaming = projectConversationTree(tree, [branchOne], streamingLogs)
+    const streamingAnswer = streaming.nodes.find(node => node.messageId === 'stream-3-1')
+
+    expect(streamingAnswer).toEqual(expect.objectContaining({
+      state: 'streaming',
+      text: 'Partial answer',
+    }))
+
+    const completeEvents = [
+      ...streamingEvents,
+      sessionEvent({
+        type: 'assistant/message',
+        seq: 17,
+        time: 2_005,
+        data: {
+          turn: 3,
+          step: 1,
+          message: {
+            id: 'branch-stream-a1',
+            role: 'assistant',
+            content: [{ type: 'text', text: 'Partial answer, completed.' }],
+            source: { kind: 'model', provider: 'test', model: 'test-model' },
+          },
+        },
+        surfaceOp: 'append',
+      }),
+      sessionEvent({
+        type: 'step/end',
+        seq: 18,
+        time: 2_006,
+        data: { turn: 3, step: 1 },
+      }),
+      sessionEvent({
+        type: 'turn/end',
+        seq: 19,
+        time: 2_007,
+        data: { turn: 3, reason: { kind: 'completed' } },
+      }),
+    ]
+    const completeLogs = logs({ branchOneEvents: completeEvents as typeof branchOneEvents })
+    const complete = projectConversationTree(tree, [branchOne], completeLogs)
+
+    expect(complete.nodes.some(node => node.messageId === 'stream-3-1')).toBe(false)
+    expect(complete.nodes.find(node => node.messageId === 'branch-stream-a1')).toEqual(
+      expect.objectContaining({ state: 'complete', text: 'Partial answer, completed.' }),
+    )
+  })
+
+  it('diagnoses tool events in a chat-only branch without rendering tool cards', () => {
+    const withToolEvent = [
+      ...branchOneEvents,
+      sessionEvent({
+        type: 'tool/call',
+        seq: 18,
+        time: 3_000,
+        data: { turn: 3, step: 1, callId: 'call-1', name: 'shell', arguments: '{}' },
+      }),
+    ]
+    const projection = projectConversationTree(
+      tree,
+      [branchOne],
+      logs({ branchOneEvents: withToolEvent as typeof branchOneEvents }),
+    )
+
+    expect(projection.diagnostics).toContainEqual(expect.objectContaining({
+      code: 'branch-tool-event',
+      branchId: branchOne.branchId,
+    }))
+    expect(projection.nodes.every(node => node.role === 'user' || node.role === 'assistant')).toBe(true)
   })
 })
