@@ -53,10 +53,10 @@ export async function apply(ctx: ClientContext): Promise<() => Promise<void>> {
       return {
         hooks: { treeProjection: controller },
         ensure: () => controller.ensure(),
-        askFollowUp: async ({ anchor, question, anchorRange }) => {
+        askFollowUp: async ({ clientRequestId, anchor, question, anchorRange }) => {
           const result = await ctx.remote.nestedFollowups.createBranch({
             ownerSessionId: String(sessionId),
-            clientRequestId: crypto.randomUUID(),
+            clientRequestId,
             anchor: {
               sessionId: anchor.sessionId,
               messageId: anchor.messageId,
@@ -68,11 +68,11 @@ export async function apply(ctx: ClientContext): Promise<() => Promise<void>> {
           if (!result.ok) throw commandError(result.error)
           if (!result.value.ok) throw commandError(result.value.error)
         },
-        continueBranch: async ({ tail, question }) => {
+        continueBranch: async ({ clientRequestId, tail, question }) => {
           if (tail.branchId === null) throw new Error('Continue is not available on the main conversation.')
           const result = await ctx.remote.nestedFollowups.continueBranch({
             ownerSessionId: String(sessionId),
-            clientRequestId: crypto.randomUUID(),
+            clientRequestId,
             branchId: tail.branchId,
             tail: {
               sessionId: tail.sessionId,

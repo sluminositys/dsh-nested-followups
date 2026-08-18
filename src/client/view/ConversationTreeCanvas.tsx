@@ -168,10 +168,15 @@ function FollowUpComposer({
   readonly mode: 'ask' | 'continue'
   readonly labels: TreeViewLabels
   readonly style: React.CSSProperties
-  readonly submit: (text: string, anchorRange?: AnchorRange) => Promise<void>
+  readonly submit: (
+    text: string,
+    clientRequestId: string,
+    anchorRange?: AnchorRange,
+  ) => Promise<void>
   readonly close: () => void
 }) {
   const [draft, setDraft] = useState('')
+  const [clientRequestId] = useState(() => crypto.randomUUID())
   const [anchorRange, setAnchorRange] = useState<AnchorRange | undefined>()
   const [pending, setPending] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
@@ -181,7 +186,7 @@ function FollowUpComposer({
     if (question === '' || pending) return
     setPending(true)
     setFailure(null)
-    void submit(question, mode === 'ask' ? anchorRange : undefined).then(() => {
+    void submit(question, clientRequestId, mode === 'ask' ? anchorRange : undefined).then(() => {
       setPending(false)
       close()
     }, (error: unknown) => {
@@ -649,13 +654,14 @@ export function ConversationTreeCanvas({
                       ? composerLayout.rect.y + 18
                       : composerLayout.rect.y + composerLayout.rect.height + 24,
                   }}
-                  submit={(question, anchorRange) => composerMode === 'ask'
+                  submit={(question, clientRequestId, anchorRange) => composerMode === 'ask'
                     ? onAskFollowUp!({
+                      clientRequestId,
                       anchor: composerNode,
                       question,
                       ...(anchorRange === undefined ? {} : { anchorRange }),
                     })
-                    : onContinueBranch!({ tail: composerNode, question })}
+                    : onContinueBranch!({ clientRequestId, tail: composerNode, question })}
                   close={() => { dispatch({ type: 'composer/close' }) }}
                 />
               )}

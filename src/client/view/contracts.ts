@@ -2,12 +2,14 @@ import type { ConversationTreeProjection } from '../../shared/projection.ts'
 import type { AnchorRange, MessageNodeView } from '../../shared/types.ts'
 
 export interface AskFollowUpRequest {
+  readonly clientRequestId: string
   readonly anchor: MessageNodeView
   readonly question: string
   readonly anchorRange?: AnchorRange
 }
 
 export interface ContinueBranchRequest {
+  readonly clientRequestId: string
   readonly tail: MessageNodeView
   readonly question: string
 }
