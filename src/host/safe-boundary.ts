@@ -1,5 +1,7 @@
 import type { ContentBlock } from '@deepseek-ai/dsh-llm/types'
-import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
+import { SessionId, type SessionEvent } from '@deepseek-ai/dsh-session/types'
+
+import { selectForkSeedRc7 } from './adapter/session-fork.ts'
 
 export type BranchBoundaryErrorCode =
   | 'invalid-log'
@@ -23,7 +25,9 @@ export interface ResolvedBranchBoundary {
   anchorMessageId: string
   anchorSeq: number
   turn: number
-  /** Inclusive event sequence of the completed turn marker. */
+  /** Inclusive event sequence of the completed `turn/end`. */
+  turnEndSeq: number
+  /** Inclusive event sequence of the actual seed cut after stable trailing events. */
   forkBoundarySeq: number
   /** Number of events copied into the child before its own descriptor and prompt. */
   seedLength: number
@@ -96,6 +100,12 @@ export function resolveBranchBoundary(
 
   let seedLength = turnEnd.seq + 1
   while (seedLength < events.length && events[seedLength]?.type !== 'turn/start') seedLength++
+  const forkBoundarySeq = seedLength - 1
+  const seed = selectForkSeedRc7(
+    SessionId('branch-boundary-validation'),
+    events,
+    forkBoundarySeq,
+  )
   const anchorMessageId = String(finalSurface.data.message.id)
   return Object.freeze({
     selectedMessageId,
@@ -103,9 +113,10 @@ export function resolveBranchBoundary(
     anchorMessageId,
     anchorSeq: finalSurface.seq,
     turn,
-    forkBoundarySeq: turnEnd.seq,
-    seedLength,
-    seed: Object.freeze(events.slice(0, seedLength)),
+    turnEndSeq: turnEnd.seq,
+    forkBoundarySeq,
+    seedLength: seed.length,
+    seed: Object.freeze(seed),
     snappedToTurnTail: anchorMessageId !== selectedMessageId,
   })
 }

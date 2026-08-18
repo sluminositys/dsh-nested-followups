@@ -37,7 +37,7 @@ export interface BranchRecord {
   anchorMessageId: string
   /** Event sequence of the selected message in the anchor session. */
   anchorSeq: number
-  /** Event sequence of the inclusive `turn/end` used to create the fork. */
+  /** Inclusive event sequence of the validated seed cut used to create the fork. */
   forkBoundarySeq: number
   /** Number of inherited events at the beginning of this branch session. */
   seedLength: number

@@ -105,7 +105,8 @@ describe('safe branch boundary', () => {
     ]
     const boundary = resolveBranchBoundary(events, 'a1')
 
-    expect(boundary.forkBoundarySeq).toBe(5)
+    expect(boundary.turnEndSeq).toBe(5)
+    expect(boundary.forkBoundarySeq).toBe(6)
     expect(boundary.seedLength).toBe(7)
     expect(boundary.seed.map(item => item.seq)).toEqual([0, 1, 2, 3, 4, 5, 6])
   })
@@ -152,6 +153,7 @@ describe('safe branch boundary', () => {
       selectedSeq: 3,
       anchorMessageId: 'a-final',
       anchorSeq: 8,
+      turnEndSeq: 10,
       forkBoundarySeq: 10,
       snappedToTurnTail: true,
     })

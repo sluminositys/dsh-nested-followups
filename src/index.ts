@@ -20,6 +20,10 @@ export {
   BranchBoundaryError,
   resolveBranchBoundary,
 } from './host/safe-boundary.ts'
+export {
+  createSubagentForkRc7,
+  selectForkSeedRc7,
+} from './host/adapter/session-fork.ts'
 export { TreeMetadataRepository } from './host/storage.ts'
 export { nestedFollowupsDomainSpec } from './shared/schema.ts'
 export type * from './shared/types.ts'
