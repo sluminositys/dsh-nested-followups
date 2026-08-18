@@ -84,6 +84,14 @@ export async function apply(ctx: ClientContext): Promise<() => Promise<void>> {
           if (!result.ok) throw commandError(result.error)
           if (!result.value.ok) throw commandError(result.value.error)
         },
+        deleteBranch: async ({ branchId }) => {
+          const result = await ctx.remote.nestedFollowups.deleteBranch({
+            ownerSessionId: String(sessionId),
+            branchId,
+          })
+          if (!result.ok) throw commandError(result.error)
+          if (!result.value.ok) throw commandError(result.value.error)
+        },
       }
     },
   }, ConversationTreeView))

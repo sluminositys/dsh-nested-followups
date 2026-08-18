@@ -34,7 +34,9 @@ vi.mock('@deepseek-ai/dsh-client-ui-primitives', async () => {
 import {
   anchorRangeFromSelection,
   ConversationTreeCanvas,
+  deletionConfirmationDescription,
 } from '../src/client/view/ConversationTreeCanvas.tsx'
+import { DEFAULT_TREE_VIEW_LABELS } from '../src/client/view/contracts.ts'
 import { treeProjectionFixture } from './fixtures/tree-projection.ts'
 
 function count(markup: string, fragment: string): number {
@@ -85,11 +87,24 @@ describe('conversation tree canvas', () => {
       projection,
       onAskFollowUp: vi.fn(async () => {}),
       onContinueBranch: vi.fn(async () => {}),
+      onDeleteBranch: vi.fn(async () => {}),
     }))
 
     expect(count(markup, 'aria-label="Ask follow-up"')).toBe(6)
     expect(count(markup, 'aria-label="Continue this branch"')).toBe(3)
+    expect(count(markup, 'aria-label="Delete branch"')).toBe(3)
     expect(markup).not.toContain('Open branch')
+  })
+
+  it('discloses the rc.7 archive fallback in the destructive confirmation', () => {
+    const impact = { branchCount: 3, messageCount: 11 }
+    const physical = deletionConfirmationDescription(DEFAULT_TREE_VIEW_LABELS, impact, 'delete')
+    const archived = deletionConfirmationDescription(DEFAULT_TREE_VIEW_LABELS, impact, 'archive')
+
+    expect(physical).toContain('3 branches')
+    expect(physical).not.toContain('archived')
+    expect(archived).toContain('3 branches')
+    expect(archived).toContain('archived rather than physically deleted')
   })
 
   it('uses raw Markdown UTF-16 offsets and renders a valid branch quote', () => {

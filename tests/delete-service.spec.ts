@@ -62,14 +62,17 @@ const b111 = branch('b1.1.1', 'session-b1.1.1', b11, 4)
 const b2 = { ...branch('b2', 'session-b2', null, 5), siblingOrdinal: 2 }
 
 class CleanupPort implements BranchSessionCleanupPort {
-  readonly mode = 'delete' as const
+  readonly mode: BranchSessionCleanupPort['mode']
   readonly cancelled: string[] = []
   readonly cleaned: string[] = []
 
   constructor(
     private readonly failCancel?: string,
     private readonly failCleanup?: string,
-  ) {}
+    mode: BranchSessionCleanupPort['mode'] = 'delete',
+  ) {
+    this.mode = mode
+  }
 
   async cancel(sessionId: string): Promise<void> {
     this.cancelled.push(sessionId)
@@ -117,6 +120,38 @@ describe('cascade branch deletion', () => {
     expect(sessions.cancelled).toEqual([b11.sessionId])
     expect(sessions.cleaned).toEqual([b111.sessionId, b11.sessionId, b1.sessionId])
     expect(repository.listBranches(tree.treeId).map(record => record.branchId)).toEqual([b2.branchId])
+  })
+
+  it('reports archive cleanup honestly and notifies after every record is hidden', async () => {
+    const repository = await repositoryWith([b1, b11, b111, b2])
+    const sessions = new CleanupPort(undefined, undefined, 'archive')
+    const phases: string[] = []
+    const originalCleanup = sessions.cleanup.bind(sessions)
+    sessions.cleanup = async (sessionId: string) => {
+      phases.push(`archive:${sessionId}`)
+      await originalCleanup(sessionId)
+    }
+    const coordinator = new CascadeDeleteCoordinator(
+      repository,
+      sessions,
+      () => 100,
+      () => {
+        expect(repository.getBranch(b1.branchId)?.status).toBe('deleted')
+        expect(repository.getBranch(b11.branchId)?.status).toBe('deleted')
+        expect(repository.getBranch(b111.branchId)?.status).toBe('deleted')
+        phases.push('marked')
+      },
+    )
+
+    const result = await coordinator.delete(tree.treeId, b1.branchId)
+
+    expect(result).toMatchObject({ status: 'deleted', cleanupMode: 'archive' })
+    expect(phases[0]).toBe('marked')
+    expect(phases.slice(1)).toEqual([
+      `archive:${b111.sessionId}`,
+      `archive:${b11.sessionId}`,
+      `archive:${b1.sessionId}`,
+    ])
   })
 
   it('does not mark records when cancellation fails', async () => {

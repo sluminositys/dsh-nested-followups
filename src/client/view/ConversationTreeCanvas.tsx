@@ -44,6 +44,7 @@ import {
 import {
   DEFAULT_TREE_VIEW_LABELS,
   type ConversationTreeCanvasProps,
+  type DeleteBranchRequest,
   type TreeViewLabels,
 } from './contracts.ts'
 import { MessageNodeCard } from './MessageNodeCard.tsx'
@@ -117,6 +118,17 @@ export function anchorRangeFromSelection(
     || start >= end
     || end > text.length) return undefined
   return { start, end, text: text.slice(start, end) }
+}
+
+export function deletionConfirmationDescription(
+  labels: TreeViewLabels,
+  impact: { readonly branchCount: number; readonly messageCount: number },
+  mode: 'delete' | 'archive',
+): string {
+  return [
+    labels.deleteDescription(impact.branchCount, impact.messageCount),
+    mode === 'archive' ? labels.deleteArchiveNotice : '',
+  ].filter(Boolean).join(' ')
 }
 
 function nodeStyle(rect: { x: number; y: number; width: number; height: number }): React.CSSProperties {
@@ -283,11 +295,12 @@ export function ConversationTreeCanvas({
   onAskFollowUp,
   onContinueBranch,
   onDeleteBranch,
+  deletionMode = 'delete',
 }: ConversationTreeCanvasProps) {
   const [interaction, dispatch] = useReducer(treeInteractionReducer, undefined, createTreeInteractionState)
   const [transform, setTransform] = useState<ViewportTransform>({ x: 0, y: 0, zoom: 1 })
   const [panning, setPanning] = useState(false)
-  const [deleteBranchId, setDeleteBranchId] = useState<string | null>(null)
+  const [deleteRequest, setDeleteRequest] = useState<DeleteBranchRequest | null>(null)
   const [deletePending, setDeletePending] = useState(false)
   const [deleteFailure, setDeleteFailure] = useState<string | null>(null)
   const [pendingCenterNodeId, setPendingCenterNodeId] = useState<string | null>(null)
@@ -467,9 +480,6 @@ export function ConversationTreeCanvas({
   const composerTargetNode = composerNode?.branchTargetMessageId === undefined
     ? undefined
     : nodesBySessionMessage.get(`${composerNode.sessionId}\u0000${composerNode.branchTargetMessageId}`)
-  const deletionImpact = deleteBranchId === null
-    ? undefined
-    : branchDeleteImpact(projection, deleteBranchId)
   const selectedDetailsBranch = selectedDetails?.branchId === null
     || selectedDetails?.branchId === undefined
     ? undefined
@@ -492,12 +502,12 @@ export function ConversationTreeCanvas({
   }
 
   const confirmDelete = (): void => {
-    if (deleteBranchId === null || deletionImpact === undefined || onDeleteBranch === undefined) return
+    if (deleteRequest === null || onDeleteBranch === undefined) return
     setDeletePending(true)
     setDeleteFailure(null)
-    void onDeleteBranch({ branchId: deleteBranchId, ...deletionImpact }).then(() => {
+    void onDeleteBranch(deleteRequest).then(() => {
       setDeletePending(false)
-      setDeleteBranchId(null)
+      setDeleteRequest(null)
     }, (error: unknown) => {
       setDeletePending(false)
       setDeleteFailure(errorMessage(error))
@@ -672,8 +682,7 @@ export function ConversationTreeCanvas({
                       && node.role === 'assistant'
                       && node.state === 'complete'
                       && branchTailNodeIds.has(node.nodeId)}
-                    canDelete={readOnlyReason === undefined
-                      && firstInBranch
+                    canDelete={firstInBranch
                       && node.branchId !== null
                       && onDeleteBranch !== undefined}
                     onSelect={() => { selectNode(node.nodeId) }}
@@ -693,7 +702,11 @@ export function ConversationTreeCanvas({
                         dispatch({ type: 'branch/toggle', branchId: branch.record.branchId })
                       }
                     }}
-                    onDelete={() => { if (node.branchId !== null) setDeleteBranchId(node.branchId) }}
+                    onDelete={() => {
+                      if (node.branchId === null) return
+                      const impact = branchDeleteImpact(projection, node.branchId)
+                      if (impact !== undefined) setDeleteRequest({ branchId: node.branchId, ...impact })
+                    }}
                   />
                 )
               })}
@@ -797,16 +810,16 @@ export function ConversationTreeCanvas({
         )}
       </div>
       <Modal
-        open={deleteBranchId !== null}
-        onClose={() => { if (!deletePending) setDeleteBranchId(null) }}
+        open={deleteRequest !== null}
+        onClose={() => { if (!deletePending) setDeleteRequest(null) }}
         title={labels.deleteTitle}
         closeLabel={labels.close}
-        {...deletionImpact === undefined ? {} : {
-          description: labels.deleteDescription(deletionImpact.branchCount, deletionImpact.messageCount),
+        {...deleteRequest === null ? {} : {
+          description: deletionConfirmationDescription(labels, deleteRequest, deletionMode),
         }}
         footer={(
           <>
-            <Button variant="ghost" disabled={deletePending} onClick={() => { setDeleteBranchId(null) }}>
+            <Button variant="ghost" disabled={deletePending} onClick={() => { setDeleteRequest(null) }}>
               {labels.cancel}
             </Button>
             <Button variant="primary" disabled={deletePending} onClick={confirmDelete}>

@@ -1,7 +1,17 @@
+import { Context, Service } from '@deepseek-ai/cordis'
+import { SessionId } from '@deepseek-ai/dsh-session'
+
+import type {
+  DeleteBranchRequest,
+  DeleteBranchResult,
+  TreeDeletionCapability,
+} from '../shared/remote.ts'
 import type { BranchRecord } from '../shared/types.ts'
+import { createSessionCleanupAdapter, probeSessionDeletionCapability } from './adapter/session-delete.ts'
+import type { NestedFollowupsMetadataService } from './metadata-service.ts'
 import type { TreeMetadataRepository } from './storage.ts'
 
-export type BranchSessionCleanupMode = 'delete'
+export type BranchSessionCleanupMode = 'delete' | 'archive'
 
 export interface BranchSessionCleanupPort {
   readonly mode: BranchSessionCleanupMode
@@ -115,6 +125,7 @@ export class CascadeDeleteCoordinator {
     private readonly repository: TreeMetadataRepository,
     private readonly sessions: BranchSessionCleanupPort,
     private readonly now: () => number = Date.now,
+    private readonly onMarked: () => void = () => {},
   ) {}
 
   async delete(
@@ -154,6 +165,7 @@ export class CascadeDeleteCoordinator {
         deletedAt: branch.deletedAt ?? deletedAt,
       })
     }
+    this.onMarked()
 
     for (const branch of plan.branches) {
       try {
@@ -179,5 +191,110 @@ export class CascadeDeleteCoordinator {
       visibleMessageCount: plan.visibleMessageCount,
       cleanupMode: this.sessions.mode,
     }
+  }
+}
+
+declare module '@deepseek-ai/cordis' {
+  interface Context {
+    nestedFollowupsDeletion: NestedFollowupsDeleteService
+  }
+}
+
+function deleteFailure(
+  code: 'compatibility' | 'tree-mismatch' | 'cancel-failed' | 'cleanup-pending',
+  message: string,
+): DeleteBranchResult {
+  return Object.freeze({ ok: false, error: Object.freeze({ code, message }) })
+}
+
+/** Host owner for spec-compliant two-phase branch cleanup. */
+export class NestedFollowupsDeleteService extends Service {
+  static inject = ['agents', 'nestedFollowupsMetadata']
+
+  constructor(ctx: Context) {
+    super(ctx, 'nestedFollowupsDeletion')
+  }
+
+  capabilities(): TreeDeletionCapability {
+    const capability = probeSessionDeletionCapability(this.ctx)
+    return capability.supported
+      ? Object.freeze({ supported: true, mode: capability.mode })
+      : Object.freeze({ supported: false, reason: capability.reason })
+  }
+
+  async deleteBranch(
+    request: DeleteBranchRequest,
+    visibleMessagesByBranch: ReadonlyMap<string, number>,
+  ): Promise<DeleteBranchResult> {
+    const cleanup = createSessionCleanupAdapter(this.ctx)
+    if (cleanup === undefined) {
+      const capability = probeSessionDeletionCapability(this.ctx)
+      return deleteFailure(
+        'compatibility',
+        capability.supported ? 'Branch cleanup is unavailable.' : capability.reason,
+      )
+    }
+    const repository = this.metadata.repository
+    const ownerBranch = repository.getBranchBySession(request.ownerSessionId)
+    const tree = ownerBranch === undefined
+      ? repository.getTreeByRootSession(request.ownerSessionId)
+      : repository.getTree(ownerBranch.treeId)
+    if (tree === undefined) {
+      return deleteFailure('tree-mismatch', 'the requested conversation does not own a follow-up tree')
+    }
+    const target = repository.getBranch(request.branchId)
+    if (target !== undefined && target.treeId !== tree.treeId) {
+      return deleteFailure('tree-mismatch', 'the requested branch belongs to another conversation tree')
+    }
+
+    const sessions: BranchSessionCleanupPort = {
+      mode: cleanup.mode,
+      cancel: async (sessionId) => {
+        const agent = this.ctx.agents.get(SessionId(sessionId))
+        if (agent === undefined || agent.status === 'idle') return
+        agent.cancel({ kind: 'user' })
+        await agent.whenIdle()
+      },
+      cleanup: sessionId => cleanup.cleanup(sessionId),
+    }
+    const coordinator = new CascadeDeleteCoordinator(
+      repository,
+      sessions,
+      Date.now,
+      () => { this.notify(tree.rootSessionId) },
+    )
+    let result: CascadeDeletionResult
+    try {
+      result = await coordinator.delete(tree.treeId, request.branchId, visibleMessagesByBranch)
+    } catch (error: unknown) {
+      if (error instanceof BranchDeletionError && error.code === 'cancel-failed') {
+        return deleteFailure('cancel-failed', error.message)
+      }
+      throw error
+    }
+    this.notify(tree.rootSessionId)
+    if (result.status === 'cleanup-pending') {
+      return deleteFailure(
+        'cleanup-pending',
+        `The branch is hidden, but cleanup of Session '${result.failedSessionId}' failed: ${result.message}`,
+      )
+    }
+    return Object.freeze({
+      ok: true,
+      value: Object.freeze({
+        status: result.status,
+        branchCount: result.branchCount,
+        visibleMessageCount: result.visibleMessageCount,
+        cleanupMode: result.cleanupMode,
+      }),
+    })
+  }
+
+  private get metadata(): NestedFollowupsMetadataService {
+    return this.ctx.nestedFollowupsMetadata
+  }
+
+  private notify(rootSessionId: string): void {
+    this.ctx.emit('nested-followups/change', rootSessionId)
   }
 }

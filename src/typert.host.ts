@@ -30,6 +30,13 @@ export const TYPERT = {
         },
         {
           kind: 'method',
+          name: 'deleteBranch',
+          signature: 'deleteBranch(request: DeleteBranchRequest): Promise<DeleteBranchResult>',
+          summary: 'Delete one branch subtree.',
+          jsDoc: '/** Delete one branch subtree with two-phase cleanup. */',
+        },
+        {
+          kind: 'method',
           name: 'readTree',
           signature: 'async readTree(request: TreeReadRequest): Promise<TreeReadResult>',
           summary: 'Read one complete tree projection.',

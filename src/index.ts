@@ -1,6 +1,7 @@
 import type { Context } from '@deepseek-ai/cordis'
 
 import { NestedFollowupsBranchService } from './host/branch-service.ts'
+import { NestedFollowupsDeleteService } from './host/delete-service.ts'
 import { NestedFollowupsMetadataService } from './host/metadata-service.ts'
 import { NestedFollowupsService } from './host/tree-service.ts'
 
@@ -10,6 +11,7 @@ export const inject = ['storageDomain']
 export function apply(ctx: Context): void {
   ctx.plugin(NestedFollowupsMetadataService)
   ctx.plugin(NestedFollowupsBranchService)
+  ctx.plugin(NestedFollowupsDeleteService)
   ctx.plugin(NestedFollowupsService)
 }
 
@@ -19,6 +21,7 @@ export { NestedFollowupsService } from './host/tree-service.ts'
 export {
   BranchDeletionError,
   CascadeDeleteCoordinator,
+  NestedFollowupsDeleteService,
   planCascadeDeletion,
 } from './host/delete-service.ts'
 export { projectConversationTree, displayLabelOf } from './host/projection.ts'
@@ -48,6 +51,8 @@ export {
   probeBranchVisibilityRc7,
 } from './host/adapter/visibility.ts'
 export {
+  createSessionCleanupAdapter,
+  SESSION_ARCHIVE_METHOD,
   SESSION_DELETE_METHOD,
   probeSessionDeletionCapability,
 } from './host/adapter/session-delete.ts'

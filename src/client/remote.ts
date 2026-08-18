@@ -5,6 +5,8 @@ import type {
   BranchCommandResult,
   ContinueBranchRequest,
   CreateBranchRequest,
+  DeleteBranchRequest,
+  DeleteBranchResult,
   TreeReadRequest,
   TreeReadResult,
   TreeWatchRequest,
@@ -16,6 +18,7 @@ export interface NestedFollowupsRemoteNamespace {
   watchTree: (request: TreeWatchRequest) => Promise<RemoteResult<TreeWatchResult>>
   createBranch: (request: CreateBranchRequest) => Promise<RemoteResult<BranchCommandResult>>
   continueBranch: (request: ContinueBranchRequest) => Promise<RemoteResult<BranchCommandResult>>
+  deleteBranch: (request: DeleteBranchRequest) => Promise<RemoteResult<DeleteBranchResult>>
 }
 
 declare module '@deepseek-ai/dsh-typert-protocol' {
@@ -24,6 +27,7 @@ declare module '@deepseek-ai/dsh-typert-protocol' {
     'nestedFollowups/watchTree': NestedFollowupsRemoteNamespace['watchTree']
     'nestedFollowups/createBranch': NestedFollowupsRemoteNamespace['createBranch']
     'nestedFollowups/continueBranch': NestedFollowupsRemoteNamespace['continueBranch']
+    'nestedFollowups/deleteBranch': NestedFollowupsRemoteNamespace['deleteBranch']
   }
 
   interface TypertRemoteNamespaceMap {

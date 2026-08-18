@@ -79,8 +79,16 @@ export interface TreeCapabilities {
   readonly continueBranch: boolean
   /** A future upstream API can make an Open Branch surface writable natively. */
   readonly nativeBranchContinuation: boolean
+  /** Branch cleanup support for this Host composition. */
+  readonly deletion: TreeDeletionCapability
   readonly reason?: string
 }
+
+export type TreeDeletionCapability =
+  | { readonly supported: true; readonly mode: 'delete' | 'archive' }
+  | { readonly supported: false; readonly reason: string }
+
+export type TreeMutationCapabilities = Omit<TreeCapabilities, 'deletion'>
 
 export interface TreeReadRequest {
   readonly sessionId: string
@@ -125,6 +133,11 @@ export interface ContinueBranchRequest {
   readonly question: string
 }
 
+export interface DeleteBranchRequest {
+  readonly ownerSessionId: string
+  readonly branchId: string
+}
+
 export interface BranchCommandValue {
   readonly action: 'create-branch' | 'continue-branch'
   readonly branchId: string
@@ -153,6 +166,30 @@ export type BranchCommandResult =
   | { readonly ok: true; readonly value: BranchCommandValue }
   | { readonly ok: false; readonly error: BranchCommandFailure }
 
+export type DeleteBranchErrorCode =
+  | 'compatibility'
+  | 'tree-mismatch'
+  | 'cancel-failed'
+  | 'cleanup-pending'
+
+export type DeleteBranchResult =
+  | {
+    readonly ok: true
+    readonly value: {
+      readonly status: 'deleted' | 'already-absent'
+      readonly branchCount: number
+      readonly visibleMessageCount: number
+      readonly cleanupMode: 'delete' | 'archive'
+    }
+  }
+  | {
+    readonly ok: false
+    readonly error: {
+      readonly code: DeleteBranchErrorCode
+      readonly message: string
+    }
+  }
+
 export type TreeReadResult =
   | { readonly ok: true; readonly value: TreeSnapshot }
   | { readonly ok: false; readonly error: TreeSessionNotFound }
@@ -172,6 +209,10 @@ export const treeSnapshotSchema = z.object({
     askFollowUp: z.boolean(),
     continueBranch: z.boolean(),
     nativeBranchContinuation: z.boolean(),
+    deletion: z.discriminatedUnion('supported', [
+      z.object({ supported: z.literal(true), mode: z.enum(['delete', 'archive']) }).strict(),
+      z.object({ supported: z.literal(false), reason: z.string().min(1) }).strict(),
+    ]),
     reason: z.string().min(1).optional(),
   }).strict(),
   projection: conversationTreeProjectionSchema,
@@ -214,6 +255,11 @@ export const continueBranchRequestSchema = z.object({
   question: requestText,
 }).strict() as z.ZodType<ContinueBranchRequest>
 
+export const deleteBranchRequestSchema = z.object({
+  ownerSessionId: identifier,
+  branchId: identifier,
+}).strict() as z.ZodType<DeleteBranchRequest>
+
 const branchCommandErrorCodeSchema = z.enum([
   'compatibility',
   'session-not-found',
@@ -245,6 +291,25 @@ export const branchCommandResultSchema = z.discriminatedUnion('ok', [
     }).strict(),
   }).strict(),
 ]) as z.ZodType<BranchCommandResult>
+
+export const deleteBranchResultSchema = z.discriminatedUnion('ok', [
+  z.object({
+    ok: z.literal(true),
+    value: z.object({
+      status: z.enum(['deleted', 'already-absent']),
+      branchCount: nonNegativeSafeInteger,
+      visibleMessageCount: nonNegativeSafeInteger,
+      cleanupMode: z.enum(['delete', 'archive']),
+    }).strict(),
+  }).strict(),
+  z.object({
+    ok: z.literal(false),
+    error: z.object({
+      code: z.enum(['compatibility', 'tree-mismatch', 'cancel-failed', 'cleanup-pending']),
+      message: z.string().min(1),
+    }).strict(),
+  }).strict(),
+]) as z.ZodType<DeleteBranchResult>
 
 const sessionNotFoundSchema = z.object({
   code: z.literal('session-not-found'),

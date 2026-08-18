@@ -11,7 +11,7 @@ import type {
   BranchCommandValue,
   ContinueBranchRequest,
   CreateBranchRequest,
-  TreeCapabilities,
+  TreeMutationCapabilities,
 } from '../shared/remote.ts'
 import type { AnchorRange, BranchRecord, TreeRecord } from '../shared/types.ts'
 import { formatAnchoredQuestion } from '../shared/anchored-question.ts'
@@ -118,7 +118,7 @@ export class NestedFollowupsBranchService extends Service {
     super(ctx, 'nestedFollowupsBranches')
   }
 
-  capabilities(): TreeCapabilities {
+  capabilities(): TreeMutationCapabilities {
     const chatOnly = probeChatOnlyCapabilityRc7(this.ctx)
     const visibility = probeBranchVisibilityRc7(this.ctx)
     const native = probeNativeContinuationCapability(this.ctx)

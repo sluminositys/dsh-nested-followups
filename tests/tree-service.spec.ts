@@ -75,10 +75,11 @@ class MemoryPersistence extends SessionPersistence {
   }
 }
 
-async function setup(options: { branches?: boolean; cold?: boolean } = {}): Promise<{
+async function setup(options: { branches?: boolean; cold?: boolean; deletion?: boolean } = {}): Promise<{
   dispose: () => Promise<void>
   service: NestedFollowupsService
   root: ReturnType<SessionStore['create']>
+  deletionCalls: Array<{ request: { ownerSessionId: string; branchId: string }; counts: Map<string, number> }>
 }> {
   const ctx = new Context()
   const fibers: Fiber[] = []
@@ -142,6 +143,34 @@ async function setup(options: { branches?: boolean; cold?: boolean } = {}): Prom
     fibers.push(branchesFiber)
     await branchesFiber
   }
+  const deletionCalls: Array<{
+    request: { ownerSessionId: string; branchId: string }
+    counts: Map<string, number>
+  }> = []
+  class DeletionStub extends Service {
+    constructor(owner: Context) { super(owner, 'nestedFollowupsDeletion') }
+    capabilities() { return { supported: true as const, mode: 'archive' as const } }
+    async deleteBranch(
+      request: { ownerSessionId: string; branchId: string },
+      counts: ReadonlyMap<string, number>,
+    ) {
+      deletionCalls.push({ request, counts: new Map(counts) })
+      return {
+        ok: true as const,
+        value: {
+          status: 'deleted' as const,
+          branchCount: 1,
+          visibleMessageCount: counts.get(request.branchId) ?? 0,
+          cleanupMode: 'archive' as const,
+        },
+      }
+    }
+  }
+  if (options.deletion === true) {
+    const deletionFiber = ctx.plugin(DeletionStub)
+    fibers.push(deletionFiber)
+    await deletionFiber
+  }
 
   const rootEvents = textTurn(0, 1, 'q1', 'a1', 'root question', 'root answer')
   const branchEvents = [
@@ -186,6 +215,7 @@ async function setup(options: { branches?: boolean; cold?: boolean } = {}): Prom
     },
     service: ctx.nestedFollowups,
     root,
+    deletionCalls,
   }
 }
 
@@ -201,6 +231,10 @@ describe('tree projection Remote service', () => {
         askFollowUp: true,
         continueBranch: true,
         nativeBranchContinuation: false,
+        deletion: {
+          supported: false,
+          reason: 'The branch deletion service is unavailable.',
+        },
       })
       expect(result.value.projection.nodes.map(node => node.messageId)).toEqual([
         'q1',
@@ -304,6 +338,35 @@ describe('tree projection Remote service', () => {
     }
   })
 
+  it('routes deletion through the Host service with projection-derived message counts', async () => {
+    const { dispose, service, deletionCalls } = await setup({ deletion: true })
+    try {
+      const read = await service.readTree({ sessionId: 'root' })
+      expect(read.ok && read.value.capabilities.deletion).toEqual({
+        supported: true,
+        mode: 'archive',
+      })
+      await expect(service.deleteBranch({
+        ownerSessionId: 'root',
+        branchId: 'branch-1',
+      })).resolves.toEqual({
+        ok: true,
+        value: {
+          status: 'deleted',
+          branchCount: 1,
+          visibleMessageCount: 2,
+          cleanupMode: 'archive',
+        },
+      })
+      expect(deletionCalls).toEqual([{
+        request: { ownerSessionId: 'root', branchId: 'branch-1' },
+        counts: new Map([['branch-1', 2]]),
+      }])
+    } finally {
+      await dispose()
+    }
+  })
+
   it('keeps projection reads available when branch mutation services are absent', async () => {
     const { dispose, service } = await setup({ branches: false })
     try {
@@ -312,6 +375,10 @@ describe('tree projection Remote service', () => {
         askFollowUp: false,
         continueBranch: false,
         nativeBranchContinuation: false,
+        deletion: {
+          supported: false,
+          reason: 'The branch deletion service is unavailable.',
+        },
         reason: 'The branch mutation service is unavailable.',
       })
       await expect(service.createBranch({

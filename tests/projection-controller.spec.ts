@@ -13,6 +13,7 @@ function snapshot(revision: number): TreeSnapshot {
       askFollowUp: true,
       continueBranch: true,
       nativeBranchContinuation: false,
+      deletion: { supported: true, mode: 'archive' },
     },
     projection: treeProjectionFixture(),
   }
@@ -41,6 +42,7 @@ describe('tree projection controller', () => {
         .mockImplementation(() => nextWatch.promise),
       createBranch: vi.fn(),
       continueBranch: vi.fn(),
+      deleteBranch: vi.fn(),
     }
     const controller = new TreeProjectionController(remote, 'root')
     const listener = vi.fn()
@@ -66,6 +68,7 @@ describe('tree projection controller', () => {
       watchTree: vi.fn(() => firstWatch.promise),
       createBranch: vi.fn(),
       continueBranch: vi.fn(),
+      deleteBranch: vi.fn(),
     }
     const controller = new TreeProjectionController(remote, 'root')
     const unsubscribe = controller.subscribe(() => {})
@@ -93,6 +96,7 @@ describe('tree projection controller', () => {
         .mockImplementationOnce(() => secondWatch.promise),
       createBranch: vi.fn(),
       continueBranch: vi.fn(),
+      deleteBranch: vi.fn(),
     }
     const controller = new TreeProjectionController(remote, 'root')
     const unsubscribe = controller.subscribe(() => {})

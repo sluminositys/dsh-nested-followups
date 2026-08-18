@@ -27,6 +27,7 @@ export interface ConversationTreeCanvasProps {
   readonly onAskFollowUp?: (request: AskFollowUpRequest) => Promise<void>
   readonly onContinueBranch?: (request: ContinueBranchRequest) => Promise<void>
   readonly onDeleteBranch?: (request: DeleteBranchRequest) => Promise<void>
+  readonly deletionMode?: 'delete' | 'archive'
 }
 
 export interface TreeViewLabels {
@@ -68,6 +69,7 @@ export interface TreeViewLabels {
   readonly deleteTitle: string
   readonly deleteConfirm: string
   readonly deletePending: string
+  readonly deleteArchiveNotice: string
   readonly askPending: string
   readonly continuePending: string
   readonly readonly: string
@@ -115,6 +117,7 @@ export const DEFAULT_TREE_VIEW_LABELS: TreeViewLabels = Object.freeze({
   deleteTitle: 'Delete branch',
   deleteConfirm: 'Delete',
   deletePending: 'Deleting…',
+  deleteArchiveNotice: 'The underlying branch sessions will be archived rather than physically deleted.',
   askPending: 'Sending…',
   continuePending: 'Continuing…',
   readonly: 'Tree View is read-only',

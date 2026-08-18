@@ -44,6 +44,7 @@ export type NestedFollowupsLocaleKey =
   | 'tree.deleteTitle'
   | 'tree.deleteConfirm'
   | 'tree.deletePending'
+  | 'tree.deleteArchiveNotice'
   | 'tree.askPending'
   | 'tree.continuePending'
   | 'tree.readonly'
@@ -101,6 +102,7 @@ export const en: Record<NestedFollowupsLocaleKey, string> = {
   'tree.deleteTitle': 'Delete branch',
   'tree.deleteConfirm': 'Delete',
   'tree.deletePending': 'Deleting…',
+  'tree.deleteArchiveNotice': 'The underlying branch sessions will be archived rather than physically deleted.',
   'tree.askPending': 'Sending…',
   'tree.continuePending': 'Continuing…',
   'tree.readonly': 'Tree View is read-only',
@@ -153,6 +155,7 @@ export const zh: Record<NestedFollowupsLocaleKey, string> = {
   'tree.deleteTitle': '删除分支',
   'tree.deleteConfirm': '删除',
   'tree.deletePending': '正在删除…',
+  'tree.deleteArchiveNotice': '底层分支会话将被归档，而不是物理删除。',
   'tree.askPending': '正在发送…',
   'tree.continuePending': '正在续聊…',
   'tree.readonly': '树状视图当前为只读',
@@ -205,6 +208,7 @@ export function labelsFrom(t: TranslateNS<typeof NS>): TreeViewLabels {
     deleteTitle: t('tree.deleteTitle'),
     deleteConfirm: t('tree.deleteConfirm'),
     deletePending: t('tree.deletePending'),
+    deleteArchiveNotice: t('tree.deleteArchiveNotice'),
     askPending: t('tree.askPending'),
     continuePending: t('tree.continuePending'),
     readonly: t('tree.readonly'),

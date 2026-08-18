@@ -9,6 +9,8 @@ import type {
   BranchCommandResult,
   ContinueBranchRequest,
   CreateBranchRequest,
+  DeleteBranchRequest,
+  DeleteBranchResult,
   TreeReadRequest,
   TreeReadResult,
   TreeSnapshot,
@@ -17,6 +19,7 @@ import type {
 } from '../shared/remote.ts'
 import type { BranchRecord, TreeRecord } from '../shared/types.ts'
 import type { NestedFollowupsBranchService } from './branch-service.ts'
+import type { NestedFollowupsDeleteService } from './delete-service.ts'
 import type { NestedFollowupsMetadataService } from './metadata-service.ts'
 import { projectConversationTree, type SessionLogSnapshot } from './projection.ts'
 
@@ -54,6 +57,13 @@ function mutationUnavailable(): BranchCommandResult {
       code: 'compatibility',
       message: 'Branch creation is unavailable in this DSH composition.',
     }),
+  })
+}
+
+function deletionUnavailable(message = 'Branch cleanup is unavailable in this DSH composition.'): DeleteBranchResult {
+  return Object.freeze({
+    ok: false,
+    error: Object.freeze({ code: 'compatibility', message }),
   })
 }
 
@@ -157,15 +167,20 @@ export class NestedFollowupsService extends TypertRemoteService {
       if (log !== undefined) logs.set(branch.sessionId, log)
     }))
 
+    const mutationCapabilities = this.branches?.capabilities() ?? Object.freeze({
+      askFollowUp: false,
+      continueBranch: false,
+      nativeBranchContinuation: false,
+      reason: 'The branch mutation service is unavailable.',
+    })
+    const deletion = this.deletion?.capabilities() ?? Object.freeze({
+      supported: false as const,
+      reason: 'The branch deletion service is unavailable.',
+    })
     const snapshot: TreeSnapshot = Object.freeze({
       rootSessionId: ownership.rootSessionId,
       revision,
-      capabilities: this.branches?.capabilities() ?? Object.freeze({
-        askFollowUp: false,
-        continueBranch: false,
-        nativeBranchContinuation: false,
-        reason: 'The branch mutation service is unavailable.',
-      }),
+      capabilities: Object.freeze({ ...mutationCapabilities, deletion }),
       projection: projectConversationTree(tree, branches, logs),
     })
     return success(snapshot)
@@ -197,12 +212,41 @@ export class NestedFollowupsService extends TypertRemoteService {
     return Promise.resolve(this.branches?.continueBranch(request) ?? mutationUnavailable())
   }
 
+  /** Delete one complete branch subtree using the advertised cleanup mode. */
+  async deleteBranch(request: DeleteBranchRequest): Promise<DeleteBranchResult> {
+    const deletion = this.deletion
+    if (deletion === undefined) return deletionUnavailable()
+    const read = await this.readTree({ sessionId: request.ownerSessionId })
+    if (!read.ok) {
+      return Object.freeze({
+        ok: false,
+        error: Object.freeze({
+          code: 'tree-mismatch',
+          message: `session '${request.ownerSessionId}' does not own an available conversation tree`,
+        }),
+      })
+    }
+    const visibleMessagesByBranch = new Map<string, number>()
+    for (const node of read.value.projection.nodes) {
+      if (node.branchId === null) continue
+      visibleMessagesByBranch.set(
+        node.branchId,
+        (visibleMessagesByBranch.get(node.branchId) ?? 0) + 1,
+      )
+    }
+    return deletion.deleteBranch(request, visibleMessagesByBranch)
+  }
+
   private get metadata(): NestedFollowupsMetadataService {
     return this.ctx.nestedFollowupsMetadata
   }
 
   private get branches(): NestedFollowupsBranchService | undefined {
     return this.ctx.get('nestedFollowupsBranches')
+  }
+
+  private get deletion(): NestedFollowupsDeleteService | undefined {
+    return this.ctx.get('nestedFollowupsDeletion')
   }
 
   private resolveOwnership(sessionId: string): TreeOwnership {

@@ -2,6 +2,8 @@ import {
   branchCommandResultSchema,
   continueBranchRequestSchema,
   createBranchRequestSchema,
+  deleteBranchRequestSchema,
+  deleteBranchResultSchema,
   treeReadRequestSchema,
   treeReadResultSchema,
   treeWatchRequestSchema,
@@ -54,6 +56,30 @@ export const continueBranchDescriptor = {
     schema: branchCommandResultSchema,
   },
   sourceLocation: { file: 'src/host/tree-service.ts', line: 185, column: 3 },
+} as const
+
+export const deleteBranchDescriptor = {
+  id: 'dsh-nested-followups#nestedFollowups/deleteBranch',
+  service: 'nestedFollowups',
+  namespace: 'nestedFollowups',
+  method: 'deleteBranch',
+  invocation: { kind: 'direct' },
+  parameters: [{
+    name: 'request',
+    wire: 'request',
+    source: 'json',
+    codec: {
+      mode: 'strict',
+      typeSymbol: 'dsh-nested-followups#DeleteBranchRequest',
+      schema: deleteBranchRequestSchema,
+    },
+  }],
+  result: {
+    mode: 'strict',
+    typeSymbol: 'dsh-nested-followups#DeleteBranchResult',
+    schema: deleteBranchResultSchema,
+  },
+  sourceLocation: { file: 'src/host/tree-service.ts', line: 220, column: 3 },
 } as const
 
 export const readTreeDescriptor = {
@@ -109,4 +135,5 @@ export const nestedFollowupsRemoteDescriptors = Object.freeze([
   watchTreeDescriptor,
   createBranchDescriptor,
   continueBranchDescriptor,
+  deleteBranchDescriptor,
 ])

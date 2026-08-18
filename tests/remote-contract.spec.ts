@@ -6,6 +6,8 @@ import {
   branchCommandResultSchema,
   continueBranchRequestSchema,
   createBranchRequestSchema,
+  deleteBranchRequestSchema,
+  deleteBranchResultSchema,
   treeReadRequestSchema,
   treeReadResultSchema,
   treeWatchRequestSchema,
@@ -33,6 +35,7 @@ describe('tree Remote contract', () => {
         askFollowUp: true,
         continueBranch: true,
         nativeBranchContinuation: false,
+        deletion: { supported: true, mode: 'archive' },
       },
       projection: treeProjectionFixture(),
     }
@@ -93,6 +96,19 @@ describe('tree Remote contract', () => {
         messageId: 'request-continue',
       },
     }).ok).toBe(true)
+    expect(deleteBranchRequestSchema.parse({
+      ownerSessionId: 'root',
+      branchId: 'branch-1',
+    })).toEqual({ ownerSessionId: 'root', branchId: 'branch-1' })
+    expect(deleteBranchResultSchema.parse({
+      ok: true,
+      value: {
+        status: 'deleted',
+        branchCount: 3,
+        visibleMessageCount: 9,
+        cleanupMode: 'archive',
+      },
+    }).ok).toBe(true)
   })
 
   it('publishes stable direct-method descriptors for the Typert loader', () => {
@@ -125,6 +141,12 @@ describe('tree Remote contract', () => {
         service: 'nestedFollowups',
         namespace: 'nestedFollowups',
         method: 'continueBranch',
+        invocation: 'direct',
+      },
+      {
+        service: 'nestedFollowups',
+        namespace: 'nestedFollowups',
+        method: 'deleteBranch',
         invocation: 'direct',
       },
     ])

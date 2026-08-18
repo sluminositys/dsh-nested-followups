@@ -11,7 +11,7 @@ import {
 } from './optimistic-projection.ts'
 import type { TreeProjectionView } from './projection-controller.ts'
 import { ConversationTreeCanvas } from './view/ConversationTreeCanvas.tsx'
-import type { AskFollowUpRequest, ContinueBranchRequest } from './view/contracts.ts'
+import type { AskFollowUpRequest, ContinueBranchRequest, DeleteBranchRequest } from './view/contracts.ts'
 import css from './view/ConversationTreeCanvas.module.css'
 
 export interface ConversationTreeViewInjected {
@@ -19,6 +19,7 @@ export interface ConversationTreeViewInjected {
   readonly ensure: () => Promise<boolean>
   readonly askFollowUp: (request: AskFollowUpRequest) => Promise<void>
   readonly continueBranch: (request: ContinueBranchRequest) => Promise<void>
+  readonly deleteBranch: (request: DeleteBranchRequest) => Promise<void>
 }
 
 export type ConversationTreeViewProps =
@@ -31,6 +32,7 @@ export function ConversationTreeView({
   ensure,
   askFollowUp,
   continueBranch,
+  deleteBranch,
   t,
 }: ConversationTreeViewProps) {
   const view = useTreeProjection(state => state)
@@ -118,6 +120,10 @@ export function ConversationTreeView({
         : { readOnlyReason: t('tree.readonlyReason') }}
       {...view.snapshot.capabilities.askFollowUp ? { onAskFollowUp: submitFollowUp } : {}}
       {...view.snapshot.capabilities.continueBranch ? { onContinueBranch: submitContinuation } : {}}
+      {...view.snapshot.capabilities.deletion.supported ? {
+        onDeleteBranch: deleteBranch,
+        deletionMode: view.snapshot.capabilities.deletion.mode,
+      } : {}}
     />
   )
 }
