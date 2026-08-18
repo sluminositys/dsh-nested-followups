@@ -250,6 +250,76 @@ function projection(
 }
 
 describe('Host branch commands', () => {
+  it('persists a UTF-16 text anchor and sends its quote only to the branch', async () => {
+    const runtime = await setup()
+    try {
+      const rootEventCount = runtime.root.events.length
+      const request = {
+        ownerSessionId: 'root',
+        clientRequestId: 'request-text-anchor',
+        anchor: {
+          sessionId: 'root',
+          messageId: 'a1',
+          seq: 3,
+          range: { start: 0, end: 4, text: 'root' },
+        },
+        question: 'What does this word mean?',
+      } as const
+
+      const created = await runtime.service.createBranch(request)
+      expect(created.ok).toBe(true)
+      if (!created.ok) return
+      const record = runtime.repository.getBranch(created.value.branchId)
+      expect(record?.anchorRange).toEqual(request.anchor.range)
+
+      const branchSession = runtime.ctx.sessions.get(SessionId(created.value.sessionId))
+      if (branchSession === undefined) throw new Error('branch session missing')
+      const delivered = branchSession.events.find((event): event is SessionEvent<'user/message'> =>
+        event.type === 'user/message' && String(event.data.id) === request.clientRequestId)
+      expect(delivered?.data.content).toEqual([
+        { type: 'text', text: '> root\n\nWhat does this word mean?' },
+      ])
+      expect(runtime.root.events).toHaveLength(rootEventCount)
+
+      const projected = projection(runtime.repository, runtime.root, runtime.ctx)
+      expect(projected.branches[0]?.anchorStatus).toBe('range-valid')
+      expect(projected.nodes.find(node => node.messageId === request.clientRequestId))
+        .toEqual(expect.objectContaining({
+          text: request.question,
+          summary: request.question,
+        }))
+
+      const repeated = await runtime.service.createBranch(request)
+      expect(repeated).toEqual(created)
+      expect(branchSession.events.filter(event =>
+        event.type === 'user/message' && String(event.data.id) === request.clientRequestId))
+        .toHaveLength(1)
+    } finally {
+      await runtime.dispose()
+    }
+  })
+
+  it('rejects an empty or stale text selection before creating a branch', async () => {
+    const runtime = await setup()
+    try {
+      for (const range of [
+        { start: 0, end: 0, text: '' },
+        { start: 0, end: 4, text: 'stale' },
+      ]) {
+        const result = await runtime.service.createBranch({
+          ownerSessionId: 'root',
+          clientRequestId: `invalid-${range.text || 'empty'}`,
+          anchor: { sessionId: 'root', messageId: 'a1', seq: 3, range },
+          question: 'must not be sent',
+        })
+        expect(result).toMatchObject({ ok: false, error: { code: 'anchor-invalid' } })
+      }
+      expect(runtime.repository.listBranches('root')).toEqual([])
+    } finally {
+      await runtime.dispose()
+    }
+  })
+
   it('recovers a forked session whose first prompt failed without duplicating the branch', async () => {
     const runtime = await setup()
     try {

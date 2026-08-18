@@ -31,7 +31,10 @@ vi.mock('@deepseek-ai/dsh-client-ui-primitives', async () => {
   }
 })
 
-import { ConversationTreeCanvas } from '../src/client/view/ConversationTreeCanvas.tsx'
+import {
+  anchorRangeFromSelection,
+  ConversationTreeCanvas,
+} from '../src/client/view/ConversationTreeCanvas.tsx'
 import { treeProjectionFixture } from './fixtures/tree-projection.ts'
 
 function count(markup: string, fragment: string): number {
@@ -87,6 +90,38 @@ describe('conversation tree canvas', () => {
     expect(count(markup, 'aria-label="Ask follow-up"')).toBe(6)
     expect(count(markup, 'aria-label="Continue this branch"')).toBe(3)
     expect(markup).not.toContain('Open branch')
+  })
+
+  it('uses raw Markdown UTF-16 offsets and renders a valid branch quote', () => {
+    expect(anchorRangeFromSelection('😀 markdown', 0, 2)).toEqual({
+      start: 0,
+      end: 2,
+      text: '😀',
+    })
+    expect(anchorRangeFromSelection('😀 markdown', 0, 1)).toEqual({
+      start: 0,
+      end: 1,
+      text: '\ud83d',
+    })
+    expect(anchorRangeFromSelection('text', 2, 2)).toBeUndefined()
+
+    const base = treeProjectionFixture()
+    const projection = {
+      ...base,
+      branches: base.branches.map(branch => branch.record.branchId === 'branch-1'
+        ? {
+            ...branch,
+            record: {
+              ...branch.record,
+              anchorRange: { start: 0, end: 6, text: 'second' },
+            },
+            anchorStatus: 'range-valid' as const,
+          }
+        : branch),
+    }
+    const markup = renderToStaticMarkup(createElement(ConversationTreeCanvas, { projection }))
+    expect(markup).toContain('aria-label="Quoted source"')
+    expect(markup).toContain('second')
   })
 
   it('uses DSH theme tokens instead of fixed color literals', () => {

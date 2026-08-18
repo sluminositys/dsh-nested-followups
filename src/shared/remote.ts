@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-import { branchRecordSchema, treeRecordSchema } from './schema.ts'
+import { anchorRangeSchema, branchRecordSchema, treeRecordSchema } from './schema.ts'
 import type { ConversationTreeProjection, ProjectionDiagnostic } from './projection.ts'
 import type { MessageNodeView } from './types.ts'
 
@@ -190,11 +190,7 @@ export const branchAnchorRequestSchema = z.object({
   sessionId: identifier,
   messageId: identifier,
   seq: nonNegativeSafeInteger,
-  range: z.object({
-    start: nonNegativeSafeInteger,
-    end: nonNegativeSafeInteger,
-    text: z.string(),
-  }).strict().optional(),
+  range: anchorRangeSchema.optional(),
 }).strict() as z.ZodType<BranchAnchorRequest>
 
 export const createBranchRequestSchema = z.object({

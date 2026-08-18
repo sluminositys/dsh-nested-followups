@@ -18,7 +18,7 @@ import {
   Modal,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import { displayLabelOf } from '../../shared/labels.ts'
-import type { MessageNodeView } from '../../shared/types.ts'
+import type { AnchorRange, MessageNodeView } from '../../shared/types.ts'
 import {
   centerOf,
   type Point,
@@ -104,6 +104,20 @@ function branchFirstNodeIds(
   return new Set(branches.flatMap(branch => branch.nodeIds[0] === undefined ? [] : [branch.nodeIds[0]]))
 }
 
+/** DOM textarea offsets and persisted Markdown offsets are both UTF-16 code units. */
+export function anchorRangeFromSelection(
+  text: string,
+  start: number,
+  end: number,
+): AnchorRange | undefined {
+  if (!Number.isSafeInteger(start)
+    || !Number.isSafeInteger(end)
+    || start < 0
+    || start >= end
+    || end > text.length) return undefined
+  return { start, end, text: text.slice(start, end) }
+}
+
 function nodeStyle(rect: { x: number; y: number; width: number; height: number }): React.CSSProperties {
   return { left: rect.x, top: rect.y, width: rect.width, height: rect.height }
 }
@@ -111,10 +125,14 @@ function nodeStyle(rect: { x: number; y: number; width: number; height: number }
 function MessageDetails({
   node,
   labels,
+  quote,
+  quoteInvalid,
   onClose,
 }: {
   readonly node: MessageNodeView
   readonly labels: TreeViewLabels
+  readonly quote?: string
+  readonly quoteInvalid: boolean
   readonly onClose: () => void
 }) {
   return (
@@ -126,6 +144,10 @@ function MessageDetails({
         </button>
       </header>
       <div className={css.detailsContent}>
+        {quote !== undefined && (
+          <blockquote className={css.anchorQuote} aria-label={labels.quoteSelected}>{quote}</blockquote>
+        )}
+        {quoteInvalid && <p className={css.invalidQuote} role="status">{labels.quoteInvalid}</p>}
         {node.role === 'assistant'
           ? <MarkdownText text={node.text} streaming={node.state === 'streaming'} />
           : <MessageText text={node.text} />}
@@ -146,10 +168,11 @@ function FollowUpComposer({
   readonly mode: 'ask' | 'continue'
   readonly labels: TreeViewLabels
   readonly style: React.CSSProperties
-  readonly submit: (text: string) => Promise<void>
+  readonly submit: (text: string, anchorRange?: AnchorRange) => Promise<void>
   readonly close: () => void
 }) {
   const [draft, setDraft] = useState('')
+  const [anchorRange, setAnchorRange] = useState<AnchorRange | undefined>()
   const [pending, setPending] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
   const onSubmit = (event: FormEvent<HTMLFormElement>): void => {
@@ -158,7 +181,7 @@ function FollowUpComposer({
     if (question === '' || pending) return
     setPending(true)
     setFailure(null)
-    void submit(question).then(() => {
+    void submit(question, mode === 'ask' ? anchorRange : undefined).then(() => {
       setPending(false)
       close()
     }, (error: unknown) => {
@@ -178,6 +201,40 @@ function FollowUpComposer({
         if (event.key === 'Escape' && !pending) close()
       }}
     >
+      {mode === 'ask' && node.text.length > 0 && (
+        <label className={css.quoteSelector}>
+          <span>{labels.quoteSource}</span>
+          <textarea
+            className={css.quoteSource}
+            rows={4}
+            value={node.text}
+            readOnly
+            disabled={pending}
+            aria-label={labels.quoteSource}
+            onSelect={(event) => {
+              setAnchorRange(anchorRangeFromSelection(
+                node.text,
+                event.currentTarget.selectionStart,
+                event.currentTarget.selectionEnd,
+              ))
+            }}
+          />
+        </label>
+      )}
+      {anchorRange !== undefined && (
+        <div className={css.selectedQuote} data-tree-scroll="true">
+          <span>{labels.quoteSelected}</span>
+          <blockquote>{anchorRange.text}</blockquote>
+          <button
+            type="button"
+            className={css.clearQuote}
+            disabled={pending}
+            onClick={() => { setAnchorRange(undefined) }}
+          >
+            {labels.clearQuote}
+          </button>
+        </div>
+      )}
       <textarea
         autoFocus
         className={css.followUpInput}
@@ -187,6 +244,11 @@ function FollowUpComposer({
         placeholder={mode === 'ask' ? labels.followUpPlaceholder : labels.continuePlaceholder}
         aria-label={mode === 'ask' ? labels.followUpPlaceholder : labels.continuePlaceholder}
         onChange={event => { setDraft(event.target.value) }}
+        onKeyDown={(event) => {
+          if (event.key !== 'Enter' || event.shiftKey || event.nativeEvent.isComposing) return
+          event.preventDefault()
+          event.currentTarget.form?.requestSubmit()
+        }}
       />
       {failure !== null && <p className={css.inlineError} role="alert">{failure}</p>}
       <div className={css.composerActions}>
@@ -341,6 +403,12 @@ export function ConversationTreeCanvas({
   const deletionImpact = deleteBranchId === null
     ? undefined
     : branchDeleteImpact(projection, deleteBranchId)
+  const selectedDetailsBranch = selectedDetails?.branchId === null
+    || selectedDetails?.branchId === undefined
+    ? undefined
+    : branches.get(selectedDetails.branchId)
+  const selectedDetailsIsBranchFirst = selectedDetails !== undefined
+    && selectedDetailsBranch?.nodeIds[0] === selectedDetails.nodeId
 
   const selectNode = (nodeId: string): void => {
     const alreadyOpen = interaction.selectedNodeId === nodeId && interaction.expandedNodeIds.has(nodeId)
@@ -497,6 +565,10 @@ export function ConversationTreeCanvas({
                 const branch = node.branchId === null ? undefined : branches.get(node.branchId)
                 const firstInBranch = firstNodeIds.has(node.nodeId)
                 const focused = interaction.focusedNodeId === node.nodeId
+                const quote = firstInBranch && branch?.anchorStatus === 'range-valid'
+                  ? branch.record.anchorRange?.text
+                  : undefined
+                const quoteInvalid = firstInBranch && branch?.anchorStatus === 'range-invalid'
                 return (
                   <MessageNodeCard
                     key={node.nodeId}
@@ -509,6 +581,8 @@ export function ConversationTreeCanvas({
                     dimmed={focus.dimmedNodeIds.has(node.nodeId)}
                     root={node.branchId === null}
                     firstInBranch={firstInBranch}
+                    {...quote === undefined ? {} : { quote }}
+                    quoteInvalid={quoteInvalid}
                     canAsk={readOnlyReason === undefined
                       && onAskFollowUp !== undefined
                       && node.role === 'assistant'
@@ -575,8 +649,12 @@ export function ConversationTreeCanvas({
                       ? composerLayout.rect.y + 18
                       : composerLayout.rect.y + composerLayout.rect.height + 24,
                   }}
-                  submit={question => composerMode === 'ask'
-                    ? onAskFollowUp!({ anchor: composerNode, question })
+                  submit={(question, anchorRange) => composerMode === 'ask'
+                    ? onAskFollowUp!({
+                      anchor: composerNode,
+                      question,
+                      ...(anchorRange === undefined ? {} : { anchorRange }),
+                    })
                     : onContinueBranch!({ tail: composerNode, question })}
                   close={() => { dispatch({ type: 'composer/close' }) }}
                 />
@@ -609,6 +687,13 @@ export function ConversationTreeCanvas({
           <MessageDetails
             node={selectedDetails}
             labels={labels}
+            {...selectedDetailsIsBranchFirst
+              && selectedDetailsBranch?.anchorStatus === 'range-valid'
+              && selectedDetailsBranch.record.anchorRange !== undefined
+              ? { quote: selectedDetailsBranch.record.anchorRange.text }
+              : {}}
+            quoteInvalid={selectedDetailsIsBranchFirst
+              && selectedDetailsBranch?.anchorStatus === 'range-invalid'}
             onClose={() => {
               dispatch({ type: 'node/toggle-expanded', nodeId: selectedDetails.nodeId })
               dispatch({ type: 'selection/set', nodeId: undefined })

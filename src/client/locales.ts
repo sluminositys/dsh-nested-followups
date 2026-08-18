@@ -34,6 +34,10 @@ export type NestedFollowupsLocaleKey =
   | 'tree.emptyDescription'
   | 'tree.followUpPlaceholder'
   | 'tree.continuePlaceholder'
+  | 'tree.quoteSource'
+  | 'tree.quoteSelected'
+  | 'tree.clearQuote'
+  | 'tree.quoteInvalid'
   | 'tree.send'
   | 'tree.cancel'
   | 'tree.deleteTitle'
@@ -86,6 +90,10 @@ export const en: Record<NestedFollowupsLocaleKey, string> = {
   'tree.emptyDescription': 'Messages appear here after the conversation begins.',
   'tree.followUpPlaceholder': 'Ask a follow-up about this message…',
   'tree.continuePlaceholder': 'Add the next turn to this branch…',
+  'tree.quoteSource': 'Select source text to quote (optional)',
+  'tree.quoteSelected': 'Quoted source',
+  'tree.clearQuote': 'Clear quote',
+  'tree.quoteInvalid': 'The quoted source changed; this branch now anchors to the whole message.',
   'tree.send': 'Send',
   'tree.cancel': 'Cancel',
   'tree.deleteTitle': 'Delete branch',
@@ -133,6 +141,10 @@ export const zh: Record<NestedFollowupsLocaleKey, string> = {
   'tree.emptyDescription': '会话开始后，消息会显示在这里。',
   'tree.followUpPlaceholder': '针对这条消息创建一个新的子分支…',
   'tree.continuePlaceholder': '向当前分支追加下一轮…',
+  'tree.quoteSource': '可选：在原始文本中选择要引用的内容',
+  'tree.quoteSelected': '引用内容',
+  'tree.clearQuote': '清除引用',
+  'tree.quoteInvalid': '引用原文已发生变化；该分支现已降级为整条消息锚点。',
   'tree.send': '发送',
   'tree.cancel': '取消',
   'tree.deleteTitle': '删除分支',
@@ -180,6 +192,10 @@ export function labelsFrom(t: TranslateNS<typeof NS>): TreeViewLabels {
     emptyDescription: t('tree.emptyDescription'),
     followUpPlaceholder: t('tree.followUpPlaceholder'),
     continuePlaceholder: t('tree.continuePlaceholder'),
+    quoteSource: t('tree.quoteSource'),
+    quoteSelected: t('tree.quoteSelected'),
+    clearQuote: t('tree.clearQuote'),
+    quoteInvalid: t('tree.quoteInvalid'),
     send: t('tree.send'),
     cancel: t('tree.cancel'),
     deleteTitle: t('tree.deleteTitle'),

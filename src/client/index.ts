@@ -53,7 +53,7 @@ export async function apply(ctx: ClientContext): Promise<() => Promise<void>> {
       return {
         hooks: { treeProjection: controller },
         ensure: () => controller.ensure(),
-        askFollowUp: async ({ anchor, question }) => {
+        askFollowUp: async ({ anchor, question, anchorRange }) => {
           const result = await ctx.remote.nestedFollowups.createBranch({
             ownerSessionId: String(sessionId),
             clientRequestId: crypto.randomUUID(),
@@ -61,6 +61,7 @@ export async function apply(ctx: ClientContext): Promise<() => Promise<void>> {
               sessionId: anchor.sessionId,
               messageId: anchor.messageId,
               seq: anchor.seq,
+              ...(anchorRange === undefined ? {} : { range: anchorRange }),
             },
             question,
           })

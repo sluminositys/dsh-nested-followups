@@ -24,6 +24,8 @@ interface MessageNodeCardProps {
   readonly dimmed: boolean
   readonly root: boolean
   readonly firstInBranch: boolean
+  readonly quote?: string
+  readonly quoteInvalid: boolean
   readonly canAsk: boolean
   readonly canContinue: boolean
   readonly canDelete: boolean
@@ -67,6 +69,8 @@ export function MessageNodeCard({
   dimmed,
   root,
   firstInBranch,
+  quote,
+  quoteInvalid,
   canAsk,
   canContinue,
   canDelete,
@@ -109,6 +113,10 @@ export function MessageNodeCard({
         <span className={css.nodeRole}>{role}</span>
         <time className={css.nodeTime} dateTime={new Date(node.time).toISOString()}>{timestamp}</time>
       </header>
+      {quote !== undefined && (
+        <blockquote className={css.anchorQuote} aria-label={labels.quoteSelected}>{quote}</blockquote>
+      )}
+      {quoteInvalid && <p className={css.invalidQuote} role="status">{labels.quoteInvalid}</p>}
       <p className={css.nodeSummary}>{node.summary}</p>
       <footer className={css.nodeFooter}>
         <span className={css.nodeStatus} title={status}>

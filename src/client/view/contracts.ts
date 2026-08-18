@@ -1,9 +1,10 @@
 import type { ConversationTreeProjection } from '../../shared/projection.ts'
-import type { MessageNodeView } from '../../shared/types.ts'
+import type { AnchorRange, MessageNodeView } from '../../shared/types.ts'
 
 export interface AskFollowUpRequest {
   readonly anchor: MessageNodeView
   readonly question: string
+  readonly anchorRange?: AnchorRange
 }
 
 export interface ContinueBranchRequest {
@@ -55,6 +56,10 @@ export interface TreeViewLabels {
   readonly emptyDescription: string
   readonly followUpPlaceholder: string
   readonly continuePlaceholder: string
+  readonly quoteSource: string
+  readonly quoteSelected: string
+  readonly clearQuote: string
+  readonly quoteInvalid: string
   readonly send: string
   readonly cancel: string
   readonly deleteTitle: string
@@ -97,6 +102,10 @@ export const DEFAULT_TREE_VIEW_LABELS: TreeViewLabels = Object.freeze({
   emptyDescription: 'Messages appear here after the conversation begins.',
   followUpPlaceholder: 'Ask a follow-up about this message…',
   continuePlaceholder: 'Add the next turn to this branch…',
+  quoteSource: 'Select source text to quote (optional)',
+  quoteSelected: 'Quoted source',
+  clearQuote: 'Clear quote',
+  quoteInvalid: 'The quoted source changed; this branch now anchors to the whole message.',
   send: 'Send',
   cancel: 'Cancel',
   deleteTitle: 'Delete branch',

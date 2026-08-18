@@ -51,9 +51,25 @@ describe('tree Remote contract', () => {
     expect(createBranchRequestSchema.parse({
       ownerSessionId: 'root',
       clientRequestId: 'request-create',
-      anchor: { sessionId: 'root', messageId: 'a2', seq: 3 },
+      anchor: {
+        sessionId: 'root',
+        messageId: 'a2',
+        seq: 3,
+        range: { start: 0, end: 2, text: '😀' },
+      },
       question: 'why?',
-    }).anchor.messageId).toBe('a2')
+    }).anchor.range).toEqual({ start: 0, end: 2, text: '😀' })
+    expect(() => createBranchRequestSchema.parse({
+      ownerSessionId: 'root',
+      clientRequestId: 'request-empty-range',
+      anchor: {
+        sessionId: 'root',
+        messageId: 'a2',
+        seq: 3,
+        range: { start: 1, end: 1, text: '' },
+      },
+      question: 'why?',
+    })).toThrow()
     expect(continueBranchRequestSchema.parse({
       ownerSessionId: 'root',
       clientRequestId: 'request-continue',

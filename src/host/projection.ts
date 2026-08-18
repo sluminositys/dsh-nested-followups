@@ -8,6 +8,7 @@ import type {
   TreeEdgeView,
 } from '../shared/projection.ts'
 import type { AnchorRange, BranchRecord, MessageNodeState, MessageNodeView, TreeRecord } from '../shared/types.ts'
+import { extractAnchoredQuestion } from '../shared/anchored-question.ts'
 
 export { displayLabelOf } from '../shared/labels.ts'
 export type {
@@ -382,6 +383,17 @@ export function projectConversationTree(
         })
       }
       branchNodes = nodesForSession(tree.treeId, branch.branchId, branchPath, log, branch.seedLength)
+      const firstQuestion = branchNodes[0]
+      if (firstQuestion?.role === 'user' && branch.anchorRange !== undefined) {
+        const visibleQuestion = extractAnchoredQuestion(firstQuestion.text, branch.anchorRange)
+        if (visibleQuestion !== firstQuestion.text) {
+          branchNodes[0] = {
+            ...firstQuestion,
+            text: visibleQuestion,
+            summary: summarizeMessage(visibleQuestion, 'user'),
+          }
+        }
+      }
       nodes.push(...branchNodes)
       edges.push(...sequenceEdges(branchNodes))
       for (const node of branchNodes) nodesByMessage.set(messageKey(node.sessionId, node.messageId), node)

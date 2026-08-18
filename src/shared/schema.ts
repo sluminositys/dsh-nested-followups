@@ -20,9 +20,9 @@ export const anchorRangeSchema = z.object({
   start: nonNegativeSafeInteger,
   end: nonNegativeSafeInteger,
   text: z.string(),
-}).strict().refine(range => range.end >= range.start, {
+}).strict().refine(range => range.end > range.start, {
   path: ['end'],
-  message: 'anchor range end must not precede start',
+  message: 'anchor range must contain at least one UTF-16 code unit',
 }) as z.ZodType<AnchorRange>
 
 export const treeRecordSchema = z.object({

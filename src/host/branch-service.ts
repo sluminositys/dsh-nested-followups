@@ -14,6 +14,7 @@ import type {
   TreeCapabilities,
 } from '../shared/remote.ts'
 import type { AnchorRange, BranchRecord, TreeRecord } from '../shared/types.ts'
+import { formatAnchoredQuestion } from '../shared/anchored-question.ts'
 import {
   ChatOnlyCapabilityError,
   createChatOnlyForkAgentRc7,
@@ -197,6 +198,7 @@ export class NestedFollowupsBranchService extends Service {
       )
     }
     const anchorRange = this.validateRange(request.anchor.range, source.events, boundary)
+    const prompt = formatAnchoredQuestion(request.question, anchorRange)
     const existing = this.metadata.repository.getBranchByClientRequest(
       tree.treeId,
       request.clientRequestId,
@@ -207,7 +209,7 @@ export class NestedFollowupsBranchService extends Service {
         existing,
         source.header,
         boundary.seed,
-        request.question,
+        prompt,
         tree.rootSessionId,
       )
     }
@@ -262,7 +264,7 @@ export class NestedFollowupsBranchService extends Service {
     try {
       const messageId = submitChatOnlyTurnRc7(
         handle.agent,
-        request.question,
+        prompt,
         request.clientRequestId,
       )
       void this.observeSettlement(handle.agent, branchId, tree.rootSessionId)
@@ -417,7 +419,7 @@ export class NestedFollowupsBranchService extends Service {
     branch: BranchRecord,
     sourceHeader: SessionHeader,
     seed: readonly SessionEvent[],
-    question: string,
+    prompt: string,
     rootSessionId: string,
   ): Promise<BranchCommandResult> {
     let snapshot: SessionSnapshot | undefined
@@ -431,7 +433,7 @@ export class NestedFollowupsBranchService extends Service {
       this.assertBranchHeader(branch, snapshot.header)
       const duplicate = userMessageById(snapshot.events, branch.clientRequestId)
       if (duplicate !== undefined) {
-        if (messageText(duplicate.data.content) !== question) {
+        if (messageText(duplicate.data.content) !== prompt) {
           throw new BranchCommandError(
             'request-conflict',
             `client request '${branch.clientRequestId}' was already used with different content`,
@@ -475,7 +477,7 @@ export class NestedFollowupsBranchService extends Service {
     await this.metadata.repository.putBranch({ ...branch, status: 'running' })
     this.notify(rootSessionId)
     try {
-      const messageId = submitChatOnlyTurnRc7(agent, question, branch.clientRequestId)
+      const messageId = submitChatOnlyTurnRc7(agent, prompt, branch.clientRequestId)
       void this.observeSettlement(agent, branch.branchId, rootSessionId)
       return commandSuccess({
         action: 'create-branch',
@@ -558,7 +560,7 @@ export class NestedFollowupsBranchService extends Service {
       event.type === 'assistant/message' && String(event.data.message.id) === boundary.anchorMessageId)
     const text = selected === undefined ? undefined : messageText(selected.data.message.content)
     if (text === undefined
-      || range.start > range.end
+      || range.start >= range.end
       || range.end > text.length
       || text.slice(range.start, range.end) !== range.text) {
       throw new BranchCommandError('anchor-invalid', 'the selected text range no longer matches the persisted Markdown source')
