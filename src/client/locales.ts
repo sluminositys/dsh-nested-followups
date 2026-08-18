@@ -38,6 +38,7 @@ export type NestedFollowupsLocaleKey =
   | 'tree.quoteSelected'
   | 'tree.clearQuote'
   | 'tree.quoteInvalid'
+  | 'tree.snapToTurnTail'
   | 'tree.send'
   | 'tree.cancel'
   | 'tree.deleteTitle'
@@ -94,6 +95,7 @@ export const en: Record<NestedFollowupsLocaleKey, string> = {
   'tree.quoteSelected': 'Quoted source',
   'tree.clearQuote': 'Clear quote',
   'tree.quoteInvalid': 'The quoted source changed; this branch now anchors to the whole message.',
+  'tree.snapToTurnTail': 'Context will include the completed turn through {label}.',
   'tree.send': 'Send',
   'tree.cancel': 'Cancel',
   'tree.deleteTitle': 'Delete branch',
@@ -145,6 +147,7 @@ export const zh: Record<NestedFollowupsLocaleKey, string> = {
   'tree.quoteSelected': '引用内容',
   'tree.clearQuote': '清除引用',
   'tree.quoteInvalid': '引用原文已发生变化；该分支现已降级为整条消息锚点。',
+  'tree.snapToTurnTail': '上下文将继承到该回合结束（{label}）。',
   'tree.send': '发送',
   'tree.cancel': '取消',
   'tree.deleteTitle': '删除分支',
@@ -196,6 +199,7 @@ export function labelsFrom(t: TranslateNS<typeof NS>): TreeViewLabels {
     quoteSelected: t('tree.quoteSelected'),
     clearQuote: t('tree.clearQuote'),
     quoteInvalid: t('tree.quoteInvalid'),
+    snapToTurnTail: label => t('tree.snapToTurnTail', { label }),
     send: t('tree.send'),
     cancel: t('tree.cancel'),
     deleteTitle: t('tree.deleteTitle'),

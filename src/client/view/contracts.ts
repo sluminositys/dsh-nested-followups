@@ -62,6 +62,7 @@ export interface TreeViewLabels {
   readonly quoteSelected: string
   readonly clearQuote: string
   readonly quoteInvalid: string
+  readonly snapToTurnTail: (label: string) => string
   readonly send: string
   readonly cancel: string
   readonly deleteTitle: string
@@ -108,6 +109,7 @@ export const DEFAULT_TREE_VIEW_LABELS: TreeViewLabels = Object.freeze({
   quoteSelected: 'Quoted source',
   clearQuote: 'Clear quote',
   quoteInvalid: 'The quoted source changed; this branch now anchors to the whole message.',
+  snapToTurnTail: (label: string) => `Context will include the completed turn through ${label}.`,
   send: 'Send',
   cancel: 'Cancel',
   deleteTitle: 'Delete branch',

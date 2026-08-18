@@ -36,6 +36,13 @@ interface VisibleMessage {
   time: number
   text: string
   state: MessageNodeState
+  branchTargetMessageId?: string
+  branchTargetSeq?: number
+}
+
+interface BranchTarget {
+  readonly messageId: string
+  readonly seq: number
 }
 
 function eventOrder(left: SessionEvent, right: SessionEvent): number {
@@ -140,6 +147,33 @@ function visibleMessages(events: readonly SessionEvent[], minimumSeq: number): V
     }
   }
 
+  const finalSurfaceByTurn = new Map<number, SessionEvent>()
+  for (const event of ordered) {
+    if (event.type === 'assistant/message' || event.type === 'tool/result') {
+      const ending = endings.get(event.data.turn)
+      if (ending !== undefined && event.seq < ending.seq) {
+        finalSurfaceByTurn.set(event.data.turn, event)
+      }
+      continue
+    }
+    if (event.type === 'user/message') {
+      const turn = turnAtUserEvent.get(event.seq)
+      const ending = turn === undefined ? undefined : endings.get(turn)
+      if (turn !== undefined && ending !== undefined && event.seq < ending.seq) {
+        finalSurfaceByTurn.set(turn, event)
+      }
+    }
+  }
+  const branchTargets = new Map<number, BranchTarget>()
+  for (const [turn, event] of finalSurfaceByTurn) {
+    if (event.type !== 'assistant/message') continue
+    if (sourceText(event.data.message.content).trim().length === 0) continue
+    branchTargets.set(turn, {
+      messageId: String(event.data.message.id),
+      seq: event.seq,
+    })
+  }
+
   const messages: VisibleMessage[] = []
   for (const event of ordered) {
     if (event.seq < minimumSeq) continue
@@ -157,6 +191,7 @@ function visibleMessages(events: readonly SessionEvent[], minimumSeq: number): V
       continue
     }
     if (event.type === 'assistant/message') {
+      const branchTarget = branchTargets.get(event.data.turn)
       messages.push({
         role: 'assistant',
         messageId: String(event.data.message.id),
@@ -165,6 +200,10 @@ function visibleMessages(events: readonly SessionEvent[], minimumSeq: number): V
         time: event.time,
         text: sourceText(event.data.message.content),
         state: turnState(event.data.turn, endings),
+        ...(branchTarget === undefined ? {} : {
+          branchTargetMessageId: branchTarget.messageId,
+          branchTargetSeq: branchTarget.seq,
+        }),
       })
     }
   }
@@ -231,6 +270,10 @@ function nodesForSession(
       text: message.text,
       summary: message.text.length === 0 ? '' : summarizeMessage(message.text, message.role),
       state: message.state,
+      ...(message.branchTargetMessageId === undefined || message.branchTargetSeq === undefined ? {} : {
+        branchTargetMessageId: message.branchTargetMessageId,
+        branchTargetSeq: message.branchTargetSeq,
+      }),
     }
   })
 }

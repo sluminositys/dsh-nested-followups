@@ -34,6 +34,10 @@ function message(
     text,
     summary: text,
     state: 'complete',
+    ...(role === 'assistant' ? {
+      branchTargetMessageId: nodeId,
+      branchTargetSeq: seq,
+    } : {}),
   }
 }
 

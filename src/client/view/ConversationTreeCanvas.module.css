@@ -496,6 +496,16 @@
   font-size: 11px;
 }
 
+.snapNotice {
+  margin: 0;
+  padding: 6px 8px;
+  border-left: 2px solid var(--dsw-alias-brand-primary);
+  color: var(--dsw-alias-label-secondary);
+  background: var(--dsw-alias-bg-layer-2);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
 .quoteSource {
   box-sizing: border-box;
   width: 100%;

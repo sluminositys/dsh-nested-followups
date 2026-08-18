@@ -68,6 +68,9 @@ export interface MessageNodeView {
   text: string
   summary: string
   state: MessageNodeState
+  /** Safe completed-turn assistant tail used when this card starts a branch. */
+  branchTargetMessageId?: string
+  branchTargetSeq?: number
 }
 
 export interface TreeViewState {

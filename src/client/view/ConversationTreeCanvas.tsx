@@ -160,6 +160,7 @@ function FollowUpComposer({
   node,
   mode,
   labels,
+  branchTargetLabel,
   style,
   submit,
   close,
@@ -167,6 +168,7 @@ function FollowUpComposer({
   readonly node: MessageNodeView
   readonly mode: 'ask' | 'continue'
   readonly labels: TreeViewLabels
+  readonly branchTargetLabel?: string
   readonly style: React.CSSProperties
   readonly submit: (
     text: string,
@@ -206,7 +208,12 @@ function FollowUpComposer({
         if (event.key === 'Escape' && !pending) close()
       }}
     >
-      {mode === 'ask' && node.text.length > 0 && (
+      {mode === 'ask' && branchTargetLabel !== undefined && (
+        <p className={css.snapNotice} role="status">{labels.snapToTurnTail(branchTargetLabel)}</p>
+      )}
+      {mode === 'ask'
+        && branchTargetLabel === undefined
+        && node.text.length > 0 && (
         <label className={css.quoteSelector}>
           <span>{labels.quoteSource}</span>
           <textarea
@@ -307,6 +314,13 @@ export function ConversationTreeCanvas({
     () => new Map(projection.nodes.map(node => [node.nodeId, node] as const)),
     [projection.nodes],
   )
+  const nodesBySessionMessage = useMemo(
+    () => new Map(projection.nodes.map(node => [
+      `${node.sessionId}\u0000${node.messageId}`,
+      node,
+    ] as const)),
+    [projection.nodes],
+  )
   const branches = useMemo(
     () => new Map(projection.branches.map(branch => [branch.record.branchId, branch] as const)),
     [projection.branches],
@@ -405,6 +419,9 @@ export function ConversationTreeCanvas({
     ? undefined
     : layout.nodes.find(node => node.nodeId === interaction.composerNodeId)
   const composerMode = interaction.composerMode
+  const composerTargetNode = composerNode?.branchTargetMessageId === undefined
+    ? undefined
+    : nodesBySessionMessage.get(`${composerNode.sessionId}\u0000${composerNode.branchTargetMessageId}`)
   const deletionImpact = deleteBranchId === null
     ? undefined
     : branchDeleteImpact(projection, deleteBranchId)
@@ -568,6 +585,9 @@ export function ConversationTreeCanvas({
                 const node = nodes.get(position.nodeId)
                 if (node === undefined) return null
                 const branch = node.branchId === null ? undefined : branches.get(node.branchId)
+                const branchTargetNode = node.branchTargetMessageId === undefined
+                  ? undefined
+                  : nodesBySessionMessage.get(`${node.sessionId}\u0000${node.branchTargetMessageId}`)
                 const firstInBranch = firstNodeIds.has(node.nodeId)
                 const focused = interaction.focusedNodeId === node.nodeId
                 const quote = firstInBranch && branch?.anchorStatus === 'range-valid'
@@ -591,7 +611,8 @@ export function ConversationTreeCanvas({
                     canAsk={readOnlyReason === undefined
                       && onAskFollowUp !== undefined
                       && node.role === 'assistant'
-                      && node.state === 'complete'}
+                      && node.state === 'complete'
+                      && branchTargetNode?.state === 'complete'}
                     canContinue={readOnlyReason === undefined
                       && onContinueBranch !== undefined
                       && node.branchId !== null
@@ -646,6 +667,11 @@ export function ConversationTreeCanvas({
                   node={composerNode}
                   mode={composerMode}
                   labels={labels}
+                  {...composerMode === 'ask'
+                    && composerTargetNode !== undefined
+                    && composerTargetNode.nodeId !== composerNode.nodeId
+                    ? { branchTargetLabel: displayLabelOf(composerTargetNode) }
+                    : {}}
                   style={{
                     left: composerMode === 'ask'
                       ? composerLayout.rect.x + composerLayout.rect.width + 24
@@ -657,7 +683,7 @@ export function ConversationTreeCanvas({
                   submit={(question, clientRequestId, anchorRange) => composerMode === 'ask'
                     ? onAskFollowUp!({
                       clientRequestId,
-                      anchor: composerNode,
+                      anchor: composerTargetNode ?? composerNode,
                       question,
                       ...(anchorRange === undefined ? {} : { anchorRange }),
                     })

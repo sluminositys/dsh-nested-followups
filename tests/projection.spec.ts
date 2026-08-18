@@ -6,7 +6,7 @@ import {
   validateAnchorRange,
 } from '../src/host/projection.ts'
 import type { BranchRecord, TreeRecord } from '../src/shared/types.ts'
-import { pluginContext, textTurn } from './fixtures/session-events.ts'
+import { pluginContext, textTurn, toolTurn } from './fixtures/session-events.ts'
 
 function sessionEvent(value: unknown): import('@deepseek-ai/dsh-session/types').SessionEvent {
   return value as import('@deepseek-ai/dsh-session/types').SessionEvent
@@ -116,6 +116,39 @@ describe('conversation tree projection', () => {
         targetNodeId: 'branch-session-1-1:nested-q1',
       }),
     ])
+  })
+
+  it('exposes the same safe completed-turn tail that branch creation will use', () => {
+    const projection = projectConversationTree(
+      tree,
+      [],
+      new Map([['root', { sessionId: 'root', events: toolTurn() }]]),
+    )
+    const prelude = projection.nodes.find(node => node.messageId === 'a-prelude')
+    const final = projection.nodes.find(node => node.messageId === 'a-final')
+
+    expect(prelude).toEqual(expect.objectContaining({
+      branchTargetMessageId: 'a-final',
+      branchTargetSeq: 8,
+    }))
+    expect(final).toEqual(expect.objectContaining({
+      branchTargetMessageId: 'a-final',
+      branchTargetSeq: 8,
+    }))
+  })
+
+  it('does not offer a branch target when a completed tool turn has no final assistant text', () => {
+    const events = toolTurn()
+      .filter(event => event.seq < 7 || event.seq === 10)
+      .map((item, index) => ({ ...item, seq: index })) as typeof rootEvents
+    const projection = projectConversationTree(
+      tree,
+      [],
+      new Map([['root', { sessionId: 'root', events }]]),
+    )
+
+    expect(projection.nodes.find(node => node.messageId === 'a-prelude'))
+      .not.toHaveProperty('branchTargetMessageId')
   })
 
   it('uses the branch path for the first turn and a local turn suffix afterwards', () => {

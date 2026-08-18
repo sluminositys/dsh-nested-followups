@@ -22,6 +22,8 @@ export const messageNodeViewSchema = z.object({
   text: z.string(),
   summary: z.string(),
   state: z.enum(['queued', 'streaming', 'complete', 'error']),
+  branchTargetMessageId: identifier.optional(),
+  branchTargetSeq: nonNegativeSafeInteger.optional(),
 }).strict() as z.ZodType<MessageNodeView>
 
 export const treeEdgeViewSchema = z.object({
