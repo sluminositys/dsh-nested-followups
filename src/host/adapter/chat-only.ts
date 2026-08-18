@@ -4,6 +4,7 @@ import { createUserMessage, freezeMessage, MessageId } from '@deepseek-ai/dsh-ll
 import type { SessionEvent, SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-tools'
+import { hiddenBranchMetaRc7 } from './visibility.ts'
 
 /** Stable compatibility failure used when rc.7 cannot enforce an empty tool surface. */
 export class ChatOnlyCapabilityError extends Error {
@@ -82,12 +83,7 @@ export function createChatOnlyForkAgentRc7(
   return agents.create({
     sessionId: input.sessionId,
     seed: input.seed,
-    meta: {
-      ...(input.sourceHeader.cwd === undefined ? {} : { cwd: input.sourceHeader.cwd }),
-      parentSession: input.sourceHeader.id,
-      seedLength: input.seed.length,
-      origin: 'subagent',
-    },
+    meta: hiddenBranchMetaRc7(input.sourceHeader, input.seed.length),
     setup: applyChatOnlyScopeRc7,
   })
 }

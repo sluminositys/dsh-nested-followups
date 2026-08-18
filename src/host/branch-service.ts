@@ -23,6 +23,7 @@ import {
   submitChatOnlyTurnRc7,
 } from './adapter/chat-only.ts'
 import { probeNativeContinuationCapability } from './adapter/native-continuation.ts'
+import { probeBranchVisibilityRc7 } from './adapter/visibility.ts'
 import type { NestedFollowupsMetadataService } from './metadata-service.ts'
 import { resolveBranchBoundary } from './safe-boundary.ts'
 
@@ -119,12 +120,17 @@ export class NestedFollowupsBranchService extends Service {
 
   capabilities(): TreeCapabilities {
     const chatOnly = probeChatOnlyCapabilityRc7(this.ctx)
+    const visibility = probeBranchVisibilityRc7(this.ctx)
     const native = probeNativeContinuationCapability(this.ctx)
     return Object.freeze({
-      askFollowUp: chatOnly.supported,
-      continueBranch: chatOnly.supported,
+      askFollowUp: chatOnly.supported && visibility.supported,
+      continueBranch: chatOnly.supported && visibility.supported,
       nativeBranchContinuation: native.supported,
-      ...chatOnly.reason === undefined ? {} : { reason: chatOnly.reason },
+      ...chatOnly.reason !== undefined
+        ? { reason: chatOnly.reason }
+        : visibility.reason === undefined
+          ? {}
+          : { reason: visibility.reason },
     })
   }
 
@@ -158,6 +164,10 @@ export class NestedFollowupsBranchService extends Service {
     const capability = probeChatOnlyCapabilityRc7(this.ctx)
     if (!capability.supported) {
       throw new BranchCommandError('compatibility', capability.reason ?? 'Chat-only branches are unavailable.')
+    }
+    const visibility = probeBranchVisibilityRc7(this.ctx)
+    if (!visibility.supported) {
+      throw new BranchCommandError('compatibility', visibility.reason ?? 'Hidden branches are unavailable.')
     }
   }
 

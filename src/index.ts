@@ -42,6 +42,15 @@ export {
   createSubagentForkRc7,
   selectForkSeedRc7,
 } from './host/adapter/session-fork.ts'
+export {
+  HIDDEN_BRANCH_ORIGIN,
+  hiddenBranchMetaRc7,
+  probeBranchVisibilityRc7,
+} from './host/adapter/visibility.ts'
+export {
+  SESSION_DELETE_METHOD,
+  probeSessionDeletionCapability,
+} from './host/adapter/session-delete.ts'
 export { TreeMetadataRepository } from './host/storage.ts'
 export { nestedFollowupsDomainSpec } from './shared/schema.ts'
 export type * from './shared/remote.ts'

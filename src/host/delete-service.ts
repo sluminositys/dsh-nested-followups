@@ -1,7 +1,7 @@
 import type { BranchRecord } from '../shared/types.ts'
 import type { TreeMetadataRepository } from './storage.ts'
 
-export type BranchSessionCleanupMode = 'delete' | 'archive'
+export type BranchSessionCleanupMode = 'delete'
 
 export interface BranchSessionCleanupPort {
   readonly mode: BranchSessionCleanupMode

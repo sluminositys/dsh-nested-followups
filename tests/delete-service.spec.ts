@@ -62,7 +62,7 @@ const b111 = branch('b1.1.1', 'session-b1.1.1', b11, 4)
 const b2 = { ...branch('b2', 'session-b2', null, 5), siblingOrdinal: 2 }
 
 class CleanupPort implements BranchSessionCleanupPort {
-  readonly mode = 'archive' as const
+  readonly mode = 'delete' as const
   readonly cancelled: string[] = []
   readonly cleaned: string[] = []
 
@@ -78,7 +78,7 @@ class CleanupPort implements BranchSessionCleanupPort {
 
   async cleanup(sessionId: string): Promise<void> {
     this.cleaned.push(sessionId)
-    if (sessionId === this.failCleanup) throw new Error('archive failed')
+    if (sessionId === this.failCleanup) throw new Error('delete failed')
   }
 }
 
@@ -113,7 +113,7 @@ describe('cascade branch deletion', () => {
 
     const result = await coordinator.delete(tree.treeId, b1.branchId)
 
-    expect(result).toMatchObject({ status: 'deleted', branchCount: 3, cleanupMode: 'archive' })
+    expect(result).toMatchObject({ status: 'deleted', branchCount: 3, cleanupMode: 'delete' })
     expect(sessions.cancelled).toEqual([b11.sessionId])
     expect(sessions.cleaned).toEqual([b111.sessionId, b11.sessionId, b1.sessionId])
     expect(repository.listBranches(tree.treeId).map(record => record.branchId)).toEqual([b2.branchId])
@@ -165,7 +165,7 @@ describe('cascade branch deletion', () => {
       status: 'already-absent',
       branchCount: 0,
       visibleMessageCount: 0,
-      cleanupMode: 'archive',
+      cleanupMode: 'delete',
     })
     expect(repository.listBranches(tree.treeId).map(record => record.branchId)).toEqual([b2.branchId])
   })

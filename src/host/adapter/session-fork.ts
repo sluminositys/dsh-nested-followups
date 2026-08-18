@@ -6,6 +6,7 @@ import {
   type SessionId,
   type SessionStore,
 } from '@deepseek-ai/dsh-session'
+import { hiddenBranchMetaRc7 } from './visibility.ts'
 
 /**
  * rc.7 equivalent of SessionStore's private `_forkSeed` method. Keep this
@@ -103,11 +104,6 @@ export function createSubagentForkRc7(
   const seed = selectForkSeedRc7(liveSource.id, liveSource.events, boundary)
   return sessions.create(childSessionId, {
     seed,
-    meta: {
-      ...(liveSource.header.cwd === undefined ? {} : { cwd: liveSource.header.cwd }),
-      parentSession: liveSource.id,
-      seedLength: seed.length,
-      origin: 'subagent',
-    },
+    meta: hiddenBranchMetaRc7(liveSource.header, seed.length),
   })
 }
