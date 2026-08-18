@@ -22,6 +22,13 @@ function commandError(error: { code: string; message?: string }): Error {
 
 export async function apply(ctx: ClientContext): Promise<() => Promise<void>> {
   const disposeRemote = await ctx.remote.$mount(remoteContribution)
+  ctx.inject(['remote.nestedFollowups'], (remoteCtx: ClientContext) => {
+    installTreeUi(remoteCtx)
+  })
+  return disposeRemote
+}
+
+function installTreeUi(ctx: ClientContext): void {
   const controllers = new Map<SessionId, TreeProjectionController>()
   const controllerFor = (sessionId: SessionId): TreeProjectionController => {
     let controller = controllers.get(sessionId)
@@ -96,5 +103,4 @@ export async function apply(ctx: ClientContext): Promise<() => Promise<void>> {
     },
   }, ConversationTreeView))
 
-  return disposeRemote
 }

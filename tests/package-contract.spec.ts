@@ -37,4 +37,10 @@ describe('package contract', () => {
     expect(patch).toContain('id: dsh-nested-followups')
     expect(patch).toContain('name: dsh-nested-followups')
   })
+
+  it('enters the mounted Typert namespace through an explicit rc.7 injection scope', async () => {
+    const client = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
+
+    expect(client).toContain("ctx.inject(['remote.nestedFollowups']")
+  })
 })
