@@ -1,0 +1,355 @@
+import type { BranchProjectionView, ConversationTreeProjection, TreeEdgeView } from '../../shared/projection.ts'
+import type { MessageNodeView } from '../../shared/types.ts'
+import { inflateRect, unionRects, type Point, type Rect } from './geometry.ts'
+import { deriveCollapseState, type CollapsedBranchSummary } from './navigation.ts'
+
+export interface TreeLayoutOptions {
+  nodeWidth?: number
+  nodeHeight?: number
+  rowGap?: number
+  columnGap?: number
+  branchGap?: number
+  canvasPadding?: number
+  regionPadding?: number
+  collapsedBranchIds?: ReadonlySet<string>
+}
+
+export interface ResolvedTreeLayoutOptions {
+  nodeWidth: number
+  nodeHeight: number
+  rowGap: number
+  columnGap: number
+  branchGap: number
+  canvasPadding: number
+  regionPadding: number
+}
+
+export interface TreeNodeLayout {
+  nodeId: string
+  branchId: string | null
+  depth: number
+  rect: Rect
+}
+
+export interface TreeEdgeLayout {
+  edgeId: string
+  kind: TreeEdgeView['kind']
+  sourceNodeId: string
+  targetNodeId: string
+  start: Point
+  end: Point
+  path: string
+}
+
+export interface BranchRegionLayout {
+  branchId: string
+  depth: number
+  rect: Rect
+}
+
+export interface CollapsedBranchBadgeLayout {
+  branchId: string
+  anchorNodeId: string
+  hiddenNodeCount: number
+  depth: number
+  rect: Rect
+  start: Point
+  end: Point
+  path: string
+}
+
+export interface ConversationTreeLayout {
+  options: ResolvedTreeLayoutOptions
+  nodes: readonly TreeNodeLayout[]
+  edges: readonly TreeEdgeLayout[]
+  branchRegions: readonly BranchRegionLayout[]
+  collapsedBadges: readonly CollapsedBranchBadgeLayout[]
+  bounds: Rect
+}
+
+export const DEFAULT_TREE_LAYOUT_OPTIONS: ResolvedTreeLayoutOptions = Object.freeze({
+  nodeWidth: 280,
+  nodeHeight: 120,
+  rowGap: 32,
+  columnGap: 120,
+  branchGap: 56,
+  canvasPadding: 80,
+  regionPadding: 24,
+})
+
+const BADGE_WIDTH = 108
+const BADGE_HEIGHT = 32
+
+function positive(value: number | undefined, fallback: number): number {
+  return value === undefined || !Number.isFinite(value) || value <= 0 ? fallback : value
+}
+
+function nonNegative(value: number | undefined, fallback: number): number {
+  return value === undefined || !Number.isFinite(value) || value < 0 ? fallback : value
+}
+
+export function resolveTreeLayoutOptions(
+  options: TreeLayoutOptions = {},
+): ResolvedTreeLayoutOptions {
+  return Object.freeze({
+    nodeWidth: positive(options.nodeWidth, DEFAULT_TREE_LAYOUT_OPTIONS.nodeWidth),
+    nodeHeight: positive(options.nodeHeight, DEFAULT_TREE_LAYOUT_OPTIONS.nodeHeight),
+    rowGap: nonNegative(options.rowGap, DEFAULT_TREE_LAYOUT_OPTIONS.rowGap),
+    columnGap: nonNegative(options.columnGap, DEFAULT_TREE_LAYOUT_OPTIONS.columnGap),
+    branchGap: nonNegative(options.branchGap, DEFAULT_TREE_LAYOUT_OPTIONS.branchGap),
+    canvasPadding: nonNegative(options.canvasPadding, DEFAULT_TREE_LAYOUT_OPTIONS.canvasPadding),
+    regionPadding: nonNegative(options.regionPadding, DEFAULT_TREE_LAYOUT_OPTIONS.regionPadding),
+  })
+}
+
+function compareNodes(left: MessageNodeView, right: MessageNodeView): number {
+  return left.seq - right.seq || left.time - right.time || left.nodeId.localeCompare(right.nodeId)
+}
+
+function compareBranchRecords(left: BranchProjectionView, right: BranchProjectionView): number {
+  return left.record.siblingOrdinal - right.record.siblingOrdinal
+    || left.record.createdAt - right.record.createdAt
+    || left.record.branchId.localeCompare(right.record.branchId)
+}
+
+function branchDepth(
+  branch: BranchProjectionView,
+  branches: ReadonlyMap<string, BranchProjectionView>,
+): number {
+  let depth = 1
+  let parentId = branch.record.parentBranchId
+  const visited = new Set([branch.record.branchId])
+  while (parentId !== null && !visited.has(parentId)) {
+    visited.add(parentId)
+    const parent = branches.get(parentId)
+    if (parent === undefined) break
+    depth += 1
+    parentId = parent.record.parentBranchId
+  }
+  return depth
+}
+
+function isDescendantOrSelf(
+  candidateId: string,
+  ancestorId: string,
+  branches: ReadonlyMap<string, BranchProjectionView>,
+): boolean {
+  let branchId: string | null = candidateId
+  const visited = new Set<string>()
+  while (branchId !== null && !visited.has(branchId)) {
+    if (branchId === ancestorId) return true
+    visited.add(branchId)
+    branchId = branches.get(branchId)?.record.parentBranchId ?? null
+  }
+  return false
+}
+
+function branchPath(
+  start: Point,
+  end: Point,
+): string {
+  const distance = Math.max(40, Math.abs(end.x - start.x) * 0.5)
+  return `M ${start.x} ${start.y} C ${start.x + distance} ${start.y}, ${end.x - distance} ${end.y}, ${end.x} ${end.y}`
+}
+
+function sequencePath(start: Point, end: Point): string {
+  const distance = Math.max(24, Math.abs(end.y - start.y) * 0.45)
+  return `M ${start.x} ${start.y} C ${start.x} ${start.y + distance}, ${end.x} ${end.y - distance}, ${end.x} ${end.y}`
+}
+
+function edgeGeometry(
+  edge: TreeEdgeView,
+  source: Rect,
+  target: Rect,
+): Omit<TreeEdgeLayout, 'edgeId' | 'kind' | 'sourceNodeId' | 'targetNodeId'> {
+  if (edge.kind === 'branch') {
+    const start = { x: source.x + source.width, y: source.y + source.height / 2 }
+    const end = { x: target.x, y: target.y + target.height / 2 }
+    return { start, end, path: branchPath(start, end) }
+  }
+  const start = { x: source.x + source.width / 2, y: source.y + source.height }
+  const end = { x: target.x + target.width / 2, y: target.y }
+  return { start, end, path: sequencePath(start, end) }
+}
+
+function badgeLayout(
+  summary: CollapsedBranchSummary,
+  anchorNodeId: string,
+  depth: number,
+  anchor: Rect,
+  x: number,
+  y: number,
+): CollapsedBranchBadgeLayout {
+  const rect = { x, y, width: BADGE_WIDTH, height: BADGE_HEIGHT }
+  const start = { x: anchor.x + anchor.width, y: anchor.y + anchor.height / 2 }
+  const end = { x: rect.x, y: rect.y + rect.height / 2 }
+  return {
+    branchId: summary.branchId,
+    anchorNodeId,
+    hiddenNodeCount: summary.hiddenNodeCount,
+    depth,
+    rect,
+    start,
+    end,
+    path: branchPath(start, end),
+  }
+}
+
+/**
+ * Deterministic lane layout. The root session never moves horizontally; every
+ * nested session owns one column to the right of its parent branch depth.
+ */
+export function layoutConversationTree(
+  projection: ConversationTreeProjection,
+  inputOptions: TreeLayoutOptions = {},
+): ConversationTreeLayout {
+  const options = resolveTreeLayoutOptions(inputOptions)
+  const collapsed = deriveCollapseState(
+    projection,
+    inputOptions.collapsedBranchIds ?? new Set<string>(),
+  )
+  const nodesById = new Map(projection.nodes.map(node => [node.nodeId, node] as const))
+  const branches = new Map(
+    projection.branches.map(branch => [branch.record.branchId, branch] as const),
+  )
+  const nodeLayouts = new Map<string, TreeNodeLayout>()
+  const nextFreeYByDepth = new Map<number, number>()
+
+  const rootNodes = projection.nodes
+    .filter(node => node.branchId === null)
+    .sort(compareNodes)
+  rootNodes.forEach((node, index) => {
+    nodeLayouts.set(node.nodeId, {
+      nodeId: node.nodeId,
+      branchId: null,
+      depth: 0,
+      rect: {
+        x: options.canvasPadding,
+        y: options.canvasPadding + index * (options.nodeHeight + options.rowGap),
+        width: options.nodeWidth,
+        height: options.nodeHeight,
+      },
+    })
+  })
+
+  const branchDepths = new Map(
+    projection.branches.map(branch => [branch.record.branchId, branchDepth(branch, branches)] as const),
+  )
+  const summaries = new Map(collapsed.summaries.map(summary => [summary.branchId, summary] as const))
+  const collapsedBadges: CollapsedBranchBadgeLayout[] = []
+  const maximumDepth = Math.max(0, ...branchDepths.values())
+
+  for (let depth = 1; depth <= maximumDepth; depth++) {
+    const atDepth = projection.branches
+      .filter(branch => branchDepths.get(branch.record.branchId) === depth)
+      .filter(branch => !collapsed.hiddenBranchIds.has(branch.record.branchId)
+        || summaries.has(branch.record.branchId))
+      .sort((left, right) => {
+        const leftY = left.anchorNodeId === undefined
+          ? Number.POSITIVE_INFINITY
+          : (nodeLayouts.get(left.anchorNodeId)?.rect.y ?? Number.POSITIVE_INFINITY)
+        const rightY = right.anchorNodeId === undefined
+          ? Number.POSITIVE_INFINITY
+          : (nodeLayouts.get(right.anchorNodeId)?.rect.y ?? Number.POSITIVE_INFINITY)
+        return leftY - rightY || compareBranchRecords(left, right)
+      })
+
+    for (const branch of atDepth) {
+      const anchor = branch.anchorNodeId === undefined
+        ? undefined
+        : nodeLayouts.get(branch.anchorNodeId)?.rect
+      const desiredY = anchor?.y ?? options.canvasPadding
+      const nextFreeY = nextFreeYByDepth.get(depth) ?? options.canvasPadding
+      const startY = Math.max(desiredY, nextFreeY)
+      const x = options.canvasPadding + depth * (options.nodeWidth + options.columnGap)
+      const summary = summaries.get(branch.record.branchId)
+      if (summary !== undefined) {
+        if (anchor !== undefined && summary.anchorNodeId !== undefined) {
+          const badgeY = Math.max(startY, anchor.y + (anchor.height - BADGE_HEIGHT) / 2)
+          collapsedBadges.push(badgeLayout(
+            summary,
+            summary.anchorNodeId,
+            depth,
+            anchor,
+            x,
+            badgeY,
+          ))
+          nextFreeYByDepth.set(depth, badgeY + BADGE_HEIGHT + options.branchGap)
+        }
+        continue
+      }
+
+      const branchNodes = branch.nodeIds
+        .map(nodeId => nodesById.get(nodeId))
+        .filter((node): node is MessageNodeView => node !== undefined)
+        .filter(node => !collapsed.hiddenNodeIds.has(node.nodeId))
+        .sort(compareNodes)
+      branchNodes.forEach((node, index) => {
+        nodeLayouts.set(node.nodeId, {
+          nodeId: node.nodeId,
+          branchId: branch.record.branchId,
+          depth,
+          rect: {
+            x,
+            y: startY + index * (options.nodeHeight + options.rowGap),
+            width: options.nodeWidth,
+            height: options.nodeHeight,
+          },
+        })
+      })
+      if (branchNodes.length > 0) {
+        const laneHeight = branchNodes.length * options.nodeHeight
+          + (branchNodes.length - 1) * options.rowGap
+        nextFreeYByDepth.set(depth, startY + laneHeight + options.branchGap)
+      }
+    }
+  }
+
+  const orderedNodeLayouts = [...nodeLayouts.values()]
+    .sort((left, right) => left.depth - right.depth
+      || left.rect.y - right.rect.y
+      || left.nodeId.localeCompare(right.nodeId))
+  const edgeLayouts = projection.edges.flatMap((edge): TreeEdgeLayout[] => {
+    const source = nodeLayouts.get(edge.sourceNodeId)?.rect
+    const target = nodeLayouts.get(edge.targetNodeId)?.rect
+    if (source === undefined || target === undefined) return []
+    return [{
+      edgeId: edge.edgeId,
+      kind: edge.kind,
+      sourceNodeId: edge.sourceNodeId,
+      targetNodeId: edge.targetNodeId,
+      ...edgeGeometry(edge, source, target),
+    }]
+  }).sort((left, right) => left.edgeId.localeCompare(right.edgeId))
+
+  const branchRegions = projection.branches.flatMap((branch): BranchRegionLayout[] => {
+    const branchId = branch.record.branchId
+    if (collapsed.hiddenBranchIds.has(branchId)) return []
+    const descendantRects = orderedNodeLayouts
+      .filter(layout => layout.branchId !== null
+        && isDescendantOrSelf(layout.branchId, branchId, branches))
+      .map(layout => layout.rect)
+    if (descendantRects.length === 0) return []
+    return [{
+      branchId,
+      depth: branchDepths.get(branchId) ?? 1,
+      rect: inflateRect(unionRects(descendantRects), options.regionPadding),
+    }]
+  }).sort((left, right) => left.depth - right.depth
+    || left.rect.y - right.rect.y
+    || left.branchId.localeCompare(right.branchId))
+
+  const allRects: Rect[] = [
+    ...orderedNodeLayouts.map(layout => layout.rect),
+    ...collapsedBadges.map(badge => badge.rect),
+    ...branchRegions.map(region => region.rect),
+  ]
+  return Object.freeze({
+    options,
+    nodes: Object.freeze(orderedNodeLayouts),
+    edges: Object.freeze(edgeLayouts),
+    branchRegions: Object.freeze(branchRegions),
+    collapsedBadges: Object.freeze(collapsedBadges),
+    bounds: unionRects(allRects),
+  })
+}

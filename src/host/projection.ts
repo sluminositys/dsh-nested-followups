@@ -1,7 +1,22 @@
 import type { ContentBlock } from '@deepseek-ai/dsh-llm/types'
 import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 
+import type {
+  BranchProjectionView,
+  ConversationTreeProjection,
+  ProjectionDiagnostic,
+  TreeEdgeView,
+} from '../shared/projection.ts'
 import type { AnchorRange, BranchRecord, MessageNodeState, MessageNodeView, TreeRecord } from '../shared/types.ts'
+
+export { displayLabelOf } from '../shared/labels.ts'
+export type {
+  BranchProjectionView,
+  ConversationTreeProjection,
+  ProjectionDiagnostic,
+  ProjectionDiagnosticCode,
+  TreeEdgeView,
+} from '../shared/projection.ts'
 
 const SUMMARY_LIMIT = 180
 
@@ -10,45 +25,6 @@ export interface SessionLogSnapshot {
   events: readonly SessionEvent[]
   /** Durable header value. Used to detect stale branch metadata. */
   seedLength?: number
-}
-
-export type ProjectionDiagnosticCode =
-  | 'root-session-missing'
-  | 'branch-session-missing'
-  | 'branch-parent-missing'
-  | 'branch-cycle'
-  | 'anchor-missing'
-  | 'anchor-range-invalid'
-  | 'seed-length-mismatch'
-
-export interface ProjectionDiagnostic {
-  code: ProjectionDiagnosticCode
-  message: string
-  branchId?: string
-  sessionId?: string
-}
-
-export interface TreeEdgeView {
-  edgeId: string
-  sourceNodeId: string
-  targetNodeId: string
-  kind: 'sequence' | 'branch'
-}
-
-export interface BranchProjectionView {
-  record: BranchRecord
-  branchPath: readonly number[]
-  nodeIds: readonly string[]
-  anchorNodeId?: string
-  anchorStatus: 'message' | 'range-valid' | 'range-invalid' | 'missing'
-}
-
-export interface ConversationTreeProjection {
-  tree: TreeRecord
-  nodes: readonly MessageNodeView[]
-  edges: readonly TreeEdgeView[]
-  branches: readonly BranchProjectionView[]
-  diagnostics: readonly ProjectionDiagnostic[]
 }
 
 interface VisibleMessage {
@@ -383,12 +359,4 @@ export function projectConversationTree(
     ),
     diagnostics: Object.freeze(diagnostics),
   })
-}
-
-/** Human-readable card address. It is never used as data identity. */
-export function displayLabelOf(node: MessageNodeView): string {
-  const prefix = node.role === 'user' ? 'Q' : 'A'
-  const path = node.branchPath.map(part => part === 0 ? '?' : String(part)).join('.')
-  if (node.branchId === null || node.localTurnIndex === 1) return `${prefix}${path}`
-  return `${prefix}${path} #${node.localTurnIndex}`
 }
