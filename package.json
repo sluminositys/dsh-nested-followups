@@ -92,6 +92,7 @@
     "@types/node": "^22.20.0",
     "@types/react": "~18.3.1",
     "@types/react-dom": "^18.3.1",
+    "lightningcss": "^1.33.0",
     "oxlint": "^1.76.0",
     "publint": "^0.3.21",
     "react": "^18.2.0",
