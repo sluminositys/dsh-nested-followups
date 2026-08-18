@@ -9,6 +9,7 @@ import {
 } from '../src/client/tree/minimap.ts'
 import {
   fitViewport,
+  isWorldRectVisible,
   screenPointToWorld,
   worldPointToScreen,
   zoomViewportAt,
@@ -38,6 +39,27 @@ describe('tree viewport and minimap', () => {
 
     expect(worldPointToScreen(world, after).x).toBeCloseTo(pointer.x)
     expect(worldPointToScreen(world, after).y).toBeCloseTo(pointer.y)
+  })
+
+  it('detects whether a generated card remains inside the usable viewport', () => {
+    const viewport = { width: 800, height: 600 }
+    const transform = { x: 0, y: 0, zoom: 1 }
+
+    expect(isWorldRectVisible(
+      { x: 100, y: 100, width: 280, height: 120 },
+      transform,
+      viewport,
+    )).toBe(true)
+    expect(isWorldRectVisible(
+      { x: 700, y: 100, width: 280, height: 120 },
+      transform,
+      viewport,
+    )).toBe(false)
+    expect(isWorldRectVisible(
+      { x: -100, y: 100, width: 1_000, height: 120 },
+      transform,
+      viewport,
+    )).toBe(true)
   })
 
   it('projects simplified geometry and centers navigation from a minimap click', () => {

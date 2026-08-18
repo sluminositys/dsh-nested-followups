@@ -36,6 +36,7 @@ import {
 import {
   centerViewportOn,
   fitViewport,
+  isWorldRectVisible,
   panViewport,
   zoomViewportAt,
   type ViewportTransform,
@@ -293,6 +294,8 @@ export function ConversationTreeCanvas({
   const viewportRef = useRef<HTMLDivElement>(null)
   const pointerPanRef = useRef<PointerPan | null>(null)
   const fittedTreeRef = useRef<string | null>(null)
+  const autoFollowStreamingRef = useRef(true)
+  const followedLiveNodeIdRef = useRef<string | null>(null)
   const viewportSize = useElementSize(viewportRef)
   const timeFormatter = useMemo(
     () => new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }),
@@ -366,16 +369,57 @@ export function ConversationTreeCanvas({
     [layout, transform, viewportSize],
   )
 
+  const noteManualViewportChange = useCallback(() => {
+    autoFollowStreamingRef.current = false
+  }, [])
+  const beginStreamFollow = useCallback(() => {
+    autoFollowStreamingRef.current = true
+    followedLiveNodeIdRef.current = null
+  }, [])
+
+  useEffect(() => {
+    autoFollowStreamingRef.current = true
+    followedLiveNodeIdRef.current = null
+  }, [projection.tree.treeId])
+
+  useEffect(() => {
+    const liveNode = projection.nodes
+      .filter(node => node.state === 'queued' || node.state === 'streaming')
+      .reduce<MessageNodeView | undefined>((latest, candidate) => {
+        if (latest === undefined) return candidate
+        return candidate.time > latest.time
+          || (candidate.time === latest.time && candidate.seq > latest.seq)
+          ? candidate
+          : latest
+      }, undefined)
+    if (liveNode === undefined) {
+      followedLiveNodeIdRef.current = null
+      return
+    }
+    if (!autoFollowStreamingRef.current
+      || followedLiveNodeIdRef.current === liveNode.nodeId
+      || viewportSize.width <= 0
+      || viewportSize.height <= 0) return
+    const position = layout.nodes.find(node => node.nodeId === liveNode.nodeId)
+    if (position === undefined) return
+    followedLiveNodeIdRef.current = liveNode.nodeId
+    if (!isWorldRectVisible(position.rect, transform, viewportSize)) {
+      setTransform(current => centerViewportOn(current, viewportSize, centerOf(position.rect)))
+    }
+  }, [layout.nodes, projection.nodes, transform, viewportSize])
+
   const zoomAtCenter = useCallback((factor: number) => {
+    noteManualViewportChange()
     setTransform(current => zoomViewportAt(
       current,
       { x: viewportSize.width / 2, y: viewportSize.height / 2 },
       current.zoom * factor,
     ))
-  }, [viewportSize])
+  }, [noteManualViewportChange, viewportSize])
 
   const onWheel = (event: WheelEvent<HTMLDivElement>): void => {
     if (!canPanFrom(event.target)) return
+    noteManualViewportChange()
     event.preventDefault()
     const bounds = event.currentTarget.getBoundingClientRect()
     const point = { x: event.clientX - bounds.left, y: event.clientY - bounds.top }
@@ -385,6 +429,7 @@ export function ConversationTreeCanvas({
 
   const onPointerDown = (event: PointerEvent<HTMLDivElement>): void => {
     if (event.button !== 0 || !canPanFrom(event.target)) return
+    noteManualViewportChange()
     event.currentTarget.setPointerCapture(event.pointerId)
     pointerPanRef.current = {
       pointerId: event.pointerId,
@@ -433,6 +478,7 @@ export function ConversationTreeCanvas({
     && selectedDetailsBranch?.nodeIds[0] === selectedDetails.nodeId
 
   const selectNode = (nodeId: string): void => {
+    noteManualViewportChange()
     const alreadyOpen = interaction.selectedNodeId === nodeId && interaction.expandedNodeIds.has(nodeId)
     if (alreadyOpen) {
       dispatch({ type: 'node/toggle-expanded', nodeId })
@@ -469,7 +515,10 @@ export function ConversationTreeCanvas({
             aria-label={labels.search}
             placeholder={labels.searchPlaceholder}
             value={interaction.searchQuery}
-            onChange={event => { dispatch({ type: 'search/set', query: event.target.value }) }}
+            onChange={event => {
+              noteManualViewportChange()
+              dispatch({ type: 'search/set', query: event.target.value })
+            }}
           />
           {interaction.searchQuery.trim() !== '' && (
             <div className={css.searchResults} role="listbox" aria-label={labels.search}>
@@ -482,6 +531,7 @@ export function ConversationTreeCanvas({
                   role="option"
                   aria-selected={false}
                   onClick={() => {
+                    noteManualViewportChange()
                     dispatch({
                       type: 'search/select',
                       nodeId: result.nodeId,
@@ -503,7 +553,10 @@ export function ConversationTreeCanvas({
           <Button
             size="sm"
             variant="ghost"
-            onClick={() => { dispatch({ type: 'focus/set', nodeId: undefined }) }}
+            onClick={() => {
+              noteManualViewportChange()
+              dispatch({ type: 'focus/set', nodeId: undefined })
+            }}
           >
             {labels.clearFocus}
           </Button>
@@ -631,10 +684,12 @@ export function ConversationTreeCanvas({
                       dispatch({ type: 'composer/open', nodeId: node.nodeId, mode: 'continue' })
                     }}
                     onFocus={() => {
+                      noteManualViewportChange()
                       dispatch({ type: 'focus/set', nodeId: focused ? undefined : node.nodeId })
                     }}
                     onCollapse={() => {
                       if (branch !== undefined) {
+                        noteManualViewportChange()
                         dispatch({ type: 'branch/toggle', branchId: branch.record.branchId })
                       }
                     }}
@@ -650,6 +705,7 @@ export function ConversationTreeCanvas({
                   style={nodeStyle(badge.rect)}
                   aria-label={`${labels.expand}: ${labels.collapsedCount(badge.hiddenNodeCount)}`}
                   onClick={() => {
+                    noteManualViewportChange()
                     dispatch({ type: 'branch/toggle', branchId: badge.branchId })
                     setPendingCenterNodeId(badge.anchorNodeId)
                   }}
@@ -680,14 +736,17 @@ export function ConversationTreeCanvas({
                       ? composerLayout.rect.y + 18
                       : composerLayout.rect.y + composerLayout.rect.height + 24,
                   }}
-                  submit={(question, clientRequestId, anchorRange) => composerMode === 'ask'
-                    ? onAskFollowUp!({
-                      clientRequestId,
-                      anchor: composerTargetNode ?? composerNode,
-                      question,
-                      ...(anchorRange === undefined ? {} : { anchorRange }),
-                    })
-                    : onContinueBranch!({ clientRequestId, tail: composerNode, question })}
+                  submit={(question, clientRequestId, anchorRange) => {
+                    beginStreamFollow()
+                    return composerMode === 'ask'
+                      ? onAskFollowUp!({
+                        clientRequestId,
+                        anchor: composerTargetNode ?? composerNode,
+                        question,
+                        ...(anchorRange === undefined ? {} : { anchorRange }),
+                      })
+                      : onContinueBranch!({ clientRequestId, tail: composerNode, question })
+                  }}
                   close={() => { dispatch({ type: 'composer/close' }) }}
                 />
               )}
@@ -701,7 +760,10 @@ export function ConversationTreeCanvas({
               <button
                 type="button"
                 aria-label={labels.fit}
-                onClick={() => { setTransform(fitViewport(layout.bounds, viewportSize)) }}
+                onClick={() => {
+                  noteManualViewportChange()
+                  setTransform(fitViewport(layout.bounds, viewportSize))
+                }}
               >
                 {labels.fit}
               </button>
@@ -710,6 +772,7 @@ export function ConversationTreeCanvas({
               model={minimap}
               label={labels.minimap}
               onNavigate={point => {
+                noteManualViewportChange()
                 setTransform(current => navigateFromMinimap(minimap, point, current, viewportSize))
               }}
             />

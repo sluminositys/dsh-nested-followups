@@ -76,6 +76,34 @@ export function visibleWorldRect(transform: ViewportTransform, viewport: Size): 
   }
 }
 
+/** Whether a world rect is comfortably visible without requiring impossible full fit. */
+export function isWorldRectVisible(
+  rect: Rect,
+  transform: ViewportTransform,
+  viewport: Size,
+  padding = 24,
+): boolean {
+  if (viewport.width <= 0 || viewport.height <= 0) return false
+  const safePadding = Math.max(0, Number.isFinite(padding) ? padding : 0)
+  const topLeft = worldPointToScreen({ x: rect.x, y: rect.y }, transform)
+  const bottomRight = worldPointToScreen({
+    x: rect.x + rect.width,
+    y: rect.y + rect.height,
+  }, transform)
+  const center = {
+    x: (topLeft.x + bottomRight.x) / 2,
+    y: (topLeft.y + bottomRight.y) / 2,
+  }
+  const fitsHorizontally = bottomRight.x - topLeft.x + safePadding * 2 <= viewport.width
+  const fitsVertically = bottomRight.y - topLeft.y + safePadding * 2 <= viewport.height
+  return (fitsHorizontally
+    ? topLeft.x >= safePadding && bottomRight.x <= viewport.width - safePadding
+    : center.x >= 0 && center.x <= viewport.width)
+    && (fitsVertically
+      ? topLeft.y >= safePadding && bottomRight.y <= viewport.height - safePadding
+      : center.y >= 0 && center.y <= viewport.height)
+}
+
 export function panViewport(
   transform: ViewportTransform,
   screenDelta: Point,

@@ -268,6 +268,30 @@ describe('tree projection Remote service', () => {
     }
   })
 
+  it('coalesces high-frequency assistant chunks into one bounded revision', async () => {
+    const { dispose, service, root } = await setup()
+    try {
+      const initial = await service.readTree({ sessionId: 'root' })
+      if (!initial.ok) throw new Error('root projection missing')
+
+      for (const text of ['one', ' two', ' three']) {
+        root.append('assistant/chunk', {
+          turn: 2,
+          step: 1,
+          chunk: { type: 'text-delta', index: 0, text },
+        })
+      }
+      const immediate = await service.readTree({ sessionId: 'root' })
+      expect(immediate.ok && immediate.value.revision).toBe(initial.value.revision)
+
+      await new Promise(resolve => setTimeout(resolve, 75))
+      const coalesced = await service.readTree({ sessionId: 'root' })
+      expect(coalesced.ok && coalesced.value.revision).toBe(initial.value.revision + 1)
+    } finally {
+      await dispose()
+    }
+  })
+
   it('returns a stable business failure for an unknown session', async () => {
     const { dispose, service } = await setup()
     try {

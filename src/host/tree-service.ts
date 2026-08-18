@@ -1,6 +1,7 @@
 import { clearTimeout, setTimeout } from 'node:timers'
 import { Context } from '@deepseek-ai/cordis'
 import type { Session, SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
+import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
 import type { SessionPersistenceSnapshot } from '@deepseek-ai/dsh-session-persistence'
 import { TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 
@@ -20,6 +21,7 @@ import type { NestedFollowupsMetadataService } from './metadata-service.ts'
 import { projectConversationTree, type SessionLogSnapshot } from './projection.ts'
 
 const WATCH_TIMEOUT_MS = 15_000
+const STREAM_TOUCH_INTERVAL_MS = 50
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -81,12 +83,13 @@ export class NestedFollowupsService extends TypertRemoteService {
 
   private readonly revisions = new Map<string, number>()
   private readonly waiters = new Map<string, Set<RevisionWaiter>>()
+  private readonly pendingStreamTouches = new Map<string, ReturnType<typeof setTimeout>>()
   private disposed = false
 
   constructor(ctx: Context) {
     super(ctx, 'nestedFollowups')
-    ctx.on('session/event', (session) => {
-      this.touchRoot(this.rootSessionIdFor(String(session.id)))
+    ctx.on('session/event', (session, event) => {
+      this.onSessionEvent(String(session.id), event)
     }, { global: true })
     ctx.on('nested-followups/change', (rootSessionId) => {
       this.touchRoot(rootSessionId)
@@ -97,6 +100,8 @@ export class NestedFollowupsService extends TypertRemoteService {
         for (const listener of listeners) listener(false)
       }
       this.waiters.clear()
+      for (const timer of this.pendingStreamTouches.values()) clearTimeout(timer)
+      this.pendingStreamTouches.clear()
     }, 'nested-followups.tree-watch')
   }
 
@@ -109,6 +114,25 @@ export class NestedFollowupsService extends TypertRemoteService {
     if (listeners === undefined) return
     this.waiters.delete(rootSessionId)
     for (const listener of listeners) listener(true)
+  }
+
+  private onSessionEvent(sessionId: string, event: SessionEvent): void {
+    const rootSessionId = this.rootSessionIdFor(sessionId)
+    if (event.type !== 'assistant/chunk') {
+      const pending = this.pendingStreamTouches.get(rootSessionId)
+      if (pending !== undefined) {
+        clearTimeout(pending)
+        this.pendingStreamTouches.delete(rootSessionId)
+      }
+      this.touchRoot(rootSessionId)
+      return
+    }
+    if (this.pendingStreamTouches.has(rootSessionId)) return
+    const timer = setTimeout(() => {
+      this.pendingStreamTouches.delete(rootSessionId)
+      if (!this.disposed) this.touchRoot(rootSessionId)
+    }, STREAM_TOUCH_INTERVAL_MS)
+    this.pendingStreamTouches.set(rootSessionId, timer)
   }
 
   /** Read a complete, de-duplicated projection without attaching cold Agents. */
