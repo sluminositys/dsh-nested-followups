@@ -14,6 +14,7 @@ const CLIENT_EXTERNALS = [
   'react-dom/client',
   '@deepseek-ai/cordis',
   '@deepseek-ai/dsh-client-runtime/client',
+  '@deepseek-ai/dsh-api-remotes/client',
   '@deepseek-ai/dsh-client-ui-slots',
   '@deepseek-ai/dsh-client-ui-conversation',
   '@deepseek-ai/dsh-client-ui-primitives',
@@ -65,7 +66,11 @@ const inlineCssPlugin = {
 
 export default [
   {
-    entry: { index: 'src/index.ts' },
+    entry: {
+      index: 'src/index.ts',
+      'typert.host': 'src/typert.host.ts',
+      'typert.remote-client': 'src/client/remote.ts',
+    },
     outDir: 'lib',
     format: ['esm'],
     platform: 'node',
@@ -77,6 +82,9 @@ export default [
       neverBundle: [
         '@deepseek-ai/cordis',
         '@deepseek-ai/dsh-storage-domain',
+        '@deepseek-ai/dsh-session-persistence',
+        '@deepseek-ai/dsh-typert-protocol',
+        'zod',
       ],
     },
   },

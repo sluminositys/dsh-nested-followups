@@ -6,6 +6,11 @@ export interface AskFollowUpRequest {
   readonly question: string
 }
 
+export interface ContinueBranchRequest {
+  readonly tail: MessageNodeView
+  readonly question: string
+}
+
 export interface DeleteBranchRequest {
   readonly branchId: string
   readonly branchCount: number
@@ -17,7 +22,7 @@ export interface ConversationTreeCanvasProps {
   readonly labels?: TreeViewLabels
   readonly readOnlyReason?: string
   readonly onAskFollowUp?: (request: AskFollowUpRequest) => Promise<void>
-  readonly onOpenBranch?: (sessionId: string) => void
+  readonly onContinueBranch?: (request: ContinueBranchRequest) => Promise<void>
   readonly onDeleteBranch?: (request: DeleteBranchRequest) => Promise<void>
 }
 
@@ -34,9 +39,9 @@ export interface TreeViewLabels {
   readonly complete: string
   readonly error: string
   readonly askFollowUp: string
+  readonly continueBranch: string
   readonly focus: string
   readonly clearFocus: string
-  readonly openBranch: string
   readonly collapse: string
   readonly expand: string
   readonly deleteBranch: string
@@ -49,12 +54,14 @@ export interface TreeViewLabels {
   readonly emptyTitle: string
   readonly emptyDescription: string
   readonly followUpPlaceholder: string
+  readonly continuePlaceholder: string
   readonly send: string
   readonly cancel: string
   readonly deleteTitle: string
   readonly deleteConfirm: string
   readonly deletePending: string
   readonly askPending: string
+  readonly continuePending: string
   readonly readonly: string
   readonly nodeCount: (count: number) => string
   readonly collapsedCount: (count: number) => string
@@ -74,9 +81,9 @@ export const DEFAULT_TREE_VIEW_LABELS: TreeViewLabels = Object.freeze({
   complete: 'Complete',
   error: 'Failed',
   askFollowUp: 'Ask follow-up',
+  continueBranch: 'Continue this branch',
   focus: 'Focus',
   clearFocus: 'Clear focus',
-  openBranch: 'Open branch',
   collapse: 'Collapse branch',
   expand: 'Expand branch',
   deleteBranch: 'Delete branch',
@@ -89,12 +96,14 @@ export const DEFAULT_TREE_VIEW_LABELS: TreeViewLabels = Object.freeze({
   emptyTitle: 'No messages yet',
   emptyDescription: 'Messages appear here after the conversation begins.',
   followUpPlaceholder: 'Ask a follow-up about this message…',
+  continuePlaceholder: 'Add the next turn to this branch…',
   send: 'Send',
   cancel: 'Cancel',
   deleteTitle: 'Delete branch',
   deleteConfirm: 'Delete',
   deletePending: 'Deleting…',
   askPending: 'Sending…',
+  continuePending: 'Continuing…',
   readonly: 'Tree View is read-only',
   nodeCount: (count: number) => `${count} messages`,
   collapsedCount: (count: number) => `+${count} nodes`,

@@ -13,16 +13,20 @@ describe('tree interaction state', () => {
     state = treeInteractionReducer(state, { type: 'branch/toggle', branchId: 'branch-1' })
     state = treeInteractionReducer(state, { type: 'node/toggle-expanded', nodeId: 'root-a2' })
     state = treeInteractionReducer(state, { type: 'focus/set', nodeId: 'root-a2' })
-    state = treeInteractionReducer(state, { type: 'composer/open', nodeId: 'root-a2' })
+    state = treeInteractionReducer(state, {
+      type: 'composer/open', nodeId: 'root-a2', mode: 'ask',
+    })
 
     expect([...state.collapsedBranchIds]).toEqual(['branch-1'])
     expect([...state.expandedNodeIds]).toEqual(['root-a2'])
     expect(state.focusedNodeId).toBe('root-a2')
     expect(state.composerNodeId).toBe('root-a2')
+    expect(state.composerMode).toBe('ask')
     expect(state.selectedNodeId).toBe('root-a2')
 
     state = treeInteractionReducer(state, { type: 'composer/close' })
     expect(state.composerNodeId).toBeUndefined()
+    expect(state.composerMode).toBeUndefined()
     expect(state.focusedNodeId).toBe('root-a2')
   })
 
@@ -47,13 +51,16 @@ describe('tree interaction state', () => {
     state = treeInteractionReducer(state, { type: 'branch/toggle', branchId: 'missing-branch' })
     state = treeInteractionReducer(state, { type: 'node/toggle-expanded', nodeId: 'missing-node' })
     state = treeInteractionReducer(state, { type: 'focus/set', nodeId: 'missing-node' })
-    state = treeInteractionReducer(state, { type: 'composer/open', nodeId: 'missing-node' })
+    state = treeInteractionReducer(state, {
+      type: 'composer/open', nodeId: 'missing-node', mode: 'continue',
+    })
 
     const reconciled = reconcileTreeInteractionState(state, treeProjectionFixture())
     expect(reconciled.collapsedBranchIds.size).toBe(0)
     expect(reconciled.expandedNodeIds.size).toBe(0)
     expect(reconciled.focusedNodeId).toBeUndefined()
     expect(reconciled.composerNodeId).toBeUndefined()
+    expect(reconciled.composerMode).toBeUndefined()
     expect(reconciled.selectedNodeId).toBeUndefined()
   })
 

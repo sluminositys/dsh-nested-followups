@@ -16,6 +16,7 @@ vi.mock('@deepseek-ai/dsh-client-ui-primitives', async () => {
       icon?: ReactNode
     }) => react.createElement('button', props, children),
     IconChevronUpOutline14: Icon,
+    IconChevronDownOutline14: Icon,
     IconCloseOutline16: Icon,
     IconInspectOutline12: Icon,
     IconPlusOutline16: Icon,
@@ -54,20 +55,38 @@ describe('conversation tree canvas', () => {
   it('removes every mutating follow-up action in read-only compatibility mode', () => {
     const projection = treeProjectionFixture()
     const onAskFollowUp = vi.fn(async () => {})
+    const onContinueBranch = vi.fn(async () => {})
     const writable = renderToStaticMarkup(createElement(ConversationTreeCanvas, {
       projection,
       onAskFollowUp,
+      onContinueBranch,
     }))
     const readOnly = renderToStaticMarkup(createElement(ConversationTreeCanvas, {
       projection,
       onAskFollowUp,
+      onContinueBranch,
       readOnlyReason: 'This DSH version cannot create isolated chat-only branches.',
     }))
 
     expect(writable).toContain('aria-label="Ask follow-up"')
+    expect(writable).toContain('aria-label="Continue this branch"')
     expect(readOnly).not.toContain('aria-label="Ask follow-up"')
+    expect(readOnly).not.toContain('aria-label="Continue this branch"')
     expect(readOnly).toContain('Tree View is read-only')
     expect(readOnly).toContain('This DSH version cannot create isolated chat-only branches.')
+  })
+
+  it('distinguishes child branching from linear continuation eligibility', () => {
+    const projection = treeProjectionFixture()
+    const markup = renderToStaticMarkup(createElement(ConversationTreeCanvas, {
+      projection,
+      onAskFollowUp: vi.fn(async () => {}),
+      onContinueBranch: vi.fn(async () => {}),
+    }))
+
+    expect(count(markup, 'aria-label="Ask follow-up"')).toBe(6)
+    expect(count(markup, 'aria-label="Continue this branch"')).toBe(3)
+    expect(markup).not.toContain('Open branch')
   })
 
   it('uses DSH theme tokens instead of fixed color literals', () => {

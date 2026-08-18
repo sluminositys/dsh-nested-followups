@@ -10,6 +10,27 @@
   font-family: var(--dsw-font-family);
 }
 
+.viewStatus {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 240px;
+  padding: 24px;
+  color: var(--dsw-alias-label-secondary);
+  background: var(--dsw-alias-bg-base);
+  text-align: center;
+}
+
+.viewStatus span {
+  max-width: 560px;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
 .toolbar {
   position: relative;
   z-index: 8;
@@ -363,6 +384,30 @@
 .iconButton[data-danger='true']:focus-visible {
   color: var(--dsw-alias-label-error);
   background: var(--dsw-alias-interactive-bg-hover-danger);
+}
+
+.continueButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  height: 24px;
+  gap: 3px;
+  padding: 0 7px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  outline: none;
+  color: var(--dsw-alias-brand-text);
+  background: var(--dsw-alias-bg-layer-2);
+  font: inherit;
+  font-size: 10px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.continueButton:hover,
+.continueButton:focus-visible {
+  border-color: var(--dsw-alias-brand-primary);
+  background: var(--dsw-alias-interactive-bg-hover);
 }
 
 .collapsedBadge {

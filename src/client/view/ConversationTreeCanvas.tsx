@@ -136,12 +136,14 @@ function MessageDetails({
 
 function FollowUpComposer({
   node,
+  mode,
   labels,
   style,
   submit,
   close,
 }: {
   readonly node: MessageNodeView
+  readonly mode: 'ask' | 'continue'
   readonly labels: TreeViewLabels
   readonly style: React.CSSProperties
   readonly submit: (text: string) => Promise<void>
@@ -169,7 +171,8 @@ function FollowUpComposer({
       className={css.followUpComposer}
       style={style}
       data-tree-interactive="true"
-      aria-label={`${labels.askFollowUp}: ${displayLabelOf(node)}`}
+      data-mode={mode}
+      aria-label={`${mode === 'ask' ? labels.askFollowUp : labels.continueBranch}: ${displayLabelOf(node)}`}
       onSubmit={onSubmit}
       onKeyDown={(event) => {
         if (event.key === 'Escape' && !pending) close()
@@ -181,15 +184,17 @@ function FollowUpComposer({
         rows={3}
         value={draft}
         disabled={pending}
-        placeholder={labels.followUpPlaceholder}
-        aria-label={labels.followUpPlaceholder}
+        placeholder={mode === 'ask' ? labels.followUpPlaceholder : labels.continuePlaceholder}
+        aria-label={mode === 'ask' ? labels.followUpPlaceholder : labels.continuePlaceholder}
         onChange={event => { setDraft(event.target.value) }}
       />
       {failure !== null && <p className={css.inlineError} role="alert">{failure}</p>}
       <div className={css.composerActions}>
         <Button size="sm" variant="ghost" disabled={pending} onClick={close}>{labels.cancel}</Button>
         <Button size="sm" variant="primary" disabled={pending || draft.trim() === ''} type="submit">
-          {pending ? labels.askPending : labels.send}
+          {pending
+            ? (mode === 'ask' ? labels.askPending : labels.continuePending)
+            : (mode === 'ask' ? labels.askFollowUp : labels.continueBranch)}
         </Button>
       </div>
     </form>
@@ -201,7 +206,7 @@ export function ConversationTreeCanvas({
   labels = DEFAULT_TREE_VIEW_LABELS,
   readOnlyReason,
   onAskFollowUp,
-  onOpenBranch,
+  onContinueBranch,
   onDeleteBranch,
 }: ConversationTreeCanvasProps) {
   const [interaction, dispatch] = useReducer(treeInteractionReducer, undefined, createTreeInteractionState)
@@ -240,6 +245,13 @@ export function ConversationTreeCanvas({
     [projection.branches],
   )
   const firstNodeIds = useMemo(() => branchFirstNodeIds(projection.branches), [projection.branches])
+  const branchTailNodeIds = useMemo(
+    () => new Set(projection.branches.flatMap(branch => {
+      const tail = branch.nodeIds.at(-1)
+      return tail === undefined ? [] : [tail]
+    })),
+    [projection.branches],
+  )
   const searchResults = useMemo(
     () => searchTreeNodes(projection, interaction.searchQuery, 12),
     [interaction.searchQuery, projection],
@@ -325,6 +337,7 @@ export function ConversationTreeCanvas({
   const composerLayout = interaction.composerNodeId === undefined
     ? undefined
     : layout.nodes.find(node => node.nodeId === interaction.composerNodeId)
+  const composerMode = interaction.composerMode
   const deletionImpact = deleteBranchId === null
     ? undefined
     : branchDeleteImpact(projection, deleteBranchId)
@@ -496,18 +509,30 @@ export function ConversationTreeCanvas({
                     dimmed={focus.dimmedNodeIds.has(node.nodeId)}
                     root={node.branchId === null}
                     firstInBranch={firstInBranch}
-                    canAsk={readOnlyReason === undefined && onAskFollowUp !== undefined && node.state === 'complete'}
-                    canOpen={node.branchId !== null && onOpenBranch !== undefined}
+                    canAsk={readOnlyReason === undefined
+                      && onAskFollowUp !== undefined
+                      && node.role === 'assistant'
+                      && node.state === 'complete'}
+                    canContinue={readOnlyReason === undefined
+                      && onContinueBranch !== undefined
+                      && node.branchId !== null
+                      && node.role === 'assistant'
+                      && node.state === 'complete'
+                      && branchTailNodeIds.has(node.nodeId)}
                     canDelete={readOnlyReason === undefined
                       && firstInBranch
                       && node.branchId !== null
                       && onDeleteBranch !== undefined}
                     onSelect={() => { selectNode(node.nodeId) }}
-                    onAsk={() => { dispatch({ type: 'composer/open', nodeId: node.nodeId }) }}
+                    onAsk={() => {
+                      dispatch({ type: 'composer/open', nodeId: node.nodeId, mode: 'ask' })
+                    }}
+                    onContinue={() => {
+                      dispatch({ type: 'composer/open', nodeId: node.nodeId, mode: 'continue' })
+                    }}
                     onFocus={() => {
                       dispatch({ type: 'focus/set', nodeId: focused ? undefined : node.nodeId })
                     }}
-                    onOpen={() => { onOpenBranch?.(node.sessionId) }}
                     onCollapse={() => {
                       if (branch !== undefined) {
                         dispatch({ type: 'branch/toggle', branchId: branch.record.branchId })
@@ -532,16 +557,27 @@ export function ConversationTreeCanvas({
                   {labels.collapsedCount(badge.hiddenNodeCount)}
                 </button>
               ))}
-              {composerNode !== undefined && composerLayout !== undefined && onAskFollowUp !== undefined && (
+              {composerNode !== undefined
+                && composerLayout !== undefined
+                && composerMode !== undefined
+                && (composerMode === 'ask' ? onAskFollowUp !== undefined : onContinueBranch !== undefined)
+                && (
                 <FollowUpComposer
-                  key={composerNode.nodeId}
+                  key={`${composerNode.nodeId}:${composerMode}`}
                   node={composerNode}
+                  mode={composerMode}
                   labels={labels}
                   style={{
-                    left: composerLayout.rect.x + composerLayout.rect.width + 24,
-                    top: composerLayout.rect.y + 18,
+                    left: composerMode === 'ask'
+                      ? composerLayout.rect.x + composerLayout.rect.width + 24
+                      : composerLayout.rect.x,
+                    top: composerMode === 'ask'
+                      ? composerLayout.rect.y + 18
+                      : composerLayout.rect.y + composerLayout.rect.height + 24,
                   }}
-                  submit={question => onAskFollowUp({ anchor: composerNode, question })}
+                  submit={question => composerMode === 'ask'
+                    ? onAskFollowUp!({ anchor: composerNode, question })
+                    : onContinueBranch!({ tail: composerNode, question })}
                   close={() => { dispatch({ type: 'composer/close' }) }}
                 />
               )}

@@ -3,45 +3,78 @@
 English | [中文](README.zh.md)
 
 `dsh-nested-followups` adds a message-level conversation tree to the
-[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) web interface.
-It provides a separate Tree View for examining a conversation and asking nested
-follow-up questions without adding those questions to the main conversation.
+[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) web UI. It
+lets you branch from a completed answer, explore that question in an isolated
+conversation, and keep the main conversation unchanged.
 
-The ordinary DSH chat remains the default view. The plugin uses DSH extension
-points and services; it does not replace the conversation interface or modify
-the original session event log.
+The plugin is additive. Standard DSH Chat remains the default view, existing
+session logs remain the source of truth, and installing the plugin requires no
+patches to DeepSeek Harness.
 
-## How it works
+## Interaction model
 
-In Tree View, each user message and assistant response is shown as a compact
-card. The main conversation remains a vertical sequence. A follow-up started
-from a historical response appears to its right, and a follow-up to that answer
-can create another nested branch.
+Tree View renders each user and assistant message as a separate card. The main
+conversation grows downward, while follow-up branches grow to the right.
 
-Each branch uses an independent DSH session seeded only with the history that
-precedes its selected message. Later main-thread messages do not enter the
-branch, and branch messages do not enter the main conversation. A branch can be
-opened in the standard DSH chat interface when a longer conversation is needed.
+Two actions have deliberately different meanings:
 
-Tree View is intended for the following tasks:
+- **Ask follow-up** creates a new child branch from the selected completed
+  assistant message. It grows to the right and receives only the history up to
+  that safe turn boundary.
+- **Continue this branch** appends the next turn to the current branch. It grows
+  downward, appears only on the latest completed assistant message of a branch,
+  and never appears on the main conversation.
 
-- inspect the main conversation and all attached follow-ups;
-- ask a question about any completed historical response;
-- continue asking nested follow-up questions with isolated context;
-- focus or collapse parts of a large tree and navigate with a minimap;
-- open a branch in the ordinary DSH chat interface.
+The distinction is structural as well as visual: Continue never creates a new
+branch, and Ask follow-up never appends to the current branch.
 
-## Compatibility
+Tree View also provides message details, search, focus, collapse, pan, zoom,
+fit-to-view, and a minimap. These controls only change presentation state.
 
-The current development target is `@deepseek-ai/dsh` `0.1.0-rc.7` on the web
-profile. DeepSeek Harness is in Developer Preview, so plugin contracts may
-change between release candidates.
+## Isolation and chat-only execution
 
-Node.js `22.19` or later is required, matching the current DSH requirement.
+Every branch is a real DSH session seeded at a validated completed-turn
+boundary. Later main-thread messages do not enter the branch, branch messages
+do not enter the main conversation, and sibling branches do not share their new
+turns.
+
+Branch prompts are submitted by the plugin on the Host side. On both initial
+creation and cold resume, the branch Agent is forced into a chat-only scope:
+
+- native tool presentation is selected, so Code Mode is unavailable;
+- the global tool allowlist is empty;
+- a final execution guard rejects any scope-local tool contributed later; and
+- prompt assembly strips any tool schema that escaped registration-time controls.
+
+Branches therefore cannot run commands, read or write files, or call tools.
+The plugin does not install the rc.7 subagent descriptor or `report` tool.
+
+## DeepSeek Harness rc.7 behavior
+
+The current target is `@deepseek-ai/dsh` `0.1.0-rc.7`, unmodified.
+
+Branch sessions use the durable `origin: "subagent"` marker. This keeps them
+out of the workspace/session overview while preserving their logs. rc.7 also
+uses that marker as an ownership fence: native Chat may display a branch log,
+but it rejects attempts to send a prompt to that branch. For that reason this
+version does not expose an **Open Branch** action; complete reading and all
+branch continuation happen inside Tree View.
+
+rc.7's built-in Subagent menu may show descriptor-less branches as disabled
+diagnostic rows. This is a cosmetic leak inside the owning root session. The
+rows are non-interactive and excluded from keyboard navigation. The built-in
+menu trigger may still include origin-classified branches in its descendant
+total.
+
+An isolated adapter probe is reserved for a future upstream
+`startChatOnlyContinuableAtBoundary` capability. It requires both the named
+method and an explicit v1 native-user-delivery advertisement, so a creation-only
+API cannot accidentally enable a writable native surface. Until both exist,
+native branch continuation remains intentionally disabled.
 
 ## Installation from source
 
-The package is not currently published to npm. Install it from a checkout:
+The package is not currently published to npm.
 
 ```sh
 git clone https://github.com/sluminositys/dsh-nested-followups.git
@@ -51,7 +84,7 @@ pnpm run check
 dsh plugin --profile web add .
 ```
 
-Restart the DSH web profile after installation if it is already running.
+Restart the DSH web profile if it is already running.
 
 To remove the plugin:
 
@@ -59,26 +92,25 @@ To remove the plugin:
 dsh plugin --profile web remove dsh-nested-followups
 ```
 
-Removing the plugin removes its interface and configuration. It does not
-rewrite the original conversation logs.
+Removal unregisters the plugin UI and services. It does not rewrite the root
+conversation or automatically delete branch session logs.
 
 ## Development
 
 ```sh
 pnpm install
-pnpm run typecheck
-pnpm run lint
-pnpm run test
-pnpm run build
+pnpm run check
 ```
 
-`pnpm run check` runs all four checks in sequence and validates the published
-package structure.
+`check` runs linting, Host and Client type checks, unit/integration tests, the
+production build, and package publication validation.
+
+Node.js 22.19 or later is required, matching rc.7.
 
 ## Status
 
-This project is under active development. Its data format and DSH compatibility
-range may change before the first stable release.
+This project is under active development. DeepSeek Harness is in Developer
+Preview, so adapter contracts may change between release candidates.
 
 ## License
 

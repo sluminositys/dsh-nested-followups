@@ -1,9 +1,9 @@
 import type { CSSProperties, KeyboardEvent, MouseEvent } from 'react'
 import {
   IconChevronUpOutline14,
+  IconChevronDownOutline14,
   IconInspectOutline12,
   IconPlusOutline16,
-  IconRightUpOutline16,
   IconTrashOutline16,
   StateDot,
   Tooltip,
@@ -25,12 +25,12 @@ interface MessageNodeCardProps {
   readonly root: boolean
   readonly firstInBranch: boolean
   readonly canAsk: boolean
-  readonly canOpen: boolean
+  readonly canContinue: boolean
   readonly canDelete: boolean
   readonly onSelect: () => void
   readonly onAsk: () => void
+  readonly onContinue: () => void
   readonly onFocus: () => void
-  readonly onOpen: () => void
   readonly onCollapse: () => void
   readonly onDelete: () => void
 }
@@ -68,12 +68,12 @@ export function MessageNodeCard({
   root,
   firstInBranch,
   canAsk,
-  canOpen,
+  canContinue,
   canDelete,
   onSelect,
   onAsk,
+  onContinue,
   onFocus,
-  onOpen,
   onCollapse,
   onDelete,
 }: MessageNodeCardProps) {
@@ -128,6 +128,19 @@ export function MessageNodeCard({
               </button>
             </Tooltip>
           )}
+          {canContinue && (
+            <Tooltip label={labels.continueBranch} side="bottom">
+              <button
+                type="button"
+                className={css.continueButton}
+                aria-label={labels.continueBranch}
+                onClick={(event) => { stop(event); onContinue() }}
+              >
+                <IconChevronDownOutline14 size={14} />
+                <span>{labels.continueBranch}</span>
+              </button>
+            </Tooltip>
+          )}
           <Tooltip label={focused ? labels.clearFocus : labels.focus} side="bottom">
             <button
               type="button"
@@ -139,18 +152,6 @@ export function MessageNodeCard({
               <IconInspectOutline12 size={12} />
             </button>
           </Tooltip>
-          {canOpen && (
-            <Tooltip label={labels.openBranch} side="bottom">
-              <button
-                type="button"
-                className={css.iconButton}
-                aria-label={labels.openBranch}
-                onClick={(event) => { stop(event); onOpen() }}
-              >
-                <IconRightUpOutline16 size={14} />
-              </button>
-            </Tooltip>
-          )}
           {firstInBranch && (
             <Tooltip label={labels.collapse} side="bottom">
               <button

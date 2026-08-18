@@ -5,6 +5,7 @@ export interface TreeInteractionState {
   readonly expandedNodeIds: ReadonlySet<string>
   readonly focusedNodeId: string | undefined
   readonly composerNodeId: string | undefined
+  readonly composerMode: 'ask' | 'continue' | undefined
   readonly selectedNodeId: string | undefined
   readonly searchQuery: string
 }
@@ -13,7 +14,7 @@ export type TreeInteractionAction =
   | { type: 'branch/toggle'; branchId: string }
   | { type: 'node/toggle-expanded'; nodeId: string }
   | { type: 'focus/set'; nodeId: string | undefined }
-  | { type: 'composer/open'; nodeId: string }
+  | { type: 'composer/open'; nodeId: string; mode: 'ask' | 'continue' }
   | { type: 'composer/close' }
   | { type: 'selection/set'; nodeId: string | undefined }
   | { type: 'search/set'; query: string }
@@ -26,6 +27,7 @@ export function createTreeInteractionState(): TreeInteractionState {
     expandedNodeIds: new Set(),
     focusedNodeId: undefined,
     composerNodeId: undefined,
+    composerMode: undefined,
     selectedNodeId: undefined,
     searchQuery: '',
   }
@@ -50,9 +52,14 @@ export function treeInteractionReducer(
     case 'focus/set':
       return { ...state, focusedNodeId: action.nodeId }
     case 'composer/open':
-      return { ...state, composerNodeId: action.nodeId, selectedNodeId: action.nodeId }
+      return {
+        ...state,
+        composerNodeId: action.nodeId,
+        composerMode: action.mode,
+        selectedNodeId: action.nodeId,
+      }
     case 'composer/close':
-      return { ...state, composerNodeId: undefined }
+      return { ...state, composerNodeId: undefined, composerMode: undefined }
     case 'selection/set':
       return { ...state, selectedNodeId: action.nodeId }
     case 'search/set':
@@ -92,6 +99,9 @@ export function reconcileTreeInteractionState(
       : undefined,
     composerNodeId: state.composerNodeId !== undefined && nodeIds.has(state.composerNodeId)
       ? state.composerNodeId
+      : undefined,
+    composerMode: state.composerNodeId !== undefined && nodeIds.has(state.composerNodeId)
+      ? state.composerMode
       : undefined,
     selectedNodeId: state.selectedNodeId !== undefined && nodeIds.has(state.selectedNodeId)
       ? state.selectedNodeId
