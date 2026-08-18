@@ -24,6 +24,7 @@ const rootEvents = [
 
 const branchOne: BranchRecord = {
   branchId: 'branch-1',
+  clientRequestId: 'request-1',
   treeId: tree.treeId,
   sessionId: 'branch-session-1',
   parentSessionId: tree.rootSessionId,
@@ -45,6 +46,7 @@ const branchOneEvents = [
 
 const nestedBranch: BranchRecord = {
   branchId: 'branch-1-1',
+  clientRequestId: 'request-1-1',
   treeId: tree.treeId,
   sessionId: 'branch-session-1-1',
   parentSessionId: branchOne.sessionId,
@@ -148,6 +150,7 @@ describe('conversation tree projection', () => {
     const sibling: BranchRecord = {
       ...branchOne,
       branchId: 'branch-2',
+      clientRequestId: 'request-2',
       sessionId: 'branch-session-2',
       siblingOrdinal: 2,
       createdAt: 4,

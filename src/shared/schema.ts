@@ -38,6 +38,7 @@ export const treeRecordSchema = z.object({
 
 export const branchRecordSchema = z.object({
   branchId: identifier,
+  clientRequestId: identifier,
   treeId: identifier,
   sessionId: identifier,
   parentSessionId: identifier,

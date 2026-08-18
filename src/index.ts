@@ -10,7 +10,16 @@ export function apply(ctx: Context): void {
 }
 
 export { NestedFollowupsMetadataService } from './host/metadata-service.ts'
+export {
+  BranchDeletionError,
+  CascadeDeleteCoordinator,
+  planCascadeDeletion,
+} from './host/delete-service.ts'
 export { projectConversationTree, displayLabelOf } from './host/projection.ts'
+export {
+  BranchBoundaryError,
+  resolveBranchBoundary,
+} from './host/safe-boundary.ts'
 export { TreeMetadataRepository } from './host/storage.ts'
 export { nestedFollowupsDomainSpec } from './shared/schema.ts'
 export type * from './shared/types.ts'

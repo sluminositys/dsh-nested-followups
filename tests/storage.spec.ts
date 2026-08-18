@@ -50,6 +50,7 @@ const tree: TreeRecord = {
 
 const branch: BranchRecord = {
   branchId: 'branch-1',
+  clientRequestId: 'request-1',
   treeId: tree.treeId,
   sessionId: 'branch-session-1',
   parentSessionId: tree.rootSessionId,
@@ -90,6 +91,11 @@ describe('tree metadata repository', () => {
       .rejects.toThrow(/already owns/)
     await expect(repository.putBranch({ ...branch, branchId: 'other-branch' }))
       .rejects.toThrow(/already belongs/)
+    await expect(repository.putBranch({
+      ...branch,
+      branchId: 'request-collision',
+      sessionId: 'other-session',
+    })).rejects.toThrow(/client request/)
   })
 
   it('requires a nested branch to reference its stored logical parent', async () => {

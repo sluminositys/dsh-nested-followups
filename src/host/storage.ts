@@ -64,6 +64,13 @@ export class TreeMetadataRepository {
     return undefined
   }
 
+  getBranchByClientRequest(treeId: string, clientRequestId: string): BranchRecord | undefined {
+    for (const entry of this.branches.entries()) {
+      if (entry[1].treeId === treeId && entry[1].clientRequestId === clientRequestId) return entry[1]
+    }
+    return undefined
+  }
+
   listBranches(treeId: string): readonly BranchRecord[] {
     return Object.freeze(
       [...this.branches.entries()]
@@ -93,6 +100,10 @@ export class TreeMetadataRepository {
     const existingAtSession = this.getBranchBySession(next.sessionId)
     if (existingAtSession !== undefined && existingAtSession.branchId !== next.branchId) {
       throw new Error(`session '${next.sessionId}' already belongs to another branch`)
+    }
+    const existingAtRequest = this.getBranchByClientRequest(next.treeId, next.clientRequestId)
+    if (existingAtRequest !== undefined && existingAtRequest.branchId !== next.branchId) {
+      throw new Error(`client request '${next.clientRequestId}' already created another branch`)
     }
     const existing = this.branches.get(next.branchId)
     if (existing !== undefined

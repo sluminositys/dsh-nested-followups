@@ -27,6 +27,8 @@ export interface AnchorRange {
 /** Durable relationship between one logical branch and its DSH session. */
 export interface BranchRecord {
   branchId: string
+  /** Stable client-generated key used to collapse retries into one branch. */
+  clientRequestId: string
   treeId: string
   sessionId: string
   parentSessionId: string
