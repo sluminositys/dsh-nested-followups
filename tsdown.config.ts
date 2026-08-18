@@ -26,7 +26,10 @@ export default [
     dts: true,
     clean: true,
     deps: {
-      neverBundle: ['@deepseek-ai/cordis'],
+      neverBundle: [
+        '@deepseek-ai/cordis',
+        '@deepseek-ai/dsh-storage-domain',
+      ],
     },
   },
   {
