@@ -1,5 +1,4 @@
 import { z } from 'zod'
-import { defineDomain, domainTable } from '@deepseek-ai/dsh-storage-domain'
 
 import type { AnchorRange, BranchRecord, BranchStatus, TreeRecord } from './types.ts'
 
@@ -83,13 +82,3 @@ export const branchRecordSchema = z.object({
     })
   }
 }) as z.ZodType<BranchRecord>
-
-/** Plugin-owned sidecar data. Session logs remain unchanged. */
-export const nestedFollowupsDomainSpec = defineDomain({
-  name: 'nested_followups',
-  version: 0,
-  tables: {
-    trees: domainTable<string, TreeRecord>(treeRecordSchema),
-    branches: domainTable<string, BranchRecord>(branchRecordSchema),
-  },
-})

@@ -1,6 +1,6 @@
 import { Context, Service } from '@deepseek-ai/cordis'
 
-import { nestedFollowupsDomainSpec } from '../shared/schema.ts'
+import { nestedFollowupsDomainSpec } from './domain.ts'
 import { TreeMetadataRepository } from './storage.ts'
 
 declare module '@deepseek-ai/cordis' {

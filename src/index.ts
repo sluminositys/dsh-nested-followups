@@ -57,6 +57,6 @@ export {
   probeSessionDeletionCapability,
 } from './host/adapter/session-delete.ts'
 export { TreeMetadataRepository } from './host/storage.ts'
-export { nestedFollowupsDomainSpec } from './shared/schema.ts'
+export { nestedFollowupsDomainSpec } from './host/domain.ts'
 export type * from './shared/remote.ts'
 export type * from './shared/types.ts'

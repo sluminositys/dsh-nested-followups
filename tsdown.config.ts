@@ -97,6 +97,7 @@ export default [
     dts: false,
     clean: false,
     deps: {
+      alwaysBundle: ['zod'],
       neverBundle: [...CLIENT_EXTERNALS],
     },
     define: {
