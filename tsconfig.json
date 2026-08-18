@@ -1,0 +1,7 @@
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2024"]
+  },
+  "include": ["src/index.ts", "src/shared/**/*.ts"]
+}
