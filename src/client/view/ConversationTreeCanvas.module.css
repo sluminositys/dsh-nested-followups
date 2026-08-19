@@ -189,6 +189,13 @@
   top: 0;
   left: 0;
   transform-origin: 0 0;
+}
+
+/* Compositor promotion is scoped to panning on purpose: a permanent hint pins
+   the raster at 1:1 and every other zoom level scales that bitmap (blurry
+   text). Panning only translates, so the cached raster stays valid; zooming
+   re-rasterizes at the final scale once the hint is gone. */
+.viewport[data-panning='true'] .world {
   will-change: transform;
 }
 

@@ -469,6 +469,17 @@ describe('conversation tree canvas', () => {
     expect(css).toContain('content: none')
   })
 
+  it('promotes the stage to a compositor layer only while panning', () => {
+    const css = readFileSync(
+      new URL('../src/client/view/ConversationTreeCanvas.module.css', import.meta.url),
+      'utf8',
+    )
+
+    const hints = css.match(/will-change/g) ?? []
+    expect(hints).toHaveLength(1)
+    expect(css).toContain(".viewport[data-panning='true'] .world")
+  })
+
   it('preserves focus dimming after the branch-card reveal animation settles', () => {
     const css = readFileSync(
       new URL('../src/client/view/ConversationTreeCanvas.module.css', import.meta.url),
