@@ -10,6 +10,7 @@
 
 [![许可证: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22.19-brightgreen.svg)](https://nodejs.org)
+[![npm](https://img.shields.io/npm/v/dsh-nested-followups.svg)](https://www.npmjs.com/package/dsh-nested-followups)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-0.1.0--rc.7-orange.svg)](https://github.com/deepseek-ai/deepseek-harness)
 
 ## 要解决的问题
@@ -46,7 +47,14 @@ DeepSeek Harness 的对话是线性的。当你正在完成一项工程任务，
 
 ## 安装
 
-本软件包尚未发布到 npm，请从源码安装：
+```sh
+dsh plugin --profile web add dsh-nested-followups
+```
+
+如果 DeepSeek Harness 的网页服务已在运行，请在安装后重启。
+
+<details>
+<summary>改用源码安装</summary>
 
 ```sh
 git clone https://github.com/sluminositys/dsh-nested-followups.git
@@ -56,7 +64,7 @@ pnpm run check
 dsh plugin --profile web add .
 ```
 
-如果 DeepSeek Harness 的网页服务已在运行，请在安装后重启。
+</details>
 
 卸载插件：
 

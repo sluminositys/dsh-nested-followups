@@ -11,6 +11,7 @@ appended to the end of your main conversation.
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22.19-brightgreen.svg)](https://nodejs.org)
+[![npm](https://img.shields.io/npm/v/dsh-nested-followups.svg)](https://www.npmjs.com/package/dsh-nested-followups)
 [![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-0.1.0--rc.7-orange.svg)](https://github.com/deepseek-ai/deepseek-harness)
 
 ## The problem it solves
@@ -55,7 +56,14 @@ conversation never sees it.
 
 ## Installation
 
-This package is not yet published to npm, so install it from source:
+```sh
+dsh plugin --profile web add dsh-nested-followups
+```
+
+Restart the DeepSeek Harness web profile if it is already running.
+
+<details>
+<summary>Installing from source instead</summary>
 
 ```sh
 git clone https://github.com/sluminositys/dsh-nested-followups.git
@@ -65,7 +73,7 @@ pnpm run check
 dsh plugin --profile web add .
 ```
 
-Restart the DeepSeek Harness web profile if it is already running.
+</details>
 
 To uninstall:
 
