@@ -657,6 +657,25 @@ export function ConversationTreeCanvas({
                   ? branch.record.anchorRange?.text
                   : undefined
                 const quoteInvalid = firstInBranch && branch?.anchorStatus === 'range-invalid'
+                const nodeSettled = node.state === 'complete' || node.state === 'error'
+                const branchTargetSettled = branchTargetNode !== undefined
+                  && (branchTargetNode.state === 'complete' || branchTargetNode.state === 'error')
+                const canAsk = readOnlyReason === undefined
+                  && onAskFollowUp !== undefined
+                  && node.role === 'assistant'
+                  && nodeSettled
+                  && branchTargetSettled
+                const askDisabledReason = node.role !== 'assistant'
+                  ? undefined
+                  : readOnlyReason !== undefined
+                    ? readOnlyReason
+                    : onAskFollowUp === undefined
+                      ? undefined
+                      : !nodeSettled || (branchTargetNode !== undefined && !branchTargetSettled)
+                        ? labels.askWaitForCompletion
+                        : branchTargetNode === undefined
+                          ? labels.askUnavailable
+                          : undefined
                 return (
                   <MessageNodeCard
                     key={node.nodeId}
@@ -671,11 +690,8 @@ export function ConversationTreeCanvas({
                     firstInBranch={firstInBranch}
                     {...quote === undefined ? {} : { quote }}
                     quoteInvalid={quoteInvalid}
-                    canAsk={readOnlyReason === undefined
-                      && onAskFollowUp !== undefined
-                      && node.role === 'assistant'
-                      && node.state === 'complete'
-                      && branchTargetNode?.state === 'complete'}
+                    canAsk={canAsk}
+                    {...askDisabledReason === undefined ? {} : { askDisabledReason }}
                     canContinue={readOnlyReason === undefined
                       && onContinueBranch !== undefined
                       && node.branchId !== null

@@ -43,6 +43,8 @@ export interface TreeViewLabels {
   readonly complete: string
   readonly error: string
   readonly askFollowUp: string
+  readonly askWaitForCompletion: string
+  readonly askUnavailable: string
   readonly continueBranch: string
   readonly focus: string
   readonly clearFocus: string
@@ -91,6 +93,8 @@ export const DEFAULT_TREE_VIEW_LABELS: TreeViewLabels = Object.freeze({
   complete: 'Complete',
   error: 'Failed',
   askFollowUp: 'Ask follow-up',
+  askWaitForCompletion: 'Wait for this turn to finish before branching.',
+  askUnavailable: 'This turn has no finalized assistant answer to branch from.',
   continueBranch: 'Continue this branch',
   focus: 'Focus',
   clearFocus: 'Clear focus',

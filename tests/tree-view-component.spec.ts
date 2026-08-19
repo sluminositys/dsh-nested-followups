@@ -57,7 +57,7 @@ describe('conversation tree canvas', () => {
     expect(markup).toContain('Conversation tree minimap')
   })
 
-  it('removes every mutating follow-up action in read-only compatibility mode', () => {
+  it('disables branching and removes continuation in read-only compatibility mode', () => {
     const projection = treeProjectionFixture()
     const onAskFollowUp = vi.fn(async () => {})
     const onContinueBranch = vi.fn(async () => {})
@@ -75,7 +75,8 @@ describe('conversation tree canvas', () => {
 
     expect(writable).toContain('aria-label="Ask follow-up"')
     expect(writable).toContain('aria-label="Continue this branch"')
-    expect(readOnly).not.toContain('aria-label="Ask follow-up"')
+    expect(readOnly).toContain('aria-label="Ask follow-up"')
+    expect(readOnly).toContain('aria-disabled="true"')
     expect(readOnly).not.toContain('aria-label="Continue this branch"')
     expect(readOnly).toContain('Tree View is read-only')
     expect(readOnly).toContain('This DSH version cannot create isolated chat-only branches.')
@@ -94,6 +95,31 @@ describe('conversation tree canvas', () => {
     expect(count(markup, 'aria-label="Continue this branch"')).toBe(3)
     expect(count(markup, 'aria-label="Delete branch"')).toBe(3)
     expect(markup).not.toContain('Open branch')
+  })
+
+  it('keeps finalized failed turns branchable while disabling an open turn with a reason', () => {
+    const base = treeProjectionFixture()
+    const projection = {
+      ...base,
+      nodes: base.nodes.map(node => {
+        if (node.nodeId === 'root-a1') return { ...node, state: 'error' as const }
+        if (node.nodeId !== 'root-a3') return node
+        const {
+          branchTargetMessageId: _branchTargetMessageId,
+          branchTargetSeq: _branchTargetSeq,
+          ...openNode
+        } = node
+        return { ...openNode, state: 'streaming' as const }
+      }),
+    }
+    const markup = renderToStaticMarkup(createElement(ConversationTreeCanvas, {
+      projection,
+      onAskFollowUp: vi.fn(async () => {}),
+    }))
+
+    expect(count(markup, 'aria-label="Ask follow-up"')).toBe(6)
+    expect(count(markup, 'aria-disabled="true"')).toBe(1)
+    expect(markup).toContain(DEFAULT_TREE_VIEW_LABELS.askWaitForCompletion)
   })
 
   it('discloses the rc.7 archive fallback in the destructive confirmation', () => {

@@ -27,6 +27,7 @@ interface MessageNodeCardProps {
   readonly quote?: string
   readonly quoteInvalid: boolean
   readonly canAsk: boolean
+  readonly askDisabledReason?: string
   readonly canContinue: boolean
   readonly canDelete: boolean
   readonly onSelect: () => void
@@ -72,6 +73,7 @@ export function MessageNodeCard({
   quote,
   quoteInvalid,
   canAsk,
+  askDisabledReason,
   canContinue,
   canDelete,
   onSelect,
@@ -124,13 +126,18 @@ export function MessageNodeCard({
           <span>{status}</span>
         </span>
         <span className={css.nodeActions}>
-          {canAsk && (
-            <Tooltip label={labels.askFollowUp} side="bottom">
+          {(canAsk || askDisabledReason !== undefined) && (
+            <Tooltip label={askDisabledReason ?? labels.askFollowUp} side="bottom">
               <button
                 type="button"
                 className={css.iconButton}
                 aria-label={labels.askFollowUp}
-                onClick={(event) => { stop(event); onAsk() }}
+                aria-disabled={!canAsk || undefined}
+                {...askDisabledReason === undefined ? {} : { 'aria-description': askDisabledReason }}
+                onClick={(event) => {
+                  stop(event)
+                  if (canAsk) onAsk()
+                }}
               >
                 <IconPlusOutline16 size={14} />
               </button>

@@ -42,6 +42,10 @@ interface SessionSnapshot {
   readonly events: readonly SessionEvent[]
 }
 
+type BranchReservation =
+  | { readonly kind: 'existing'; readonly branch: BranchRecord }
+  | { readonly kind: 'created'; readonly branch: BranchRecord }
+
 class BranchCommandError extends Error {
   constructor(
     readonly code: BranchCommandErrorCode,
@@ -113,6 +117,7 @@ export class NestedFollowupsBranchService extends Service {
   static inject = ['agents', 'sessions', 'sessionPersistence', 'nestedFollowupsMetadata']
 
   private readonly pending = new Map<string, Promise<BranchCommandResult>>()
+  private readonly reservationTails = new Map<string, Promise<void>>()
   private readonly handles = new Map<string, AgentHandle>()
   private readonly activityEpochs = new Map<string, number>()
 
@@ -211,14 +216,51 @@ export class NestedFollowupsBranchService extends Service {
     }
     const anchorRange = this.validateRange(request.anchor.range, source.events, boundary)
     const prompt = formatAnchoredQuestion(request.question, anchorRange)
-    const existing = this.metadata.repository.getBranchByClientRequest(
-      tree.treeId,
-      request.clientRequestId,
+    const reservation = await this.withReservationLock(
+      [
+        tree.treeId,
+        parentBranch?.branchId ?? '',
+        String(source.header.id),
+        boundary.anchorMessageId,
+      ].join('\u0000'),
+      async (): Promise<BranchReservation> => {
+        const existing = this.metadata.repository.getBranchByClientRequest(
+          tree.treeId,
+          request.clientRequestId,
+        )
+        if (existing !== undefined) return { kind: 'existing', branch: existing }
+
+        const now = Date.now()
+        const record: BranchRecord = {
+          branchId: `branch-${randomUUID()}`,
+          clientRequestId: request.clientRequestId,
+          treeId: tree.treeId,
+          sessionId: String(SessionId(randomUUID())),
+          parentSessionId: String(source.header.id),
+          parentBranchId: parentBranch?.branchId ?? null,
+          anchorSessionId: String(source.header.id),
+          anchorMessageId: boundary.anchorMessageId,
+          anchorSeq: boundary.anchorSeq,
+          forkBoundarySeq: boundary.forkBoundarySeq,
+          seedLength: boundary.seedLength,
+          ...(anchorRange === undefined ? {} : { anchorRange }),
+          siblingOrdinal: this.metadata.repository.nextSiblingOrdinal(
+            tree.treeId,
+            parentBranch?.branchId ?? null,
+            String(source.header.id),
+            boundary.anchorMessageId,
+          ),
+          createdAt: now,
+          status: 'creating',
+        }
+        await this.metadata.repository.putBranch(record)
+        return { kind: 'created', branch: record }
+      },
     )
-    if (existing !== undefined) {
-      this.assertMatchingCreateRetry(existing, request, boundary, anchorRange)
+    if (reservation.kind === 'existing') {
+      this.assertMatchingCreateRetry(reservation.branch, request, boundary, anchorRange)
       return this.recoverExistingCreate(
-        existing,
+        reservation.branch,
         source.header,
         boundary.seed,
         prompt,
@@ -226,33 +268,9 @@ export class NestedFollowupsBranchService extends Service {
       )
     }
 
-    const now = Date.now()
-    const branchId = `branch-${randomUUID()}`
-    const childSessionId = SessionId(randomUUID())
-    const record: BranchRecord = {
-      branchId,
-      clientRequestId: request.clientRequestId,
-      treeId: tree.treeId,
-      sessionId: String(childSessionId),
-      parentSessionId: String(source.header.id),
-      parentBranchId: parentBranch?.branchId ?? null,
-      anchorSessionId: String(source.header.id),
-      anchorMessageId: boundary.anchorMessageId,
-      anchorSeq: boundary.anchorSeq,
-      forkBoundarySeq: boundary.forkBoundarySeq,
-      seedLength: boundary.seedLength,
-      ...(anchorRange === undefined ? {} : { anchorRange }),
-      siblingOrdinal: this.metadata.repository.nextSiblingOrdinal(
-        tree.treeId,
-        parentBranch?.branchId ?? null,
-        String(source.header.id),
-        boundary.anchorMessageId,
-      ),
-      createdAt: now,
-      status: 'creating',
-    }
-
-    await this.metadata.repository.putBranch(record)
+    const record = reservation.branch
+    const branchId = record.branchId
+    const childSessionId = SessionId(record.sessionId)
     this.notify(tree.rootSessionId)
     let handle: AgentHandle | undefined
     try {
@@ -409,6 +427,25 @@ export class NestedFollowupsBranchService extends Service {
         `session '${sessionId}' could not be loaded`,
         { cause: error },
       )
+    }
+  }
+
+  /**
+   * Serialize only the durable ordinal reservation for one anchor. Agent
+   * creation and generation happen after this critical section, so sibling
+   * branches still stream independently.
+   */
+  private async withReservationLock<T>(key: string, operation: () => Promise<T>): Promise<T> {
+    const previous = this.reservationTails.get(key) ?? Promise.resolve()
+    let release: (() => void) | undefined
+    const current = new Promise<void>((resolve) => { release = resolve })
+    this.reservationTails.set(key, current)
+    await previous
+    try {
+      return await operation()
+    } finally {
+      release?.()
+      if (this.reservationTails.get(key) === current) this.reservationTails.delete(key)
     }
   }
 

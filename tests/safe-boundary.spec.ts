@@ -61,6 +61,19 @@ describe('safe branch boundary', () => {
     })
   })
 
+  it('accepts a crash-interrupted turn when it still has a finalized assistant tail', () => {
+    const events = textTurn(0, 1, 'q1', 'a1', 'question', 'durable answer').map(item =>
+      item.type === 'turn/end'
+        ? event({ ...item, data: { turn: 1, reason: { kind: 'interrupted' } } })
+        : item)
+
+    expect(resolveBranchBoundary(events, 'a1')).toMatchObject({
+      anchorMessageId: 'a1',
+      turnEndSeq: 5,
+      seedLength: 6,
+    })
+  })
+
   it('rejects an anchor whose own turn is still open', () => {
     const events = [
       ...textTurn(0, 1, 'q1', 'a1', 'question', 'answer'),

@@ -20,6 +20,8 @@ export type NestedFollowupsLocaleKey =
   | 'tree.complete'
   | 'tree.error'
   | 'tree.askFollowUp'
+  | 'tree.askWaitForCompletion'
+  | 'tree.askUnavailable'
   | 'tree.continueBranch'
   | 'tree.focus'
   | 'tree.clearFocus'
@@ -80,6 +82,8 @@ export const en: Record<NestedFollowupsLocaleKey, string> = {
   'tree.complete': 'Complete',
   'tree.error': 'Failed',
   'tree.askFollowUp': 'Ask follow-up',
+  'tree.askWaitForCompletion': 'Wait for this turn to finish before branching.',
+  'tree.askUnavailable': 'This turn has no finalized assistant answer to branch from.',
   'tree.continueBranch': 'Continue this branch',
   'tree.focus': 'Focus',
   'tree.clearFocus': 'Clear focus',
@@ -135,6 +139,8 @@ export const zh: Record<NestedFollowupsLocaleKey, string> = {
   'tree.complete': '已完成',
   'tree.error': '失败',
   'tree.askFollowUp': '创建子分支',
+  'tree.askWaitForCompletion': '请等待当前回合完成后再创建分支。',
+  'tree.askUnavailable': '当前回合没有可用于创建分支的最终助手回答。',
   'tree.continueBranch': '继续当前分支',
   'tree.focus': '聚焦',
   'tree.clearFocus': '取消聚焦',
@@ -188,6 +194,8 @@ export function labelsFrom(t: TranslateNS<typeof NS>): TreeViewLabels {
     complete: t('tree.complete'),
     error: t('tree.error'),
     askFollowUp: t('tree.askFollowUp'),
+    askWaitForCompletion: t('tree.askWaitForCompletion'),
+    askUnavailable: t('tree.askUnavailable'),
     continueBranch: t('tree.continueBranch'),
     focus: t('tree.focus'),
     clearFocus: t('tree.clearFocus'),

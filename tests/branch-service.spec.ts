@@ -5,7 +5,7 @@ import type {
   CreateAgentOptions,
   ResumeAgentOptions,
 } from '@deepseek-ai/dsh-agent'
-import { createAssistantMessage } from '@deepseek-ai/dsh-llm'
+import { createAssistantMessage, createUserMessage } from '@deepseek-ai/dsh-llm'
 import SessionStore, {
   SessionId,
   type Session,
@@ -41,6 +41,14 @@ class MemoryTable<V> implements KvTable<string, V> {
     const next = fn(current)
     this.values.set(key, next)
     return next
+  }
+}
+
+/** Expose ordinal-allocation races that an asynchronously durable table can hit. */
+class YieldingMemoryTable<V> extends MemoryTable<V> {
+  override async put(key: string, value: V): Promise<void> {
+    await Promise.resolve()
+    this.values.set(key, value)
   }
 }
 
@@ -119,6 +127,7 @@ class ToolsCapabilityStub extends Service {
 class AgentsStub extends Service {
   readonly setupRecords: ChatOnlySetupRecord[] = []
   readonly deliveredPrompts: string[] = []
+  failNextCreate = false
   failNextFollowup = false
   private readonly values = new Map<SessionId, Agent>()
 
@@ -127,6 +136,10 @@ class AgentsStub extends Service {
   get(id: SessionId): Agent | undefined { return this.values.get(id) }
 
   async create(options: CreateAgentOptions): Promise<AgentHandle> {
+    if (this.failNextCreate) {
+      this.failNextCreate = false
+      throw new Error('injected branch session creation failure')
+    }
     const session = this.ctx.sessions.create(options.sessionId, {
       ...(options.seed === undefined ? {} : { seed: options.seed }),
       ...(options.meta === undefined ? {} : { meta: options.meta }),
@@ -183,11 +196,24 @@ function latestAssistant(session: Session): SessionEvent<'assistant/message'> {
   return event
 }
 
-async function setup() {
+function appendOpenStreamingTurn(session: Session, turn: number, marker: string): void {
+  session.append('turn/start', { turn })
+  session.append('user/message', createUserMessage({
+    content: [{ type: 'text', text: marker }],
+    source: { kind: 'user' },
+  }), { surfaceOp: 'append' })
+  session.append('step/start', { turn, step: 1 })
+  session.append('assistant/chunk', {
+    turn,
+    step: 1,
+    chunk: { type: 'text-delta', index: 0, text: 'still streaming' },
+  })
+}
+
+async function setup(branches: MemoryTable<BranchRecord> = new MemoryTable<BranchRecord>()) {
   const ctx = new Context()
   const fibers: Fiber[] = []
   const trees = new MemoryTable<TreeRecord>()
-  const branches = new MemoryTable<BranchRecord>()
   const repository = new TreeMetadataRepository(trees, branches)
 
   for (const plugin of [SessionStore, MemoryPersistence, ToolsCapabilityStub, AgentsStub]) {
@@ -348,6 +374,70 @@ describe('Host branch commands', () => {
 
       const conflict = await runtime.service.createBranch({ ...request, question: 'different content' })
       expect(conflict).toMatchObject({ ok: false, error: { code: 'request-conflict' } })
+    } finally {
+      await runtime.dispose()
+    }
+  })
+
+  it('removes the reservation after fork creation fails and leaves the root untouched', async () => {
+    const runtime = await setup()
+    try {
+      runtime.agents.failNextCreate = true
+      const rootBefore = JSON.stringify(runtime.root.events)
+      const result = await runtime.service.createBranch({
+        ownerSessionId: 'root',
+        clientRequestId: 'request-fork-failure',
+        anchor: { sessionId: 'root', messageId: 'a1', seq: 3 },
+        question: 'this prompt must never be delivered',
+      })
+
+      expect(result).toMatchObject({ ok: false, error: { code: 'fork-failed' } })
+      expect(runtime.repository.listBranches('root')).toEqual([])
+      expect(runtime.agents.deliveredPrompts).toEqual([])
+      expect(JSON.stringify(runtime.root.events)).toBe(rootBefore)
+    } finally {
+      await runtime.dispose()
+    }
+  })
+
+  it('creates concurrent siblings from a completed turn while the root keeps streaming', async () => {
+    const runtime = await setup(new YieldingMemoryTable<BranchRecord>())
+    try {
+      const completedPrefixLength = runtime.root.events.length
+      appendOpenStreamingTurn(runtime.root, 2, 'ROOT_STILL_STREAMING')
+      const rootBefore = JSON.stringify(runtime.root.events)
+      const results = await Promise.all([
+        runtime.service.createBranch({
+          ownerSessionId: 'root',
+          clientRequestId: 'concurrent-sibling-1',
+          anchor: { sessionId: 'root', messageId: 'a1', seq: 3 },
+          question: 'first concurrent clarification',
+        }),
+        runtime.service.createBranch({
+          ownerSessionId: 'root',
+          clientRequestId: 'concurrent-sibling-2',
+          anchor: { sessionId: 'root', messageId: 'a1', seq: 3 },
+          question: 'second concurrent clarification',
+        }),
+      ])
+
+      expect(results.every(result => result.ok)).toBe(true)
+      const records = runtime.repository.listBranches('root')
+      expect(records).toHaveLength(2)
+      expect(records.map(record => record.siblingOrdinal).sort((left, right) => left - right))
+        .toEqual([1, 2])
+      expect(new Set(records.map(record => record.sessionId)).size).toBe(2)
+      expect(records.every(record => record.seedLength === completedPrefixLength)).toBe(true)
+      for (const record of records) {
+        const session = runtime.ctx.sessions.get(SessionId(record.sessionId))
+        expect(session?.header.origin).toBe('subagent')
+        expect(JSON.stringify(session?.events)).not.toContain('ROOT_STILL_STREAMING')
+      }
+      expect(runtime.agents.deliveredPrompts.sort()).toEqual([
+        'concurrent-sibling-1',
+        'concurrent-sibling-2',
+      ])
+      expect(JSON.stringify(runtime.root.events)).toBe(rootBefore)
     } finally {
       await runtime.dispose()
     }

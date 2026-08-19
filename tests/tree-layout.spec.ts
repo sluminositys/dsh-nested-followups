@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 
 import { layoutConversationTree } from '../src/client/tree/layout.ts'
+import type { ConversationTreeProjection, TreeEdgeView } from '../src/shared/projection.ts'
+import type { MessageNodeView } from '../src/shared/types.ts'
 import { treeProjectionFixture } from './fixtures/tree-projection.ts'
 
 function nodeMap(layout: ReturnType<typeof layoutConversationTree>) {
@@ -80,5 +82,61 @@ describe('conversation tree layout', () => {
       y: anchor.y + anchor.height / 2,
     })
     expect(edge?.path).toMatch(/^M .+ C .+$/u)
+  })
+
+  it('keeps a 200-message mainline finite, ordered, and deterministic', () => {
+    const fixture = treeProjectionFixture()
+    const nodes: MessageNodeView[] = Array.from({ length: 200 }, (_, index) => {
+      const role = index % 2 === 0 ? 'user' as const : 'assistant' as const
+      const localTurnIndex = Math.floor(index / 2) + 1
+      const nodeId = `large-root-${index}`
+      return {
+        nodeId,
+        treeId: fixture.tree.treeId,
+        branchId: null,
+        sessionId: 'large-root',
+        messageId: nodeId,
+        seq: index,
+        role,
+        turnId: `large-root:${localTurnIndex}`,
+        branchPath: [localTurnIndex],
+        localTurnIndex,
+        time: index,
+        text: `message ${index}`,
+        summary: `message ${index}`,
+        state: 'complete',
+        ...(role === 'assistant' ? {
+          branchTargetMessageId: nodeId,
+          branchTargetSeq: index,
+        } : {}),
+      }
+    })
+    const edges: TreeEdgeView[] = nodes.slice(1).map((target, index) => ({
+      edgeId: `sequence:${nodes[index]!.nodeId}:${target.nodeId}`,
+      sourceNodeId: nodes[index]!.nodeId,
+      targetNodeId: target.nodeId,
+      kind: 'sequence',
+    }))
+    const projection: ConversationTreeProjection = {
+      tree: fixture.tree,
+      nodes,
+      edges,
+      branches: [],
+      diagnostics: [],
+    }
+
+    const first = layoutConversationTree(projection)
+    const second = layoutConversationTree({
+      ...projection,
+      nodes: [...nodes].reverse(),
+      edges: [...edges].reverse(),
+    })
+
+    expect(first.nodes).toHaveLength(200)
+    expect(first.nodes.map(node => node.rect.y))
+      .toEqual(first.nodes.map(node => node.rect.y).sort((left, right) => left - right))
+    expect(Object.values(first.bounds).every(Number.isFinite)).toBe(true)
+    expect(second.nodes).toEqual(first.nodes)
+    expect(second.bounds).toEqual(first.bounds)
   })
 })

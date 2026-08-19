@@ -403,6 +403,11 @@
   background: var(--dsw-alias-interactive-bg-hover);
 }
 
+.iconButton[aria-disabled='true'] {
+  cursor: not-allowed;
+  opacity: 0.48;
+}
+
 .iconButton[data-danger='true']:hover,
 .iconButton[data-danger='true']:focus-visible {
   color: var(--dsw-alias-label-error);
