@@ -70,7 +70,7 @@ describe('conversation tree layout', () => {
         pathLabel: '2.1',
         firstQuestionSummary: 'branch question',
         childBranchCount: 1,
-        messageCount: 4,
+        messageCount: 2,
       }),
     ])
     const expandedRoot = expanded.nodes.filter(node => node.branchId === null)

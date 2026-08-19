@@ -28,7 +28,7 @@ export type TreeInteractionAction =
       branchIds: readonly string[]
       anchorDotIds: readonly string[]
     }
-  | { type: 'anchor/toggle'; anchorDotId: string }
+  | { type: 'anchor/toggle'; anchorDotId: string; branchIds?: readonly string[] }
   | {
       type: 'anchor/deep-expand'
       anchorDotIds: readonly string[]
@@ -93,8 +93,15 @@ export function treeInteractionReducer(
       for (const anchorDotId of action.anchorDotIds) anchorDotIds.delete(anchorDotId)
       return { ...state, collapsedBranchIds, anchorDotIds }
     }
-    case 'anchor/toggle':
-      return { ...state, anchorDotIds: toggled(state.anchorDotIds, action.anchorDotId) }
+    case 'anchor/toggle': {
+      const anchorDotIds = toggled(state.anchorDotIds, action.anchorDotId)
+      if (anchorDotIds.has(action.anchorDotId)) return { ...state, anchorDotIds }
+      // Opening a dot reveals exactly one level: every direct branch arrives as
+      // a capsule, and the user chooses which one to open next.
+      const collapsedBranchIds = new Set(state.collapsedBranchIds)
+      for (const branchId of action.branchIds ?? []) collapsedBranchIds.add(branchId)
+      return { ...state, anchorDotIds, collapsedBranchIds }
+    }
     case 'anchor/deep-expand': {
       const anchorDotIds = new Set(state.anchorDotIds)
       for (const anchorDotId of action.anchorDotIds) anchorDotIds.delete(anchorDotId)

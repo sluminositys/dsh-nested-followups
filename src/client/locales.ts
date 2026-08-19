@@ -39,9 +39,13 @@ export type NestedFollowupsLocaleKey =
   | 'tree.emptyDescription'
   | 'tree.followUpPlaceholder'
   | 'tree.continuePlaceholder'
-  | 'tree.quoteSource'
   | 'tree.quoteSelected'
-  | 'tree.clearQuote'
+  | 'tree.quoteHint'
+  | 'tree.savedQuotes'
+  | 'tree.saveQuote'
+  | 'tree.removeQuote'
+  | 'tree.quoteNotePlaceholder'
+
   | 'tree.quoteInvalid'
   | 'tree.snapToTurnTail'
   | 'tree.send'
@@ -107,9 +111,13 @@ export const en: Record<NestedFollowupsLocaleKey, string> = {
   'tree.emptyDescription': 'Messages appear here after the conversation begins.',
   'tree.followUpPlaceholder': 'Ask a follow-up about this message…',
   'tree.continuePlaceholder': 'Add the next turn to this branch…',
-  'tree.quoteSource': 'Select source text to quote (optional)',
+
   'tree.quoteSelected': 'Quoted source',
-  'tree.clearQuote': 'Clear quote',
+  'tree.quoteHint': 'To quote the answer, open the message and select the passage.',
+  'tree.savedQuotes': 'Saved quotes',
+  'tree.saveQuote': 'Save quote',
+  'tree.removeQuote': 'Remove quote',
+  'tree.quoteNotePlaceholder': 'Add an optional comment, Enter saves the quote',
   'tree.quoteInvalid': 'The quoted source changed; this branch now anchors to the whole message.',
   'tree.snapToTurnTail': 'Context will include the completed turn through {label}.',
   'tree.send': 'Send',
@@ -123,7 +131,7 @@ export const en: Record<NestedFollowupsLocaleKey, string> = {
   'tree.readonly': 'Tree View is read-only',
   'tree.readonlyReason': 'This Host cannot gate branch tool execution. Update DeepSeek Harness to create follow-up branches.',
   'tree.nodeCount': '{count} messages',
-  'tree.collapsedCount': '+{count} nodes',
+  'tree.collapsedCount': '+{count} messages',
   'tree.expandAnchorGroup': 'Expand {branches} branches · +{messages} messages',
   'tree.collapseAnchorGroup': 'Collapse whole group: {branches} branches · +{messages} messages',
   'tree.expandBranchPath': 'Expand branch {path}',
@@ -170,9 +178,13 @@ export const zh: Record<NestedFollowupsLocaleKey, string> = {
   'tree.emptyDescription': '会话开始后，消息会显示在这里。',
   'tree.followUpPlaceholder': '针对这条消息创建一个新的子分支…',
   'tree.continuePlaceholder': '向当前分支追加下一轮…',
-  'tree.quoteSource': '可选：在原始文本中选择要引用的内容',
+
   'tree.quoteSelected': '引用内容',
-  'tree.clearQuote': '清除引用',
+  'tree.quoteHint': '想引用回答内容？点开消息后用光标选中文字即可。',
+  'tree.savedQuotes': '已保存的引用',
+  'tree.saveQuote': '保存引用',
+  'tree.removeQuote': '删除引用',
+  'tree.quoteNotePlaceholder': '补充说明（可选），回车保存引用',
   'tree.quoteInvalid': '引用原文已发生变化；该分支现已降级为整条消息锚点。',
   'tree.snapToTurnTail': '上下文将继承到该回合结束（{label}）。',
   'tree.send': '发送',
@@ -186,7 +198,7 @@ export const zh: Record<NestedFollowupsLocaleKey, string> = {
   'tree.readonly': '树状视图当前为只读',
   'tree.readonlyReason': '当前 Host 无法限制分支的工具执行。请升级 DeepSeek Harness 后再创建追问分支。',
   'tree.nodeCount': '{count} 条消息',
-  'tree.collapsedCount': '+{count} 个节点',
+  'tree.collapsedCount': '+{count} 条消息',
   'tree.expandAnchorGroup': '展开 {branches} 条分支 · 共 +{messages} 条消息',
   'tree.collapseAnchorGroup': '收回整组：{branches} 条分支 · 共 +{messages} 条消息',
   'tree.expandBranchPath': '展开分支 {path}',
@@ -231,9 +243,13 @@ export function labelsFrom(t: TranslateNS<typeof NS>): TreeViewLabels {
     emptyDescription: t('tree.emptyDescription'),
     followUpPlaceholder: t('tree.followUpPlaceholder'),
     continuePlaceholder: t('tree.continuePlaceholder'),
-    quoteSource: t('tree.quoteSource'),
+
     quoteSelected: t('tree.quoteSelected'),
-    clearQuote: t('tree.clearQuote'),
+    quoteHint: t('tree.quoteHint'),
+    savedQuotes: t('tree.savedQuotes'),
+    saveQuote: t('tree.saveQuote'),
+    removeQuote: t('tree.removeQuote'),
+    quoteNotePlaceholder: t('tree.quoteNotePlaceholder'),
     quoteInvalid: t('tree.quoteInvalid'),
     snapToTurnTail: label => t('tree.snapToTurnTail', { label }),
     send: t('tree.send'),

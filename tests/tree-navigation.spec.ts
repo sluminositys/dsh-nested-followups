@@ -55,7 +55,7 @@ describe('tree navigation state', () => {
         firstQuestionSummary: 'branch question',
         childBranchCount: 1,
         branchCount: 2,
-        messageCount: 4,
+        messageCount: 2,
       }),
     ])
     expect(collapsed.visibleBranchIds).toEqual(new Set(['branch-2']))
@@ -95,7 +95,7 @@ describe('tree navigation state', () => {
     }
     const state = deriveCollapseState(projection, new Set(['branch-1']))
 
-    expect(state.summaries[0]).toMatchObject({ activity: 'error', messageCount: 4 })
+    expect(state.summaries[0]).toMatchObject({ activity: 'error', messageCount: 2 })
   })
 
   it('finds text and display labels and supplies the complete expansion path', () => {

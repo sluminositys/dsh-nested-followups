@@ -9,6 +9,7 @@ import {
   type PointerEvent,
   type WheelEvent,
 } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Button,
   IconChevronUpOutline14,
@@ -18,6 +19,11 @@ import {
   MessageText,
   Modal,
 } from '@deepseek-ai/dsh-client-ui-primitives'
+import {
+  composeQuotedQuestion,
+  locateQuoteRange,
+  type SavedQuote,
+} from '../../shared/anchored-question.ts'
 import { displayLabelOf } from '../../shared/labels.ts'
 import type { AnchorRange, MessageNodeView } from '../../shared/types.ts'
 import {
@@ -153,19 +159,55 @@ function nodeStyle(rect: { x: number; y: number; width: number; height: number }
   return { left: rect.x, top: rect.y, width: rect.width, height: rect.height }
 }
 
+interface PendingQuoteCapture {
+  readonly text: string
+  readonly left: number
+  readonly top: number
+}
+
 function MessageDetails({
   node,
   labels,
   quote,
   quoteInvalid,
+  savedQuotes,
+  onAddQuote,
+  onRemoveQuote,
   onClose,
 }: {
   readonly node: MessageNodeView
   readonly labels: TreeViewLabels
   readonly quote?: string
   readonly quoteInvalid: boolean
+  readonly savedQuotes: readonly SavedQuote[]
+  readonly onAddQuote: (text: string, note: string) => void
+  readonly onRemoveQuote: (quoteId: string) => void
   readonly onClose: () => void
 }) {
+  const [capture, setCapture] = useState<PendingQuoteCapture | null>(null)
+  const [note, setNote] = useState('')
+  const contentRef = useRef<HTMLDivElement>(null)
+
+  const beginCapture = (): void => {
+    const selection = typeof window === 'undefined' ? null : window.getSelection()
+    const content = contentRef.current
+    if (selection === null || content === null || selection.rangeCount === 0) return
+    const text = selection.toString().trim()
+    if (text === '' || selection.isCollapsed) return
+    const range = selection.getRangeAt(0)
+    if (!content.contains(range.commonAncestorContainer)) return
+    const rect = range.getBoundingClientRect()
+    setNote('')
+    setCapture({ text, left: rect.left + rect.width / 2, top: rect.bottom + 8 })
+  }
+  const saveCapture = (): void => {
+    if (capture === null) return
+    onAddQuote(capture.text, note)
+    setCapture(null)
+    setNote('')
+    if (typeof window !== 'undefined') window.getSelection()?.removeAllRanges()
+  }
+
   return (
     <aside className={css.detailsDrawer} data-tree-scroll="true" aria-label={labels.details}>
       <header className={css.detailsHeader}>
@@ -174,7 +216,31 @@ function MessageDetails({
           <IconCloseOutline16 size={14} />
         </button>
       </header>
-      <div className={css.detailsContent}>
+      {savedQuotes.length > 0 && (
+        <ul className={css.savedQuoteList} aria-label={labels.savedQuotes}>
+          {savedQuotes.map((saved, index) => (
+            <li key={saved.id} className={css.savedQuoteChip}>
+              <span className={css.savedQuoteText} title={saved.text}>
+                {index + 1}. {saved.text}
+              </span>
+              {saved.note !== '' && <span className={css.savedQuoteNote}>{saved.note}</span>}
+              <button
+                type="button"
+                className={css.savedQuoteRemove}
+                aria-label={labels.removeQuote}
+                onClick={() => { onRemoveQuote(saved.id) }}
+              >
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div
+        ref={contentRef}
+        className={css.detailsContent}
+        onMouseUp={beginCapture}
+      >
         {quote !== undefined && (
           <blockquote className={css.anchorQuote} aria-label={labels.quoteSelected}>{quote}</blockquote>
         )}
@@ -183,6 +249,37 @@ function MessageDetails({
           ? <MarkdownText text={node.text} streaming={node.state === 'streaming'} />
           : <MessageText text={node.text} />}
       </div>
+      {capture !== null && typeof document !== 'undefined' && createPortal(
+        <div
+          className={css.quoteCapture}
+          style={{ left: capture.left, top: capture.top }}
+          role="dialog"
+          aria-label={labels.saveQuote}
+        >
+          <blockquote className={css.quoteCaptureText}>{capture.text}</blockquote>
+          <input
+            autoFocus
+            className={css.quoteCaptureInput}
+            value={note}
+            placeholder={labels.quoteNotePlaceholder}
+            aria-label={labels.quoteNotePlaceholder}
+            onChange={event => { setNote(event.target.value) }}
+            onKeyDown={(event) => {
+              if (event.nativeEvent.isComposing) return
+              if (event.key === 'Enter') {
+                event.preventDefault()
+                saveCapture()
+              }
+              if (event.key === 'Escape') setCapture(null)
+            }}
+          />
+          <div className={css.quoteCaptureActions}>
+            <button type="button" onClick={() => { setCapture(null) }}>{labels.cancel}</button>
+            <button type="button" data-primary="true" onClick={saveCapture}>{labels.saveQuote}</button>
+          </div>
+        </div>,
+        document.body,
+      )}
     </aside>
   )
 }
@@ -192,6 +289,8 @@ function FollowUpComposer({
   mode,
   labels,
   branchTargetLabel,
+  savedQuotes,
+  onRemoveQuote,
   style,
   submit,
   close,
@@ -200,6 +299,8 @@ function FollowUpComposer({
   readonly mode: 'ask' | 'continue'
   readonly labels: TreeViewLabels
   readonly branchTargetLabel?: string
+  readonly savedQuotes: readonly SavedQuote[]
+  readonly onRemoveQuote: (quoteId: string) => void
   readonly style: React.CSSProperties
   readonly submit: (
     text: string,
@@ -210,16 +311,23 @@ function FollowUpComposer({
 }) {
   const [draft, setDraft] = useState('')
   const [clientRequestId] = useState(() => crypto.randomUUID())
-  const [anchorRange, setAnchorRange] = useState<AnchorRange | undefined>()
   const [pending, setPending] = useState(false)
   const [failure, setFailure] = useState<string | null>(null)
+  const quotes = mode === 'ask' ? savedQuotes : []
   const onSubmit = (event: FormEvent<HTMLFormElement>): void => {
     event.preventDefault()
-    const question = draft.trim()
-    if (question === '' || pending) return
+    const typed = draft.trim()
+    if (typed === '' || pending) return
+    // The first pure quote becomes the durable anchor when it matches the
+    // source exactly once; the Host prepends that quote block itself. Every
+    // other quote, and any quote carrying a note, travels inline.
+    const headRange = quotes.length > 0 && quotes[0]!.note.trim() === ''
+      ? locateQuoteRange(node.text, quotes[0]!.text)
+      : undefined
+    const question = composeQuotedQuestion(quotes, typed, headRange !== undefined)
     setPending(true)
     setFailure(null)
-    void submit(question, clientRequestId, mode === 'ask' ? anchorRange : undefined).then(() => {
+    void submit(question, clientRequestId, headRange).then(() => {
       setPending(false)
       close()
     }, (error: unknown) => {
@@ -242,41 +350,28 @@ function FollowUpComposer({
       {mode === 'ask' && branchTargetLabel !== undefined && (
         <p className={css.snapNotice} role="status">{labels.snapToTurnTail(branchTargetLabel)}</p>
       )}
-      {mode === 'ask'
-        && branchTargetLabel === undefined
-        && node.text.length > 0 && (
-        <label className={css.quoteSelector}>
-          <span>{labels.quoteSource}</span>
-          <textarea
-            className={css.quoteSource}
-            rows={4}
-            value={node.text}
-            readOnly
-            disabled={pending}
-            aria-label={labels.quoteSource}
-            onSelect={(event) => {
-              setAnchorRange(anchorRangeFromSelection(
-                node.text,
-                event.currentTarget.selectionStart,
-                event.currentTarget.selectionEnd,
-              ))
-            }}
-          />
-        </label>
-      )}
-      {anchorRange !== undefined && (
+      {quotes.length > 0 && (
         <div className={css.selectedQuote} data-tree-scroll="true">
           <span>{labels.quoteSelected}</span>
-          <blockquote>{anchorRange.text}</blockquote>
-          <button
-            type="button"
-            className={css.clearQuote}
-            disabled={pending}
-            onClick={() => { setAnchorRange(undefined) }}
-          >
-            {labels.clearQuote}
-          </button>
+          {quotes.map(saved => (
+            <div key={saved.id} className={css.composerQuoteRow}>
+              <blockquote>{saved.text}</blockquote>
+              {saved.note !== '' && <p className={css.savedQuoteNote}>{saved.note}</p>}
+              <button
+                type="button"
+                className={css.clearQuote}
+                disabled={pending}
+                aria-label={labels.removeQuote}
+                onClick={() => { onRemoveQuote(saved.id) }}
+              >
+                ×
+              </button>
+            </div>
+          ))}
         </div>
+      )}
+      {mode === 'ask' && quotes.length === 0 && (
+        <p className={css.quoteHint}>{labels.quoteHint}</p>
       )}
       <textarea
         autoFocus
@@ -336,6 +431,9 @@ export function ConversationTreeCanvas({
   const [collapsingToCapsuleIds, setCollapsingToCapsuleIds] = useState<ReadonlySet<string>>(
     new Set(),
   )
+  const [quotesByNodeId, setQuotesByNodeId] = useState<ReadonlyMap<string, readonly SavedQuote[]>>(
+    new Map(),
+  )
   const viewportRef = useRef<HTMLDivElement>(null)
   const pointerPanRef = useRef<PointerPan | null>(null)
   const fittedTreeRef = useRef<string | null>(
@@ -370,6 +468,23 @@ export function ConversationTreeCanvas({
     dispatch({ type: 'projection/reconcile', projection })
   }, [interaction.treeId, projection])
 
+  // First visit to a tree with no stored ViewState starts fully folded: the
+  // trunk plus one dot per top-level anchor group, revealed level by level.
+  // Folding is derived during render so the first frame is already folded,
+  // then committed once so later interactions behave normally.
+  const [needsInitialFold, setNeedsInitialFold] = useState(() => initialViewState === undefined)
+  useEffect(() => {
+    if (interaction.treeId === projection.tree.treeId) return
+    setNeedsInitialFold(loadTreeViewState(projection.tree.treeId) === undefined)
+  }, [interaction.treeId, projection.tree.treeId])
+  useEffect(() => {
+    if (!needsInitialFold || interaction.treeId !== projection.tree.treeId) return
+    const anchorDotIds = topLevelAnchorDotIds(projection)
+    if (anchorDotIds.length === 0) return
+    setNeedsInitialFold(false)
+    dispatch({ type: 'anchors/collapse-all', anchorDotIds })
+  }, [interaction.treeId, needsInitialFold, projection])
+
   useEffect(() => {
     if (interaction.treeId !== projection.tree.treeId) return
     saveTreeViewState(toTreeViewState(interaction, transform))
@@ -382,10 +497,15 @@ export function ConversationTreeCanvas({
     if (capsuleMorphTimerRef.current !== null) clearTimeout(capsuleMorphTimerRef.current)
   }, [])
 
-  const layout = useMemo(() => layoutConversationTree(projection, {
-    collapsedBranchIds: interaction.collapsedBranchIds,
-    anchorDotIds: interaction.anchorDotIds,
-  }), [interaction.anchorDotIds, interaction.collapsedBranchIds, projection])
+  const layout = useMemo(() => {
+    const anchorDotIds = needsInitialFold
+      ? new Set([...interaction.anchorDotIds, ...topLevelAnchorDotIds(projection)])
+      : interaction.anchorDotIds
+    return layoutConversationTree(projection, {
+      collapsedBranchIds: interaction.collapsedBranchIds,
+      anchorDotIds,
+    })
+  }, [interaction.anchorDotIds, interaction.collapsedBranchIds, needsInitialFold, projection])
   const focus = useMemo(
     () => deriveFocusState(projection, interaction.focusedNodeId),
     [interaction.focusedNodeId, projection],
@@ -591,6 +711,32 @@ export function ConversationTreeCanvas({
   const requestBranchDelete = (branchId: string): void => {
     const impact = branchDeleteImpact(projection, branchId)
     setDeleteRequest({ branchId, ...impact })
+  }
+
+  const addQuote = (nodeId: string, text: string, note: string): void => {
+    setQuotesByNodeId((current) => {
+      const next = new Map(current)
+      const existing = next.get(nodeId) ?? []
+      next.set(nodeId, [...existing, { id: crypto.randomUUID(), text, note: note.trim() }])
+      return next
+    })
+  }
+  const removeQuote = (nodeId: string, quoteId: string): void => {
+    setQuotesByNodeId((current) => {
+      const next = new Map(current)
+      const remaining = (next.get(nodeId) ?? []).filter(saved => saved.id !== quoteId)
+      if (remaining.length === 0) next.delete(nodeId)
+      else next.set(nodeId, remaining)
+      return next
+    })
+  }
+  const clearQuotes = (nodeId: string): void => {
+    setQuotesByNodeId((current) => {
+      if (!current.has(nodeId)) return current
+      const next = new Map(current)
+      next.delete(nodeId)
+      return next
+    })
   }
 
   const activityLabel = (activity: 'running' | 'error' | 'complete'): string => {
@@ -866,13 +1012,6 @@ export function ConversationTreeCanvas({
                       noteManualViewportChange()
                       dispatch({ type: 'focus/set', nodeId: focused ? undefined : node.nodeId })
                     }}
-                    onCollapse={() => {
-                      if (branch !== undefined) {
-                        noteManualViewportChange()
-                        startCardExit([branch.record.branchId], true)
-                        dispatch({ type: 'branch/toggle', branchId: branch.record.branchId })
-                      }
-                    }}
                     onDelete={() => {
                       if (node.branchId === null) return
                       requestBranchDelete(node.branchId)
@@ -1032,7 +1171,11 @@ export function ConversationTreeCanvas({
                           ...deepExpansionTargetsForAnchor(projection, control.anchorDotId),
                         })
                       } else {
-                        dispatch({ type: 'anchor/toggle', anchorDotId: control.anchorDotId })
+                        dispatch({
+                          type: 'anchor/toggle',
+                          anchorDotId: control.anchorDotId,
+                          branchIds: control.branchIds,
+                        })
                       }
                       setPendingCenterNodeId(control.anchorNodeId)
                     }}
@@ -1083,9 +1226,13 @@ export function ConversationTreeCanvas({
                 && (
                 <FollowUpComposer
                   key={`${composerNode.nodeId}:${composerMode}`}
-                  node={composerNode}
+                  node={composerTargetNode ?? composerNode}
                   mode={composerMode}
                   labels={labels}
+                  savedQuotes={quotesByNodeId.get((composerTargetNode ?? composerNode).nodeId) ?? []}
+                  onRemoveQuote={(quoteId) => {
+                    removeQuote((composerTargetNode ?? composerNode).nodeId, quoteId)
+                  }}
                   {...composerMode === 'ask'
                     && composerTargetNode !== undefined
                     && composerTargetNode.nodeId !== composerNode.nodeId
@@ -1101,14 +1248,19 @@ export function ConversationTreeCanvas({
                   }}
                   submit={(question, clientRequestId, anchorRange) => {
                     beginStreamFollow()
-                    return composerMode === 'ask'
+                    const anchorNode = composerTargetNode ?? composerNode
+                    const request = composerMode === 'ask'
                       ? onAskFollowUp!({
                         clientRequestId,
-                        anchor: composerTargetNode ?? composerNode,
+                        anchor: anchorNode,
                         question,
                         ...(anchorRange === undefined ? {} : { anchorRange }),
                       })
                       : onContinueBranch!({ clientRequestId, tail: composerNode, question })
+                    return request.then((value) => {
+                      if (composerMode === 'ask') clearQuotes(anchorNode.nodeId)
+                      return value
+                    })
                   }}
                   close={() => { dispatch({ type: 'composer/close' }) }}
                 />
@@ -1152,6 +1304,9 @@ export function ConversationTreeCanvas({
               : {}}
             quoteInvalid={selectedDetailsIsBranchFirst
               && selectedDetailsBranch?.anchorStatus === 'range-invalid'}
+            savedQuotes={quotesByNodeId.get(selectedDetails.nodeId) ?? []}
+            onAddQuote={(text, note) => { addQuote(selectedDetails.nodeId, text, note) }}
+            onRemoveQuote={(quoteId) => { removeQuote(selectedDetails.nodeId, quoteId) }}
             onClose={() => {
               dispatch({ type: 'node/toggle-expanded', nodeId: selectedDetails.nodeId })
               dispatch({ type: 'selection/set', nodeId: undefined })

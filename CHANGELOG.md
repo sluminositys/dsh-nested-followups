@@ -5,6 +5,30 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- A tree now opens fully folded on first visit: the trunk plus one dot per
+  anchor. Opening a dot always reveals one capsule per branch, even for
+  branches that were expanded before, so each level is chosen deliberately.
+- A capsule's count now reports only that branch's own messages; nested
+  content is signalled by the child-branch marker instead.
+- Quoting moved out of the follow-up box. Select text in a message's details
+  panel, press Enter in the small popover to save the quote (several can be
+  saved, each with an optional comment), and the follow-up box lists them.
+- Sibling capsules stack tightly under their anchor, and expanded frames keep
+  a guaranteed clearance so dashed regions never overlap.
+
+### Fixed
+
+- Tooltips inside the zoomed canvas rendered far away from their buttons: a
+  CSS transform hijacks fixed positioning, so canvas tooltips now render
+  through a portal. The focus action also uses a crosshair glyph instead of an
+  inspect icon that read as a code bracket.
+- Cards no longer carry a collapse button; folding lives on the region's
+  bottom-edge shadow and the dot/capsule controls.
+
 ## [0.2.0] - 2026-08-19
 
 ### Added

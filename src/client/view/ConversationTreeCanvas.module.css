@@ -985,14 +985,6 @@
   border-color: var(--dsw-alias-brand-primary);
 }
 
-.quoteSelector {
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  color: var(--dsw-alias-label-secondary);
-  font-size: 11px;
-}
-
 .snapNotice {
   margin: 0;
   padding: 6px 8px;
@@ -1001,26 +993,6 @@
   background: var(--dsw-alias-bg-layer-2);
   font-size: 11px;
   line-height: 1.4;
-}
-
-.quoteSource {
-  box-sizing: border-box;
-  width: 100%;
-  max-height: 96px;
-  resize: vertical;
-  padding: 6px 7px;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 7px;
-  outline: none;
-  color: var(--dsw-alias-label-secondary);
-  background: var(--dsw-alias-bg-base);
-  font: inherit;
-  font-size: 11px;
-  line-height: 1.4;
-}
-
-.quoteSource:focus-visible {
-  border-color: var(--dsw-alias-brand-primary);
 }
 
 .selectedQuote {
@@ -1261,4 +1233,164 @@
     animation: none;
     content: none;
   }
+}
+
+.canvasTooltip {
+  position: fixed;
+  z-index: 60;
+  max-width: 260px;
+  padding: 4px 8px;
+  border-radius: 6px;
+  transform: translate(-50%, 0);
+  color: var(--dsw-alias-label-inverse, var(--dsw-alias-bg-base));
+  background: var(--dsw-alias-bg-inverse, var(--dsw-alias-label-primary));
+  font-size: 11px;
+  line-height: 1.35;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+.canvasTooltip[data-above='true'] {
+  transform: translate(-50%, -100%);
+}
+
+.quoteHint {
+  margin: 0;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.composerQuoteRow {
+  position: relative;
+  padding-right: 24px;
+}
+
+.composerQuoteRow + .composerQuoteRow {
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--dsw-alias-border-l2);
+}
+
+.savedQuoteList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+  list-style: none;
+}
+
+.savedQuoteChip {
+  position: relative;
+  padding: 5px 26px 5px 8px;
+  border-left: 2px solid var(--dsw-alias-brand-primary);
+  border-radius: 4px;
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.savedQuoteText {
+  display: block;
+  overflow: hidden;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 11px;
+  line-height: 1.4;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.savedQuoteNote {
+  display: block;
+  margin: 2px 0 0;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.savedQuoteRemove {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  color: var(--dsw-alias-label-tertiary);
+  background: transparent;
+  cursor: pointer;
+  font-size: 13px;
+  line-height: 1;
+}
+
+.savedQuoteRemove:hover {
+  color: var(--dsw-alias-func-error);
+  background: var(--dsw-alias-bg-layer-1);
+}
+
+.quoteCapture {
+  position: fixed;
+  z-index: 70;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  width: 300px;
+  padding: 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 10px;
+  transform: translateX(-50%);
+  background: var(--dsw-alias-bg-layer-1);
+  box-shadow: 0 8px 24px var(--dsw-alias-bg-mask-2);
+}
+
+.quoteCaptureText {
+  max-height: 72px;
+  overflow: auto;
+  margin: 0;
+  padding: 4px 8px;
+  border-left: 2px solid var(--dsw-alias-brand-primary);
+  color: var(--dsw-alias-label-secondary);
+  background: var(--dsw-alias-bg-layer-2);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.quoteCaptureInput {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 7px;
+  outline: none;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-base);
+  font: inherit;
+  font-size: 12px;
+}
+
+.quoteCaptureInput:focus-visible {
+  border-color: var(--dsw-alias-brand-primary);
+}
+
+.quoteCaptureActions {
+  display: flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.quoteCaptureActions button {
+  padding: 3px 10px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 6px;
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+  cursor: pointer;
+  font-size: 11px;
+}
+
+.quoteCaptureActions button[data-primary='true'] {
+  border-color: var(--dsw-alias-brand-primary);
+  color: var(--dsw-alias-label-inverse, var(--dsw-alias-bg-base));
+  background: var(--dsw-alias-brand-primary);
 }

@@ -201,3 +201,29 @@ describe('tree interaction state', () => {
     }
   })
 })
+
+describe('level-by-level reveal', () => {
+  it('opening a dot turns every direct branch into a capsule', () => {
+    const initial = createTreeInteractionState(undefined, 'tree-layout')
+    const folded = treeInteractionReducer(initial, {
+      type: 'anchors/collapse-all',
+      anchorDotIds: ['root-a2'],
+    })
+    const opened = treeInteractionReducer(folded, {
+      type: 'anchor/toggle',
+      anchorDotId: 'root-a2',
+      branchIds: ['branch-1', 'branch-2', 'branch-3'],
+    })
+
+    expect(opened.anchorDotIds.has('root-a2')).toBe(false)
+    expect([...opened.collapsedBranchIds].sort()).toEqual(['branch-1', 'branch-2', 'branch-3'])
+
+    const reclosed = treeInteractionReducer(opened, {
+      type: 'anchor/toggle',
+      anchorDotId: 'root-a2',
+      branchIds: ['branch-1', 'branch-2', 'branch-3'],
+    })
+    expect(reclosed.anchorDotIds.has('root-a2')).toBe(true)
+    expect(reclosed.collapsedBranchIds.size).toBe(3)
+  })
+})

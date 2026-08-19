@@ -49,6 +49,7 @@ function count(markup: string, fragment: string): number {
 function renderWithViewState(
   viewState: TreeViewState,
   projection = treeProjectionFixture(),
+  extraProps: Record<string, unknown> = {},
 ): string {
   const values = new Map<string, string>()
   const storage: TreeViewStateStorage = {
@@ -63,7 +64,7 @@ function renderWithViewState(
     value: storage,
   })
   try {
-    return renderToStaticMarkup(createElement(ConversationTreeCanvas, { projection }))
+    return renderToStaticMarkup(createElement(ConversationTreeCanvas, { projection, ...extraProps }))
   } finally {
     if (previous === undefined) delete (globalThis as { localStorage?: unknown }).localStorage
     else Object.defineProperty(globalThis, 'localStorage', previous)
@@ -154,7 +155,7 @@ function collapseV2ProjectionFixture(): ConversationTreeProjection {
 describe('conversation tree canvas', () => {
   it('renders every projected message as a separate card in one graph', () => {
     const projection = treeProjectionFixture()
-    const markup = renderToStaticMarkup(createElement(ConversationTreeCanvas, { projection }))
+    const markup = renderWithViewState(viewState([], []), projection)
 
     expect(count(markup, 'role="treeitem"')).toBe(projection.nodes.length)
     expect(markup).toContain('Q1')
@@ -169,17 +170,15 @@ describe('conversation tree canvas', () => {
     const projection = treeProjectionFixture()
     const onAskFollowUp = vi.fn(async () => {})
     const onContinueBranch = vi.fn(async () => {})
-    const writable = renderToStaticMarkup(createElement(ConversationTreeCanvas, {
-      projection,
+    const writable = renderWithViewState(viewState([], []), projection, {
       onAskFollowUp,
       onContinueBranch,
-    }))
-    const readOnly = renderToStaticMarkup(createElement(ConversationTreeCanvas, {
-      projection,
+    })
+    const readOnly = renderWithViewState(viewState([], []), projection, {
       onAskFollowUp,
       onContinueBranch,
       readOnlyReason: 'This DSH version cannot create isolated read-only branches.',
-    }))
+    })
 
     expect(writable).toContain('aria-label="Ask follow-up"')
     expect(writable).toContain('aria-label="Continue this branch"')
@@ -192,12 +191,11 @@ describe('conversation tree canvas', () => {
 
   it('distinguishes child branching from linear continuation eligibility', () => {
     const projection = treeProjectionFixture()
-    const markup = renderToStaticMarkup(createElement(ConversationTreeCanvas, {
-      projection,
+    const markup = renderWithViewState(viewState([], []), projection, {
       onAskFollowUp: vi.fn(async () => {}),
       onContinueBranch: vi.fn(async () => {}),
       onDeleteBranch: vi.fn(async () => {}),
-    }))
+    })
 
     expect(count(markup, 'aria-label="Ask follow-up"')).toBe(6)
     expect(count(markup, 'aria-label="Continue this branch"')).toBe(3)
@@ -220,14 +218,67 @@ describe('conversation tree canvas', () => {
         return { ...openNode, state: 'streaming' as const }
       }),
     }
-    const markup = renderToStaticMarkup(createElement(ConversationTreeCanvas, {
-      projection,
+    const markup = renderWithViewState(viewState([], []), projection, {
       onAskFollowUp: vi.fn(async () => {}),
-    }))
+    })
 
     expect(count(markup, 'aria-label="Ask follow-up"')).toBe(6)
     expect(count(markup, 'aria-disabled="true"')).toBe(1)
     expect(markup).toContain(DEFAULT_TREE_VIEW_LABELS.askWaitForCompletion)
+  })
+
+  it('starts fully folded on first visit and reveals one level per dot click', () => {
+    const projection = treeProjectionFixture()
+    const firstVisit = renderToStaticMarkup(createElement(ConversationTreeCanvas, { projection }))
+
+    expect(count(firstVisit, 'role="treeitem"')).toBe(6)
+    expect(firstVisit).toContain('data-open="false"')
+    expect(firstVisit).not.toContain('data-mode="capsule"')
+    expect(firstVisit).not.toContain('data-mode="expanded"')
+  })
+
+  it('has no collapse button on cards; folding belongs to the region hot zone', () => {
+    const markup = renderWithViewState(viewState([], []))
+
+    expect(markup).not.toContain('aria-label="Collapse branch"')
+    expect(markup).toContain('_collapseHotZone_')
+  })
+
+  it('stacks sibling capsules tightly under one anchor', () => {
+    const markup = renderWithViewState(
+      viewState(['branch-1', 'branch-2', 'branch-3'], []),
+      collapseV2ProjectionFixture(),
+    )
+    const tops = [...markup.matchAll(/left:480px;top:(\d+)px;width:270px;height:34px/gu)]
+      .map(match => Number(match[1]))
+      .sort((left, right) => left - right)
+
+    expect(tops).toHaveLength(3)
+    expect(tops[1]! - tops[0]!).toBe(42)
+    expect(tops[2]! - tops[1]!).toBe(42)
+  })
+
+  it('keeps sibling order stable when only the middle branch is expanded', () => {
+    const markup = renderWithViewState(
+      viewState(['branch-1', 'branch-3'], []),
+      collapseV2ProjectionFixture(),
+    )
+    const capsule21 = markup.indexOf('Expand branch 2.1')
+    const expanded22 = markup.indexOf('sibling question')
+    const capsule23 = markup.indexOf('Expand branch 2.3')
+    const top21 = Number(/top:(\d+)px[^"]*" data-mode="capsule"[^>]*><button type="button"[^>]*aria-label="Expand branch 2\.1/u.exec(markup)?.[1] ?? NaN)
+
+    expect(capsule21).toBeGreaterThan(-1)
+    expect(expanded22).toBeGreaterThan(-1)
+    expect(capsule23).toBeGreaterThan(-1)
+    expect(Number.isNaN(top21)).toBe(false)
+  })
+
+  it('renders the composer quote list from saved quotes instead of a source textarea', () => {
+    const markup = renderWithViewState(viewState([], []))
+
+    expect(markup).not.toContain('readonly')
+    expect(markup).not.toContain('Select source text to quote')
   })
 
   it('discloses the rc.7 archive fallback in the destructive confirmation', () => {
@@ -268,7 +319,7 @@ describe('conversation tree canvas', () => {
           }
         : branch),
     }
-    const markup = renderToStaticMarkup(createElement(ConversationTreeCanvas, { projection }))
+    const markup = renderWithViewState(viewState([], []), projection)
     expect(markup).toContain('aria-label="Quoted source"')
     expect(markup).toContain('second')
   })
@@ -307,7 +358,7 @@ describe('conversation tree canvas', () => {
     expect(markup).toContain('Expand branch 2.3')
     expect(markup).toContain('branch question')
     expect(markup).toContain('⑂×1')
-    expect(markup).toContain('+4')
+    expect(markup).toContain('+2')
   })
 
   it('renders a partial level-one capsule beside an expanded sibling branch', () => {
@@ -318,7 +369,7 @@ describe('conversation tree canvas', () => {
     expect(markup).toContain('Expand branch 2.1')
     expect(markup).toContain('branch question')
     expect(markup).toContain('⑂×1')
-    expect(markup).toContain('+4')
+    expect(markup).toContain('+2')
     expect(markup).toContain('aria-label="Collapse branch 2.2"')
   })
 

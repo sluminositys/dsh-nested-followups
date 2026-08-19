@@ -62,10 +62,13 @@ export interface TreeViewLabels {
   readonly emptyDescription: string
   readonly followUpPlaceholder: string
   readonly continuePlaceholder: string
-  readonly quoteSource: string
   readonly quoteSelected: string
-  readonly clearQuote: string
   readonly quoteInvalid: string
+  readonly quoteHint: string
+  readonly savedQuotes: string
+  readonly saveQuote: string
+  readonly removeQuote: string
+  readonly quoteNotePlaceholder: string
   readonly snapToTurnTail: (label: string) => string
   readonly send: string
   readonly cancel: string
@@ -118,10 +121,13 @@ export const DEFAULT_TREE_VIEW_LABELS: TreeViewLabels = Object.freeze({
   emptyDescription: 'Messages appear here after the conversation begins.',
   followUpPlaceholder: 'Ask a follow-up about this message…',
   continuePlaceholder: 'Add the next turn to this branch…',
-  quoteSource: 'Select source text to quote (optional)',
   quoteSelected: 'Quoted source',
-  clearQuote: 'Clear quote',
   quoteInvalid: 'The quoted source changed; this branch now anchors to the whole message.',
+  quoteHint: 'To quote the answer, open the message and select the passage.',
+  savedQuotes: 'Saved quotes',
+  saveQuote: 'Save quote',
+  removeQuote: 'Remove quote',
+  quoteNotePlaceholder: 'Add an optional comment, Enter saves the quote',
   snapToTurnTail: (label: string) => `Context will include the completed turn through ${label}.`,
   send: 'Send',
   cancel: 'Cancel',

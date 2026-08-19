@@ -180,7 +180,9 @@ function branchSummary(
     firstQuestionSummary: truncateSummary(firstQuestion?.summary ?? firstQuestion?.text ?? ''),
     childBranchCount: children.get(branch.record.branchId)?.length ?? 0,
     branchCount: subtreeIds.length,
-    messageCount: subtreeNodes.length,
+    // The capsule shows only what expanding it reveals directly: this branch's
+    // own messages. Deeper content is signalled by childBranchCount instead.
+    messageCount: branch.nodeIds.length,
     hiddenNodeCount: subtreeNodes.length,
     depth,
     activity: activityForBranches(subtreeIds, branches, nodes),

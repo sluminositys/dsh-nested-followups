@@ -1,14 +1,12 @@
 import type { CSSProperties, KeyboardEvent, MouseEvent } from 'react'
 import {
-  IconChevronUpOutline14,
   IconChevronDownOutline14,
-  IconInspectOutline12,
   IconPlusOutline16,
   IconTrashOutline16,
   StateDot,
-  Tooltip,
   type StateDotState,
 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { CanvasTooltip } from './CanvasTooltip.tsx'
 import { displayLabelOf } from '../../shared/labels.ts'
 import type { MessageNodeView } from '../../shared/types.ts'
 import type { TreeViewLabels } from './contracts.ts'
@@ -34,7 +32,6 @@ interface MessageNodeCardProps {
   readonly onAsk: () => void
   readonly onContinue: () => void
   readonly onFocus: () => void
-  readonly onCollapse: () => void
   readonly onDelete: () => void
 }
 
@@ -60,6 +57,21 @@ function stop(event: MouseEvent<HTMLButtonElement>): void {
   event.stopPropagation()
 }
 
+/**
+ * Crosshair glyph for the Focus action. The shared icon set has no
+ * target/focus symbol, and the closest match (IconInspect) reads as a code
+ * bracket, which users mistook for a quoting feature.
+ */
+function FocusTargetIcon({ size = 13 }: { readonly size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <circle cx="8" cy="8" r="5.2" stroke="currentColor" strokeWidth="1.4" />
+      <circle cx="8" cy="8" r="1.6" fill="currentColor" />
+      <path d="M8 0.8v2.4M8 12.8v2.4M0.8 8h2.4M12.8 8h2.4" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+    </svg>
+  )
+}
+
 export function MessageNodeCard({
   node,
   style,
@@ -80,7 +92,6 @@ export function MessageNodeCard({
   onAsk,
   onContinue,
   onFocus,
-  onCollapse,
   onDelete,
 }: MessageNodeCardProps) {
   const label = displayLabelOf(node)
@@ -102,6 +113,7 @@ export function MessageNodeCard({
       aria-label={`${label}, ${role}, ${status}`}
       aria-selected={selected}
       data-role={node.role}
+      data-first-in-branch={firstInBranch || undefined}
       data-root={root || undefined}
       data-selected={selected || undefined}
       data-focused={focused || undefined}
@@ -127,7 +139,7 @@ export function MessageNodeCard({
         </span>
         <span className={css.nodeActions}>
           {(canAsk || askDisabledReason !== undefined) && (
-            <Tooltip label={askDisabledReason ?? labels.askFollowUp} side="bottom">
+            <CanvasTooltip label={askDisabledReason ?? labels.askFollowUp}>
               <button
                 type="button"
                 className={css.iconButton}
@@ -141,10 +153,10 @@ export function MessageNodeCard({
               >
                 <IconPlusOutline16 size={14} />
               </button>
-            </Tooltip>
+            </CanvasTooltip>
           )}
           {canContinue && (
-            <Tooltip label={labels.continueBranch} side="bottom">
+            <CanvasTooltip label={labels.continueBranch}>
               <button
                 type="button"
                 className={css.continueButton}
@@ -154,9 +166,9 @@ export function MessageNodeCard({
                 <IconChevronDownOutline14 size={14} />
                 <span>{labels.continueBranch}</span>
               </button>
-            </Tooltip>
+            </CanvasTooltip>
           )}
-          <Tooltip label={focused ? labels.clearFocus : labels.focus} side="bottom">
+          <CanvasTooltip label={focused ? labels.clearFocus : labels.focus}>
             <button
               type="button"
               className={css.iconButton}
@@ -164,23 +176,11 @@ export function MessageNodeCard({
               aria-pressed={focused}
               onClick={(event) => { stop(event); onFocus() }}
             >
-              <IconInspectOutline12 size={12} />
+              <FocusTargetIcon size={13} />
             </button>
-          </Tooltip>
-          {firstInBranch && (
-            <Tooltip label={labels.collapse} side="bottom">
-              <button
-                type="button"
-                className={css.iconButton}
-                aria-label={labels.collapse}
-                onClick={(event) => { stop(event); onCollapse() }}
-              >
-                <IconChevronUpOutline14 size={14} />
-              </button>
-            </Tooltip>
-          )}
+          </CanvasTooltip>
           {canDelete && (
-            <Tooltip label={labels.deleteBranch} side="bottom">
+            <CanvasTooltip label={labels.deleteBranch}>
               <button
                 type="button"
                 className={css.iconButton}
@@ -190,7 +190,7 @@ export function MessageNodeCard({
               >
                 <IconTrashOutline16 size={14} />
               </button>
-            </Tooltip>
+            </CanvasTooltip>
           )}
         </span>
       </footer>

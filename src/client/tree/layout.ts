@@ -114,6 +114,10 @@ export const DEFAULT_TREE_LAYOUT_OPTIONS: ResolvedTreeLayoutOptions = Object.fre
 
 const CAPSULE_WIDTH = 270
 const CAPSULE_HEIGHT = 34
+/** Adjacent capsules of one lane stack tightly, like a list. */
+const CAPSULE_STACK_GAP = 8
+/** Extra clearance a dashed region needs after a capsule (region inflation + breathing room). */
+const CAPSULE_TO_REGION_GAP = 32
 const ANCHOR_CONTROL_SIZE = 28
 const NESTED_ANCHOR_CONTROL_SIZE = 20
 const ANCHOR_CONTROL_GAP = 24
@@ -254,7 +258,10 @@ export function layoutConversationTree(
     projection.branches.map(branch => [branch.record.branchId, branch] as const),
   )
   const nodeLayouts = new Map<string, TreeNodeLayout>()
-  const nextFreeYByDepth = new Map<number, number>()
+  const nextFreeYByDepth = new Map<number, { y: number; kind: 'capsule' | 'lane' | 'none' }>()
+  // Regions inflate by regionPadding on every side, so two stacked lanes need
+  // more clearance than the raw branchGap or their dashed frames overlap.
+  const laneGap = Math.max(options.branchGap, options.regionPadding * 2 + 16)
 
   const rootNodes = projection.nodes
     .filter(node => node.branchId === null)
@@ -300,18 +307,27 @@ export function layoutConversationTree(
         ? undefined
         : nodeLayouts.get(branch.anchorNodeId)?.rect
       const desiredY = anchor?.y ?? options.canvasPadding
-      const nextFreeY = nextFreeYByDepth.get(depth) ?? options.canvasPadding
-      const startY = Math.max(desiredY, nextFreeY)
+      const cursor = nextFreeYByDepth.get(depth) ?? { y: options.canvasPadding, kind: 'none' as const }
       const x = options.canvasPadding + depth * (options.nodeWidth + options.columnGap)
       const summary = summaries.get(branch.record.branchId)
       if (summary !== undefined) {
         if (anchor !== undefined) {
-          const capsuleY = Math.max(startY, anchor.y + (anchor.height - CAPSULE_HEIGHT) / 2)
+          const capsuleY = Math.max(
+            cursor.y,
+            anchor.y + (anchor.height - CAPSULE_HEIGHT) / 2,
+          )
           branchCapsules.push(capsuleLayout(summary, anchor, x, capsuleY))
-          nextFreeYByDepth.set(depth, capsuleY + CAPSULE_HEIGHT + options.branchGap)
+          nextFreeYByDepth.set(depth, {
+            y: capsuleY + CAPSULE_HEIGHT + CAPSULE_STACK_GAP,
+            kind: 'capsule',
+          })
         }
         continue
       }
+      const startY = Math.max(
+        desiredY,
+        cursor.kind === 'capsule' ? cursor.y + CAPSULE_TO_REGION_GAP - CAPSULE_STACK_GAP : cursor.y,
+      )
 
       const branchNodes = branch.nodeIds
         .map(nodeId => nodesById.get(nodeId))
@@ -334,7 +350,7 @@ export function layoutConversationTree(
       if (branchNodes.length > 0) {
         const laneHeight = branchNodes.length * options.nodeHeight
           + (branchNodes.length - 1) * options.rowGap
-        nextFreeYByDepth.set(depth, startY + laneHeight + options.branchGap)
+        nextFreeYByDepth.set(depth, { y: startY + laneHeight + laneGap, kind: 'lane' })
       }
     }
   }
