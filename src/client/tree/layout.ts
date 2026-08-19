@@ -120,7 +120,6 @@ const CAPSULE_STACK_GAP = 8
 const CAPSULE_TO_REGION_GAP = 32
 const ANCHOR_CONTROL_SIZE = 28
 const NESTED_ANCHOR_CONTROL_SIZE = 20
-const ANCHOR_CONTROL_GAP = 24
 
 function positive(value: number | undefined, fallback: number): number {
   return value === undefined || !Number.isFinite(value) || value <= 0 ? fallback : value
@@ -196,10 +195,11 @@ function edgeGeometry(
   return { start, end, path: sequencePath(start, end) }
 }
 
-function anchorControlRect(anchor: Rect, nested: boolean): Rect {
+/** The dot sits horizontally centered in the column gap between its anchor and the next lane. */
+function anchorControlRect(anchor: Rect, nested: boolean, columnGap: number): Rect {
   const size = nested ? NESTED_ANCHOR_CONTROL_SIZE : ANCHOR_CONTROL_SIZE
   return {
-    x: anchor.x + anchor.width + ANCHOR_CONTROL_GAP,
+    x: anchor.x + anchor.width + (columnGap - size) / 2,
     y: anchor.y + (anchor.height - size) / 2,
     width: size,
     height: size,
@@ -236,9 +236,10 @@ function capsuleLayout(
 function anchorControlLayout(
   summary: AnchorGroupSummary,
   anchor: Rect,
+  columnGap: number,
 ): AnchorGroupControlLayout {
   const nested = summary.depth > 1
-  const rect = anchorControlRect(anchor, nested)
+  const rect = anchorControlRect(anchor, nested, columnGap)
   const start = { x: anchor.x + anchor.width, y: anchor.y + anchor.height / 2 }
   const end = { x: rect.x, y: rect.y + rect.height / 2 }
   return {
@@ -329,7 +330,7 @@ export function layoutConversationTree(
             cursor.y,
             anchor.y + (anchor.height - CAPSULE_HEIGHT) / 2,
           )
-          const control = anchorControlRect(anchor, summary.depth > 1)
+          const control = anchorControlRect(anchor, summary.depth > 1, options.columnGap)
           branchCapsules.push(capsuleLayout(summary, control, x, capsuleY))
           nextFreeYByDepth.set(depth, {
             y: capsuleY + CAPSULE_HEIGHT + CAPSULE_STACK_GAP,
@@ -377,7 +378,7 @@ export function layoutConversationTree(
     const anchor = nodeLayouts.get(summary.anchorNodeId)?.rect
     return anchor === undefined
       ? []
-      : [[summary.anchorNodeId, anchorControlRect(anchor, summary.depth > 1)] as const]
+      : [[summary.anchorNodeId, anchorControlRect(anchor, summary.depth > 1, options.columnGap)] as const]
   }))
   const edgeLayouts = projection.edges.flatMap((edge): TreeEdgeLayout[] => {
     const source = nodeLayouts.get(edge.sourceNodeId)?.rect
@@ -428,7 +429,7 @@ export function layoutConversationTree(
 
   const anchorControls = collapsed.anchorGroups.flatMap((summary): AnchorGroupControlLayout[] => {
     const anchor = nodeLayouts.get(summary.anchorNodeId)?.rect
-    return anchor === undefined ? [] : [anchorControlLayout(summary, anchor)]
+    return anchor === undefined ? [] : [anchorControlLayout(summary, anchor, options.columnGap)]
   }).sort((left, right) => left.depth - right.depth
     || left.rect.y - right.rect.y
     || left.anchorDotId.localeCompare(right.anchorDotId))

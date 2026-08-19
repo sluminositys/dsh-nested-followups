@@ -134,6 +134,17 @@ describe('conversation tree layout', () => {
     expect(edge?.path).toMatch(/^M .+ C .+$/u)
   })
 
+  it('centers each dot control horizontally inside its column gap', () => {
+    const layout = layoutConversationTree(treeProjectionFixture())
+    const nodes = nodeMap(layout)
+    const control = layout.anchorControls.find(candidate => candidate.anchorNodeId === 'root-a2')!
+    const anchor = nodes.get('root-a2')!.rect
+    const gap = layout.options.columnGap
+
+    expect(control.rect.x + control.rect.width / 2)
+      .toBe(anchor.x + anchor.width + gap / 2)
+  })
+
   it('starts capsule edges at the dot control instead of the anchor card', () => {
     const layout = layoutConversationTree(treeProjectionFixture(), {
       collapsedBranchIds: new Set(['branch-1']),
