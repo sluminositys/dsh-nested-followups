@@ -2,119 +2,58 @@
 
 English | [中文](README.zh.md)
 
-`dsh-nested-followups` adds a message-level conversation tree to the
-[DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) web UI. It
-lets you branch from a completed answer, explore that question in an isolated
-conversation, and keep the main conversation unchanged.
+A plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)
+that adds a conversation tree to the web interface. Ask a follow-up question
+about any earlier answer, and it opens as an isolated branch instead of being
+appended to the end of your main conversation.
 
-The plugin is additive. Standard DSH Chat remains the default view, existing
-session logs remain the source of truth, and installing the plugin requires no
-patches to DeepSeek Harness.
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22.19-brightgreen.svg)](https://nodejs.org)
+[![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-0.1.0--rc.7-orange.svg)](https://github.com/deepseek-ai/deepseek-harness)
 
-## Using Tree View
+## The problem it solves
 
-Open a root conversation as usual, then select **Tree View** in the conversation
-header. The button and the native **Chat** / **Tree View** tabs switch the same
-conversation between its normal linear presentation and its tree projection;
-they do not copy or convert any session data.
+A DeepSeek Harness conversation is linear. When you are part way through an
+engineering task and you want to ask what a term in an earlier answer means,
+you have two poor options: ask in the main conversation, which mixes an
+unrelated question into the task context and keeps sending it with every later
+request, or start a new conversation, which loses the context that made the
+question worth asking.
 
-In Tree View:
+This plugin adds a third option. The follow-up becomes a branch that inherits
+the conversation up to the answer you asked about, and nothing else. Your main
+conversation never sees it.
 
-1. Hover a completed assistant card and select **Ask follow-up**.
-2. Enter the local clarification beside that card. Its question appears to the
-   right and its answer streams beneath it.
-3. To keep talking on that branch, use **Continue this branch** on its latest
-   completed answer. To create another level of isolation, use **Ask follow-up**
-   again instead.
-4. Select a card to read the complete message in the details panel. Use search,
-   Focus, Collapse, the minimap, or the zoom controls to navigate larger trees.
+## Features
 
-Return to **Chat** whenever you want to continue the root engineering task.
+- **A tree view of the current conversation.** Every user and assistant message
+  is a separate card. The main conversation runs downward; branches grow to the
+  right.
+- **Follow-up questions at any depth.** A branch answer can be branched from
+  again, with no limit on nesting.
+- **Genuine context isolation.** Each branch is a real, separate session created
+  with the official fork mechanism, not a prompt-level instruction to ignore
+  something.
+- **Read-only branches.** A branch can read the workspace but cannot modify it,
+  so a follow-up can never disturb work in progress in the main conversation.
+- **No interference with the standard interface.** The regular chat view, the
+  sidebar, and message rendering are unchanged. Branches do not appear in the
+  session list.
+- **Reuses the model provider's cached context.** A branch sends the same
+  request prefix as the main conversation, so it does not pay to re-read the
+  inherited history.
 
-## Interaction model
+## Requirements
 
-Tree View renders each user and assistant message as a separate card. The main
-conversation grows downward, while follow-up branches grow to the right.
+| Requirement | Version |
+| --- | --- |
+| DeepSeek Harness | `0.1.0-rc.7` (unmodified) |
+| Node.js | 22.19 or later |
+| Package manager | pnpm |
 
-Two actions have deliberately different meanings:
+## Installation
 
-- **Ask follow-up** creates a new child branch from the selected completed
-  assistant message. It grows to the right and receives only the history up to
-  that safe turn boundary.
-- **Continue this branch** appends the next turn to the current branch. It grows
-  downward, appears only on the latest completed assistant message of a branch,
-  and never appears on the main conversation.
-
-The distinction is structural as well as visual: Continue never creates a new
-branch, and Ask follow-up never appends to the current branch.
-
-Tree View also provides message details, search, focus, collapse, pan, zoom,
-fit-to-view, and a minimap. These controls only change presentation state.
-
-Deleting a branch removes the selected branch and all of its descendants from
-the tree after a confirmation that reports the affected branch and message
-counts. It never deletes the root conversation or a sibling branch. Because
-rc.7 exposes session archival rather than physical deletion for this path, the
-underlying branch logs are archived after the plugin records the deletion; the
-confirmation states this explicitly.
-
-## Isolation and read-only execution
-
-Every branch is a real DSH session seeded at a validated completed-turn
-boundary. Later main-thread messages do not enter the branch, branch messages
-do not enter the main conversation, and sibling branches do not share their new
-turns.
-
-Branch prompts are submitted by the plugin on the Host side. A branch runs as a
-**read-only agent**: it may inspect the workspace, but it can change nothing.
-
-Enforcement happens entirely at execution time. A scoped guard allows the
-shipped read tools — `read`, `read_image`, `glob`, `grep`, `lsp`, the
-`session_*` query tools, `job_list`/`job_output`, `terminal_list`/
-`terminal_read`, `list_agents`, and `get_goal` — and denies everything else,
-including any tool the guard does not recognize. Code Mode's `run_code`
-transport stays available because each binding a program calls re-enters the
-same guard, so nested writes are denied individually.
-
-Nothing about the request is rewritten. The branch joins the preset its source
-session ran under and leaves the tool schemas, prompt sections, and presentation
-transport untouched, so its request prefix is byte-identical to the main
-conversation's prefix at the fork point. That is deliberate: an identical prefix
-lets the provider reuse its cached prefix for the main conversation instead of
-re-reading the inherited history from cold, which is what determines how quickly
-a branch produces its first token. Restricting the visible tool set would have
-been simpler and would have thrown that away for no additional safety, since a
-removed schema and a denied execution stop the same call.
-
-The plugin does not install the rc.7 subagent descriptor or `report` tool.
-
-## DeepSeek Harness rc.7 behavior
-
-The current target is `@deepseek-ai/dsh` `0.1.0-rc.7`, unmodified.
-
-Branch sessions use the durable `origin: "subagent"` marker. This keeps them
-out of the workspace/session overview while preserving their logs. rc.7 also
-uses that marker as an ownership fence: native Chat may display a branch log,
-but it rejects attempts to send a prompt to that branch. For that reason this
-version does not expose an **Open Branch** action; complete reading and all
-branch continuation happen inside Tree View.
-
-rc.7's built-in Subagent menu may show descriptor-less branches as disabled
-diagnostic rows inside the owning root session. This accepted rc.7 display
-behavior does not expose branches in the workspace sidebar. The rows are
-non-interactive, excluded from keyboard navigation and healthy-child counts,
-and do not block the menu or the root conversation. The menu trigger may still
-include origin-classified branches in its descendant total.
-
-An isolated adapter probe is reserved for a future upstream
-`startChatOnlyContinuableAtBoundary` capability. It requires both the named
-method and an explicit v1 native-user-delivery advertisement, so a creation-only
-API cannot accidentally enable a writable native surface. Until both exist,
-native branch continuation remains intentionally disabled.
-
-## Installation from source
-
-The package is not currently published to npm.
+This package is not yet published to npm, so install it from source:
 
 ```sh
 git clone https://github.com/sluminositys/dsh-nested-followups.git
@@ -124,16 +63,133 @@ pnpm run check
 dsh plugin --profile web add .
 ```
 
-Restart the DSH web profile if it is already running.
+Restart the DeepSeek Harness web profile if it is already running.
 
-To remove the plugin:
+To uninstall:
 
 ```sh
 dsh plugin --profile web remove dsh-nested-followups
 ```
 
-Removal unregisters the plugin UI and services. It does not rewrite the root
-conversation or automatically delete branch session logs.
+Uninstalling removes the plugin's interface and services. It does not modify
+your main conversation and does not delete branch history.
+
+## Usage
+
+Open a conversation as usual and select **Tree View** in the conversation
+header. Switching between **Chat** and **Tree View** changes only how the
+conversation is displayed; no data is copied or converted.
+
+In Tree View:
+
+1. Move the pointer over a completed assistant message and select
+   **Ask follow-up**.
+2. Type your question. It appears as a card to the right of the answer you
+   asked about, and the reply is generated below it.
+3. To keep talking within that branch, select **Continue this branch** on its
+   most recent answer. To isolate the context one level further, select
+   **Ask follow-up** again.
+4. Select any card to read the full message. Use search, focus, collapse, the
+   overview map, and the zoom controls to navigate larger trees.
+
+Return to **Chat** whenever you want to continue the main task.
+
+### Two actions, two meanings
+
+The difference between the two actions is structural, not just visual:
+
+| Action | Direction | Effect |
+| --- | --- | --- |
+| **Ask follow-up** | Grows right | Creates a new branch that inherits the conversation up to the selected answer |
+| **Continue this branch** | Grows down | Adds the next exchange to the current branch |
+
+**Ask follow-up** never appends to an existing branch, and **Continue this
+branch** never creates one. **Continue this branch** appears only on the most
+recent completed answer within a branch, never in the main conversation.
+
+### Deleting a branch
+
+Deleting a branch also deletes every branch below it. The confirmation dialog
+states how many branches and messages will be removed. Your main conversation
+and any sibling branches are unaffected.
+
+## How it works
+
+### Branch isolation
+
+Each branch is a real DeepSeek Harness session created from a completed turn in
+its parent. A branch created from answer A2 inherits the conversation from the
+beginning through A2. It does not receive anything the main conversation does
+afterwards, and the main conversation never receives anything from the branch.
+Sibling branches created from the same answer cannot see each other's messages.
+
+Branches are recorded as subagent-origin sessions. This keeps them out of the
+session list while preserving their history, so a branch belongs to its main
+conversation rather than becoming a separate item you have to manage.
+
+### Read-only execution
+
+A branch runs as a read-only agent: it can inspect the workspace, but it cannot
+change anything.
+
+This is enforced when a tool actually runs, not by hiding tools from the model.
+The following tools are permitted:
+
+`read`, `read_image`, `glob`, `grep`, `lsp`, the `session_*` query tools,
+`job_list`, `job_output`, `terminal_list`, `terminal_read`, `list_agents`, and
+`get_goal`.
+
+Everything else is refused, including any tool the plugin does not recognise, so
+a newly added tool is never permitted by omission. Code Mode's `run_code` remains
+available because each tool a program calls is checked individually, which means
+nested write operations are refused one by one.
+
+Read access is deliberate: a follow-up question is often "what does this file
+do?". Write access is not, because a branch runs in the same working directory
+as the main conversation and could otherwise modify files while a task is still
+running.
+
+### Reusing the provider's cached context
+
+The plugin does not alter the request a branch sends. It joins the same preset
+the parent session used and leaves tool definitions, prompt sections, and the
+presentation format untouched. As a result, the beginning of a branch's request
+is byte-for-byte identical to the main conversation's request at the point the
+branch was created.
+
+This matters for speed. Model providers cache request prefixes, and tool
+definitions sit at the very front of a request. Removing a single tool
+definition would change the first bytes and lose the entire cached prefix,
+forcing the provider to re-read the whole inherited conversation before it can
+produce the first word of the answer. Restricting the visible tool list would
+have been simpler to implement and would have given up that saving for no gain
+in safety, because hiding a tool and refusing to run it stop the same call.
+
+## Compatibility with DeepSeek Harness 0.1.0-rc.7
+
+This version targets an unmodified `@deepseek-ai/dsh` `0.1.0-rc.7`. Two current
+limitations follow from how that release treats subagent-origin sessions.
+
+**Branches cannot be continued from the standard chat view.** DeepSeek Harness
+uses the subagent origin marker to decide which component owns a session, and it
+rejects messages sent to such a session from the standard chat view. The
+standard view can display a branch's history but cannot add to it. This version
+therefore has no "open branch in chat" action; reading and continuing branches
+both happen in Tree View.
+
+**Branches may be listed in the Subagent menu.** Because the plugin does not
+install a subagent descriptor, the built-in Subagent menu inside a conversation
+may list branches as disabled rows. These rows cannot be selected, are skipped
+during keyboard navigation, and are excluded from the count of active child
+agents; the menu and the conversation continue to work normally. Branches still
+do not appear in the sidebar session list.
+
+The plugin includes a check for a proposed future DeepSeek Harness capability
+that would allow branches to be continued from the standard chat view. It
+requires that release to provide both the capability and an explicit guarantee
+that user messages can be delivered, so that a partial implementation cannot
+silently re-enable a writable interface. Until then, this feature stays
+disabled.
 
 ## Development
 
@@ -142,17 +198,27 @@ pnpm install
 pnpm run check
 ```
 
-`check` runs linting, Host and Client type checks, unit/integration tests, the
-production build, and package publication validation.
+`pnpm run check` runs linting, type checking for both the host and browser
+builds, the test suite, a production build, and package validation.
 
-Node.js 22.19 or later is required, matching rc.7.
+| Command | Purpose |
+| --- | --- |
+| `pnpm run lint` | Static analysis |
+| `pnpm run typecheck` | Type checking |
+| `pnpm test` | Unit and integration tests |
+| `pnpm run build` | Production build |
+| `pnpm run check` | All of the above, plus package validation |
 
-## Status
+## Contributing
 
-The implementation and package checks are validated against unmodified DeepSeek
-Harness `0.1.0-rc.7`. DeepSeek Harness is in Developer Preview, so later release
-candidates may require adapter updates even though the package peer range is
-broader.
+Issues and pull requests are welcome. Please run `pnpm run check` before
+submitting a pull request.
+
+## Project status
+
+The implementation is verified against an unmodified DeepSeek Harness
+`0.1.0-rc.7`. DeepSeek Harness is in developer preview, so later releases may
+require updates even though this package declares a wider compatibility range.
 
 ## License
 
