@@ -2,6 +2,8 @@
 
 English | [中文](README.zh.md)
 
+![dsh-nested-followups — a nested follow-up conversation tree for DeepSeek Harness](assets/banner.png)
+
 A plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)
 that adds a conversation tree to the web interface. Ask a follow-up question
 about any earlier answer, and it opens as an isolated branch instead of being
