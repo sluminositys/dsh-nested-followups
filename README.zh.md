@@ -9,6 +9,23 @@
 插件只做增量扩展：DSH 原生 Chat 仍是默认视图，原始 Session 日志仍是唯一事实源，
 安装插件不需要修改或补丁 DeepSeek Harness 核心。
 
+## 使用 Tree View
+
+照常打开一个 Root Session，然后点击会话顶栏的 **Tree View**。顶栏按钮和原生
+**Chat** / **Tree View** 标签切换的是同一棵会话数据的两种呈现方式，不会复制、
+迁移或转换 Session。
+
+进入 Tree View 后：
+
+1. hover 一张已完成的 assistant 卡片，点击 **Ask follow-up**；
+2. 在卡片旁输入局部追问，新的问题向右出现，回答在其下方实时生成；
+3. 若要沿当前分支持续聊，在该分支最新回答上点击 **Continue this branch**；若要
+   再隔离一层上下文，则再次使用 **Ask follow-up**；
+4. 点击卡片可在详情面板阅读完整消息；大树可通过搜索、Focus、Collapse、Minimap
+   和缩放控件导航。
+
+需要继续主工程任务时，随时切回 **Chat**。
+
 ## 交互模型
 
 Tree View 把每条用户消息和助手消息分别显示成卡片。主会话向下生长，追问分支向右
@@ -26,6 +43,11 @@ Ask follow-up 不会向当前分支追加消息。
 
 Tree View 还提供完整消息详情、搜索、聚焦、折叠、平移、缩放、适应画布和小地图。
 这些控件只改变展示状态，不改变会话数据。
+
+删除分支会在二次确认后把该分支及其全部后代从树中移除；确认框会列出受影响的分支
+数和消息数。删除不会影响 Root Session 或兄弟分支。由于 rc.7 在这条路径上提供的
+是 Session 归档而非物理删除，插件记录删除后会归档底层 Branch Session，确认框会
+明确说明这一点。
 
 ## 隔离与纯聊天执行
 
@@ -53,8 +75,9 @@ workspace/session 总览中，同时保留完整日志。rc.7 也把该标记作
 **Open Branch** 动作；完整阅读和全部分支续聊都在 Tree View 中完成。
 
 rc.7 内置的 Subagent 菜单可能把没有 descriptor 的分支显示成禁用的诊断行。
-这是 Root Session 内部的视觉泄漏：诊断行不可交互，也不参与键盘导航；但菜单入口的
-后代数量仍可能计入带有该 origin 标记的分支。
+这是已经接受的 rc.7 展示行为，只发生在所属 Root Session 内，不会让分支出现在
+workspace 侧栏。诊断行不可交互，不参与键盘导航和健康子项计数，不会阻塞菜单或 Root
+Session；但菜单入口的后代总数仍可能计入带有该 origin 标记的分支。
 
 插件在独立 adapter 中为未来上游的
 `startChatOnlyContinuableAtBoundary` 能力保留了探测位。只有命名方法和明确的 v1
@@ -97,8 +120,9 @@ Node.js 要求为 22.19 或更高，与 rc.7 一致。
 
 ## 项目状态
 
-项目正在开发中。DeepSeek Harness 仍处于 Developer Preview，候选版本之间的 adapter
-契约可能变化。
+当前实现与发布包检查已在未修改的 DeepSeek Harness `0.1.0-rc.7` 上验证通过。
+DeepSeek Harness 仍处于 Developer Preview；即使 package 的 peer 范围更宽，后续候选
+版本仍可能需要更新 adapter。
 
 ## 许可证
 

@@ -11,6 +11,26 @@ The plugin is additive. Standard DSH Chat remains the default view, existing
 session logs remain the source of truth, and installing the plugin requires no
 patches to DeepSeek Harness.
 
+## Using Tree View
+
+Open a root conversation as usual, then select **Tree View** in the conversation
+header. The button and the native **Chat** / **Tree View** tabs switch the same
+conversation between its normal linear presentation and its tree projection;
+they do not copy or convert any session data.
+
+In Tree View:
+
+1. Hover a completed assistant card and select **Ask follow-up**.
+2. Enter the local clarification beside that card. Its question appears to the
+   right and its answer streams beneath it.
+3. To keep talking on that branch, use **Continue this branch** on its latest
+   completed answer. To create another level of isolation, use **Ask follow-up**
+   again instead.
+4. Select a card to read the complete message in the details panel. Use search,
+   Focus, Collapse, the minimap, or the zoom controls to navigate larger trees.
+
+Return to **Chat** whenever you want to continue the root engineering task.
+
 ## Interaction model
 
 Tree View renders each user and assistant message as a separate card. The main
@@ -30,6 +50,13 @@ branch, and Ask follow-up never appends to the current branch.
 
 Tree View also provides message details, search, focus, collapse, pan, zoom,
 fit-to-view, and a minimap. These controls only change presentation state.
+
+Deleting a branch removes the selected branch and all of its descendants from
+the tree after a confirmation that reports the affected branch and message
+counts. It never deletes the root conversation or a sibling branch. Because
+rc.7 exposes session archival rather than physical deletion for this path, the
+underlying branch logs are archived after the plugin records the deletion; the
+confirmation states this explicitly.
 
 ## Isolation and chat-only execution
 
@@ -61,10 +88,11 @@ version does not expose an **Open Branch** action; complete reading and all
 branch continuation happen inside Tree View.
 
 rc.7's built-in Subagent menu may show descriptor-less branches as disabled
-diagnostic rows. This is a cosmetic leak inside the owning root session. The
-rows are non-interactive and excluded from keyboard navigation. The built-in
-menu trigger may still include origin-classified branches in its descendant
-total.
+diagnostic rows inside the owning root session. This accepted rc.7 display
+behavior does not expose branches in the workspace sidebar. The rows are
+non-interactive, excluded from keyboard navigation and healthy-child counts,
+and do not block the menu or the root conversation. The menu trigger may still
+include origin-classified branches in its descendant total.
 
 An isolated adapter probe is reserved for a future upstream
 `startChatOnlyContinuableAtBoundary` capability. It requires both the named
@@ -109,8 +137,10 @@ Node.js 22.19 or later is required, matching rc.7.
 
 ## Status
 
-This project is under active development. DeepSeek Harness is in Developer
-Preview, so adapter contracts may change between release candidates.
+The implementation and package checks are validated against unmodified DeepSeek
+Harness `0.1.0-rc.7`. DeepSeek Harness is in Developer Preview, so later release
+candidates may require adapter updates even though the package peer range is
+broader.
 
 ## License
 
