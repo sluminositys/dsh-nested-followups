@@ -1,7 +1,12 @@
 import type { Context } from '@deepseek-ai/cordis'
-import type { Agent, AgentHandle, AgentRegistry } from '@deepseek-ai/dsh-agent'
+import type { Agent, AgentHandle, AgentOptions, AgentRegistry } from '@deepseek-ai/dsh-agent'
 import { createUserMessage, freezeMessage, MessageId } from '@deepseek-ai/dsh-llm'
-import type { SessionEvent, SessionHeader, SessionId } from '@deepseek-ai/dsh-session'
+import {
+  foldRequestHeader,
+  type SessionEvent,
+  type SessionHeader,
+  type SessionId,
+} from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type {} from '@deepseek-ai/dsh-tools'
 import { hiddenBranchMetaRc7 } from './visibility.ts'
@@ -23,11 +28,48 @@ export interface ChatOnlyForkInput {
   readonly sessionId: SessionId
   readonly sourceHeader: SessionHeader
   readonly seed: readonly SessionEvent[]
+  readonly fallbackAgentOptions?: AgentOptions
+}
+
+export interface ChatOnlyResumeInput {
+  readonly sessionId: SessionId
+  readonly events: readonly SessionEvent[]
+  readonly fallbackAgentOptions?: AgentOptions
 }
 
 export type BranchAgentRegistry = Pick<AgentRegistry, 'get' | 'create' | 'resume'>
 
 const TOOL_DENIAL = 'Nested follow-up branches are chat-only; tool execution is disabled.'
+
+/**
+ * Recover the route that was actually in force at a fork/resume boundary.
+ *
+ * The Web surface can change its model without mutating `Agent.options`, so the
+ * latest durable request header is authoritative. Adapter-derived output caps
+ * remain defaults instead of becoming explicit child settings. A live Agent's
+ * options are only a fallback for a valid completed history predating request
+ * header snapshots.
+ */
+export function resolveChatOnlyAgentOptionsRc7(
+  events: readonly SessionEvent[],
+  fallback: AgentOptions = {},
+): AgentOptions {
+  const header = foldRequestHeader(events)
+  if (header === undefined) {
+    return {
+      ...fallback.provider === undefined ? {} : { provider: fallback.provider },
+      ...fallback.model === undefined ? {} : { model: fallback.model },
+      ...fallback.maxTokens === undefined ? {} : { maxTokens: fallback.maxTokens },
+    }
+  }
+  return {
+    provider: header.config.provider,
+    model: header.config.model,
+    ...header.config.maxTokens === undefined || header.adapterDefaults?.maxTokens === true
+      ? {}
+      : { maxTokens: header.config.maxTokens },
+  }
+}
 
 /**
  * Probe only the public rc.7 surfaces the plugin relies on. Absence blocks
@@ -84,6 +126,7 @@ export function createChatOnlyForkAgentRc7(
     sessionId: input.sessionId,
     seed: input.seed,
     meta: hiddenBranchMetaRc7(input.sourceHeader, input.seed.length),
+    agentOptions: resolveChatOnlyAgentOptionsRc7(input.seed, input.fallbackAgentOptions),
     setup: applyChatOnlyScopeRc7,
   })
 }
@@ -91,10 +134,11 @@ export function createChatOnlyForkAgentRc7(
 /** Resume a cold branch through the same chat-only composition used at birth. */
 export function resumeChatOnlyBranchAgentRc7(
   agents: BranchAgentRegistry,
-  sessionId: SessionId,
+  input: ChatOnlyResumeInput,
 ): Promise<AgentHandle> {
   return agents.resume({
-    resumeSessionId: sessionId,
+    resumeSessionId: input.sessionId,
+    agentOptions: resolveChatOnlyAgentOptionsRc7(input.events, input.fallbackAgentOptions),
     setup: applyChatOnlyScopeRc7,
   })
 }

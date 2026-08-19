@@ -113,6 +113,8 @@ export class NestedFollowupsBranchService extends Service {
   static inject = ['agents', 'sessions', 'sessionPersistence', 'nestedFollowupsMetadata']
 
   private readonly pending = new Map<string, Promise<BranchCommandResult>>()
+  private readonly handles = new Map<string, AgentHandle>()
+  private readonly activityEpochs = new Map<string, number>()
 
   constructor(ctx: Context) {
     super(ctx, 'nestedFollowupsBranches')
@@ -254,11 +256,14 @@ export class NestedFollowupsBranchService extends Service {
     this.notify(tree.rootSessionId)
     let handle: AgentHandle | undefined
     try {
+      const sourceAgentOptions = this.ctx.agents.get(source.header.id)?.options
       handle = await createChatOnlyForkAgentRc7(this.ctx.agents, {
         sessionId: childSessionId,
         sourceHeader: source.header,
         seed: boundary.seed,
+        ...sourceAgentOptions === undefined ? {} : { fallbackAgentOptions: sourceAgentOptions },
       })
+      this.rememberHandle(handle)
     } catch (error: unknown) {
       await this.metadata.repository.deleteBranchRecord(branchId)
       this.notify(tree.rootSessionId)
@@ -272,12 +277,13 @@ export class NestedFollowupsBranchService extends Service {
     await this.metadata.repository.putBranch({ ...record, status: 'running' })
     this.notify(tree.rootSessionId)
     try {
+      const activityEpoch = this.beginActivity(handle)
       const messageId = submitChatOnlyTurnRc7(
         handle.agent,
         prompt,
         request.clientRequestId,
       )
-      void this.observeSettlement(handle.agent, branchId, tree.rootSessionId)
+      void this.observeSettlement(handle, branchId, tree.rootSessionId, activityEpoch)
       return commandSuccess({
         action: 'create-branch',
         branchId,
@@ -287,6 +293,7 @@ export class NestedFollowupsBranchService extends Service {
     } catch (error: unknown) {
       await this.metadata.repository.putBranch({ ...record, status: 'failed' })
       this.notify(tree.rootSessionId)
+      await this.releaseHandle(handle)
       throw new BranchCommandError(
         'prompt-failed',
         `branch was created but the first prompt was not accepted: ${error instanceof Error ? error.message : String(error)}`,
@@ -348,13 +355,20 @@ export class NestedFollowupsBranchService extends Service {
       )
     }
 
-    let agent = this.ctx.agents.get(SessionId(branch.sessionId))
-    if (agent !== undefined) this.assertBranchHeader(branch, agent.session.header)
-    if (agent === undefined) {
-      const handle = await resumeChatOnlyBranchAgentRc7(this.ctx.agents, SessionId(branch.sessionId))
-      agent = handle.agent
-      this.assertBranchHeader(branch, agent.session.header)
+    const liveAgent = this.ctx.agents.get(SessionId(branch.sessionId))
+    let handle: AgentHandle
+    if (liveAgent === undefined) {
+      handle = await resumeChatOnlyBranchAgentRc7(this.ctx.agents, {
+        sessionId: SessionId(branch.sessionId),
+        events: snapshot.events,
+      })
+      this.rememberHandle(handle)
+    } else {
+      this.assertBranchHeader(branch, liveAgent.session.header)
+      handle = this.requireOwnedHandle(liveAgent)
     }
+    const agent = handle.agent
+    this.assertBranchHeader(branch, agent.session.header)
     if (agent.status !== 'idle') {
       throw new BranchCommandError('branch-busy', 'wait for the current branch turn to finish before continuing')
     }
@@ -362,8 +376,9 @@ export class NestedFollowupsBranchService extends Service {
     await this.metadata.repository.putBranch({ ...branch, status: 'running' })
     this.notify(tree.rootSessionId)
     try {
+      const activityEpoch = this.beginActivity(handle)
       const messageId = submitChatOnlyTurnRc7(agent, request.question, request.clientRequestId)
-      void this.observeSettlement(agent, branch.branchId, tree.rootSessionId)
+      void this.observeSettlement(handle, branch.branchId, tree.rootSessionId, activityEpoch)
       return commandSuccess({
         action: 'continue-branch',
         branchId: branch.branchId,
@@ -373,6 +388,7 @@ export class NestedFollowupsBranchService extends Service {
     } catch (error: unknown) {
       await this.metadata.repository.putBranch({ ...branch, status: 'failed' })
       this.notify(tree.rootSessionId)
+      await this.releaseHandle(handle)
       throw new BranchCommandError(
         'prompt-failed',
         `the continuation prompt was not accepted: ${error instanceof Error ? error.message : String(error)}`,
@@ -468,17 +484,26 @@ export class NestedFollowupsBranchService extends Service {
       }
     }
 
-    let agent = this.ctx.agents.get(SessionId(branch.sessionId))
-    if (agent === undefined) {
-      const handle = snapshot === undefined
+    const liveAgent = this.ctx.agents.get(SessionId(branch.sessionId))
+    let handle: AgentHandle
+    if (liveAgent === undefined) {
+      const sourceAgentOptions = this.ctx.agents.get(sourceHeader.id)?.options
+      handle = snapshot === undefined
         ? await createChatOnlyForkAgentRc7(this.ctx.agents, {
           sessionId: SessionId(branch.sessionId),
           sourceHeader,
           seed,
+          ...sourceAgentOptions === undefined ? {} : { fallbackAgentOptions: sourceAgentOptions },
         })
-        : await resumeChatOnlyBranchAgentRc7(this.ctx.agents, SessionId(branch.sessionId))
-      agent = handle.agent
+        : await resumeChatOnlyBranchAgentRc7(this.ctx.agents, {
+          sessionId: SessionId(branch.sessionId),
+          events: snapshot.events,
+        })
+      this.rememberHandle(handle)
+    } else {
+      handle = this.requireOwnedHandle(liveAgent)
     }
+    const agent = handle.agent
     this.assertBranchHeader(branch, agent.session.header)
     if (agent.status !== 'idle') {
       throw new BranchCommandError('branch-busy', 'wait for the current branch turn to finish before retrying')
@@ -487,8 +512,9 @@ export class NestedFollowupsBranchService extends Service {
     await this.metadata.repository.putBranch({ ...branch, status: 'running' })
     this.notify(rootSessionId)
     try {
+      const activityEpoch = this.beginActivity(handle)
       const messageId = submitChatOnlyTurnRc7(agent, prompt, branch.clientRequestId)
-      void this.observeSettlement(agent, branch.branchId, rootSessionId)
+      void this.observeSettlement(handle, branch.branchId, rootSessionId, activityEpoch)
       return commandSuccess({
         action: 'create-branch',
         branchId: branch.branchId,
@@ -498,6 +524,7 @@ export class NestedFollowupsBranchService extends Service {
     } catch (error: unknown) {
       await this.metadata.repository.putBranch({ ...branch, status: 'failed' })
       this.notify(rootSessionId)
+      await this.releaseHandle(handle)
       throw new BranchCommandError(
         'prompt-failed',
         `the recovered branch did not accept its first prompt: ${error instanceof Error ? error.message : String(error)}`,
@@ -578,13 +605,57 @@ export class NestedFollowupsBranchService extends Service {
     return { start: range.start, end: range.end, text: range.text }
   }
 
+  private rememberHandle(handle: AgentHandle): void {
+    const sessionId = String(handle.agent.id)
+    const current = this.handles.get(sessionId)
+    if (current !== undefined && current !== handle) {
+      throw new BranchCommandError('branch-busy', `branch session '${sessionId}' already has an owned runtime`)
+    }
+    this.handles.set(sessionId, handle)
+  }
+
+  private requireOwnedHandle(agent: Agent): AgentHandle {
+    const handle = this.handles.get(String(agent.id))
+    if (handle === undefined || handle.agent !== agent) {
+      throw new BranchCommandError(
+        'branch-busy',
+        'this branch is open in the native session runtime; close it before continuing in Tree View',
+      )
+    }
+    return handle
+  }
+
+  private beginActivity(handle: AgentHandle): number {
+    this.rememberHandle(handle)
+    const sessionId = String(handle.agent.id)
+    const epoch = (this.activityEpochs.get(sessionId) ?? 0) + 1
+    this.activityEpochs.set(sessionId, epoch)
+    return epoch
+  }
+
+  private async releaseHandle(handle: AgentHandle): Promise<void> {
+    const sessionId = String(handle.agent.id)
+    if (this.handles.get(sessionId) !== handle) return
+    try {
+      await handle.dispose()
+      this.handles.delete(sessionId)
+      this.activityEpochs.delete(sessionId)
+    } catch (error: unknown) {
+      this.ctx.logger.warn(`branch session '${sessionId}' could not be detached: ${String(error)}`)
+    }
+  }
+
   private async observeSettlement(
-    agent: Agent,
+    handle: AgentHandle,
     branchId: string,
     rootSessionId: string,
+    activityEpoch: number,
   ): Promise<void> {
+    const agent = handle.agent
+    const sessionId = String(agent.id)
     try {
       await agent.whenIdle()
+      if (this.activityEpochs.get(sessionId) !== activityEpoch) return
       const current = this.metadata.repository.getBranch(branchId)
       if (current === undefined || current.status === 'deleted' || current.deletedAt !== undefined) return
       await this.metadata.repository.putBranch({
@@ -594,6 +665,10 @@ export class NestedFollowupsBranchService extends Service {
       this.notify(rootSessionId)
     } catch (error: unknown) {
       this.ctx.logger.warn(`branch '${branchId}' settlement could not be recorded: ${String(error)}`)
+    } finally {
+      if (this.activityEpochs.get(sessionId) === activityEpoch && agent.status === 'idle') {
+        await this.releaseHandle(handle)
+      }
     }
   }
 

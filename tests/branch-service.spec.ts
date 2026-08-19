@@ -417,7 +417,11 @@ describe('Host branch commands', () => {
 
       expect(branchSession.events.some(event =>
         event.type === 'tool/call' || event.type === 'tool/result')).toBe(false)
-      expect(runtime.agents.setupRecords).toHaveLength(2)
+      // Every completed branch round is detached so rc.7 classifies a
+      // descriptorless child as a settled diagnostic instead of a perpetual
+      // creation window. Three Continue rounds therefore resume through the
+      // same chat-only setup before the nested branch is created.
+      expect(runtime.agents.setupRecords).toHaveLength(5)
       for (const record of runtime.agents.setupRecords) {
         expect(record.modes).toEqual(['native'])
         expect(record.restrictions).toEqual([{ allow: [] }])
@@ -466,6 +470,50 @@ describe('Host branch commands', () => {
         question: 'must not run',
       })
       expect(nonTail).toMatchObject({ ok: false, error: { code: 'branch-not-tail' } })
+    } finally {
+      await runtime.dispose()
+    }
+  })
+
+  it('refuses to drive a branch Agent owned by the native session runtime', async () => {
+    const runtime = await setup()
+    try {
+      const created = await runtime.service.createBranch({
+        ownerSessionId: 'root',
+        clientRequestId: 'request-native-owner',
+        anchor: { sessionId: 'root', messageId: 'a1', seq: 3 },
+        question: 'first branch turn',
+      })
+      if (!created.ok) throw new Error('branch creation failed')
+      const branchSession = runtime.ctx.sessions.get(SessionId(created.value.sessionId))
+      if (branchSession === undefined) throw new Error('branch session missing')
+
+      const nativeHandle = await runtime.agents.resume({
+        resumeSessionId: branchSession.id,
+      })
+      try {
+        const tail = latestAssistant(branchSession)
+        const result = await runtime.service.continueBranch({
+          ownerSessionId: 'root',
+          clientRequestId: 'native-owner-continue',
+          branchId: created.value.branchId,
+          tail: {
+            sessionId: String(branchSession.id),
+            messageId: String(tail.data.message.id),
+            seq: tail.seq,
+          },
+          question: 'must remain fenced',
+        })
+        expect(result).toMatchObject({
+          ok: false,
+          error: {
+            code: 'branch-busy',
+            message: expect.stringContaining('native session runtime'),
+          },
+        })
+      } finally {
+        await nativeHandle.dispose()
+      }
     } finally {
       await runtime.dispose()
     }

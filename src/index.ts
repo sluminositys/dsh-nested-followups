@@ -34,6 +34,7 @@ export {
   ChatOnlyCapabilityError,
   createChatOnlyForkAgentRc7,
   probeChatOnlyCapabilityRc7,
+  resolveChatOnlyAgentOptionsRc7,
   resumeChatOnlyBranchAgentRc7,
   submitChatOnlyTurnRc7,
 } from './host/adapter/chat-only.ts'

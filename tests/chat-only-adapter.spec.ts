@@ -16,6 +16,7 @@ import {
   applyChatOnlyScopeRc7,
   createChatOnlyForkAgentRc7,
   probeChatOnlyCapabilityRc7,
+  resolveChatOnlyAgentOptionsRc7,
   resumeChatOnlyBranchAgentRc7,
   submitChatOnlyTurnRc7,
   type BranchAgentRegistry,
@@ -136,13 +137,19 @@ describe('rc.7 chat-only Agent adapter', () => {
       cwd: 'D:\\workspace\\project',
     }
     const seed = [] as SessionEvent[]
+    const fallbackAgentOptions = { provider: 'mock-provider', model: 'mock-model', maxTokens: 321 }
 
     await createChatOnlyForkAgentRc7(agents, {
       sessionId: SessionId('branch'),
       sourceHeader: header,
       seed,
+      fallbackAgentOptions,
     })
-    await resumeChatOnlyBranchAgentRc7(agents, SessionId('branch'))
+    await resumeChatOnlyBranchAgentRc7(agents, {
+      sessionId: SessionId('branch'),
+      events: seed,
+      fallbackAgentOptions,
+    })
 
     const createOptions = create.mock.calls[0]?.[0]
     const resumeOptions = resume.mock.calls[0]?.[0]
@@ -152,8 +159,50 @@ describe('rc.7 chat-only Agent adapter', () => {
       seedLength: 0,
       origin: 'subagent',
     })
+    expect(createOptions?.agentOptions).toEqual(fallbackAgentOptions)
+    expect(resumeOptions?.agentOptions).toEqual(fallbackAgentOptions)
     expect(createOptions?.setup).toBe(applyChatOnlyScopeRc7)
     expect(resumeOptions?.setup).toBe(applyChatOnlyScopeRc7)
+  })
+
+  it('inherits the durable fork-boundary route and does not freeze adapter defaults', () => {
+    const session = Session.create(SessionId('source'))
+    session.append('request/header', {
+      header: {
+        config: {
+          provider: 'logged-provider',
+          model: 'logged-model',
+          maxTokens: 777,
+        },
+        adapterDefaults: { maxTokens: true },
+      },
+      reason: 'initial',
+    })
+
+    expect(resolveChatOnlyAgentOptionsRc7(session.events, {
+      provider: 'stale-provider',
+      model: 'stale-model',
+      maxTokens: 123,
+    })).toEqual({
+      provider: 'logged-provider',
+      model: 'logged-model',
+    })
+
+    session.append('request/header', {
+      header: {
+        config: {
+          provider: 'selected-provider',
+          model: 'selected-model',
+          maxTokens: 456,
+        },
+      },
+      reason: 'change',
+    })
+    expect(resolveChatOnlyAgentOptionsRc7(session.events)).toEqual({
+      provider: 'selected-provider',
+      model: 'selected-model',
+      maxTokens: 456,
+    })
   })
 
   it('uses a durable client request id for idempotent Host-side delivery', () => {
