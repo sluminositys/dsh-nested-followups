@@ -196,14 +196,33 @@ function edgeGeometry(
   return { start, end, path: sequencePath(start, end) }
 }
 
+function anchorControlRect(anchor: Rect, nested: boolean): Rect {
+  const size = nested ? NESTED_ANCHOR_CONTROL_SIZE : ANCHOR_CONTROL_SIZE
+  return {
+    x: anchor.x + anchor.width + ANCHOR_CONTROL_GAP,
+    y: anchor.y + (anchor.height - size) / 2,
+    width: size,
+    height: size,
+  }
+}
+
+function rightEdgeCenter(rect: Rect): Point {
+  return { x: rect.x + rect.width, y: rect.y + rect.height / 2 }
+}
+
+/**
+ * A capsule's edge starts at the anchor group's dot control, not at the
+ * anchor card: card → control → capsules reads as one hub, and edges no
+ * longer pile up on the card's right edge.
+ */
 function capsuleLayout(
   summary: CollapsedBranchSummary,
-  anchor: Rect,
+  control: Rect,
   x: number,
   y: number,
 ): BranchCapsuleLayout {
   const rect = { x, y, width: CAPSULE_WIDTH, height: CAPSULE_HEIGHT }
-  const start = { x: anchor.x + anchor.width, y: anchor.y + anchor.height / 2 }
+  const start = rightEdgeCenter(control)
   const end = { x: rect.x, y: rect.y + rect.height / 2 }
   return {
     ...summary,
@@ -219,13 +238,7 @@ function anchorControlLayout(
   anchor: Rect,
 ): AnchorGroupControlLayout {
   const nested = summary.depth > 1
-  const size = nested ? NESTED_ANCHOR_CONTROL_SIZE : ANCHOR_CONTROL_SIZE
-  const rect = {
-    x: anchor.x + anchor.width + ANCHOR_CONTROL_GAP,
-    y: anchor.y + (anchor.height - size) / 2,
-    width: size,
-    height: size,
-  }
+  const rect = anchorControlRect(anchor, nested)
   const start = { x: anchor.x + anchor.width, y: anchor.y + anchor.height / 2 }
   const end = { x: rect.x, y: rect.y + rect.height / 2 }
   return {
@@ -316,7 +329,8 @@ export function layoutConversationTree(
             cursor.y,
             anchor.y + (anchor.height - CAPSULE_HEIGHT) / 2,
           )
-          branchCapsules.push(capsuleLayout(summary, anchor, x, capsuleY))
+          const control = anchorControlRect(anchor, summary.depth > 1)
+          branchCapsules.push(capsuleLayout(summary, control, x, capsuleY))
           nextFreeYByDepth.set(depth, {
             y: capsuleY + CAPSULE_HEIGHT + CAPSULE_STACK_GAP,
             kind: 'capsule',
@@ -359,16 +373,40 @@ export function layoutConversationTree(
     .sort((left, right) => left.depth - right.depth
       || left.rect.y - right.rect.y
       || left.nodeId.localeCompare(right.nodeId))
+  const controlRectByAnchorNodeId = new Map(collapsed.anchorGroups.flatMap((summary) => {
+    const anchor = nodeLayouts.get(summary.anchorNodeId)?.rect
+    return anchor === undefined
+      ? []
+      : [[summary.anchorNodeId, anchorControlRect(anchor, summary.depth > 1)] as const]
+  }))
   const edgeLayouts = projection.edges.flatMap((edge): TreeEdgeLayout[] => {
     const source = nodeLayouts.get(edge.sourceNodeId)?.rect
     const target = nodeLayouts.get(edge.targetNodeId)?.rect
     if (source === undefined || target === undefined) return []
+    // Branch edges leave from the anchor group's dot control so every line of
+    // the fan shares the card → control → branches hub.
+    const control = edge.kind === 'branch'
+      ? controlRectByAnchorNodeId.get(edge.sourceNodeId)
+      : undefined
+    const geometry = edgeGeometry(edge, source, target)
+    if (control !== undefined) {
+      const start = rightEdgeCenter(control)
+      return [{
+        edgeId: edge.edgeId,
+        kind: edge.kind,
+        sourceNodeId: edge.sourceNodeId,
+        targetNodeId: edge.targetNodeId,
+        start,
+        end: geometry.end,
+        path: branchPath(start, geometry.end),
+      }]
+    }
     return [{
       edgeId: edge.edgeId,
       kind: edge.kind,
       sourceNodeId: edge.sourceNodeId,
       targetNodeId: edge.targetNodeId,
-      ...edgeGeometry(edge, source, target),
+      ...geometry,
     }]
   }).sort((left, right) => left.edgeId.localeCompare(right.edgeId))
 

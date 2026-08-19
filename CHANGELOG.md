@@ -20,6 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Sibling capsules stack tightly under their anchor, and expanded frames keep
   a guaranteed clearance so dashed regions never overlap.
 
+- Folding never moves the viewport: dots, capsules, and the bottom-edge
+  target all act in place. Automatic centering remains only for search
+  results and streaming follow.
+- Every connector is now a solid line, and branch fans route through the
+  dot control as one hub instead of piling up on the anchor card's edge.
+
 ### Fixed
 
 - Tooltips inside the zoomed canvas rendered far away from their buttons: a

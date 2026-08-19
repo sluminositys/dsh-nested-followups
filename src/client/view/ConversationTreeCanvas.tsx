@@ -1064,7 +1064,6 @@ export function ConversationTreeCanvas({
                                   childAnchorDotIds: childAnchorDotIdsForBranch(projection, branchId),
                                 })
                               }
-                              setPendingCenterNodeId(branch.nodeIds[0] ?? capsule.anchorNodeId)
                             }}
                           >
                             {capsule.activity !== 'complete' && (
@@ -1129,7 +1128,6 @@ export function ConversationTreeCanvas({
                               noteManualViewportChange()
                               startCardExit([branchId], true)
                               dispatch({ type: 'branch/toggle', branchId })
-                              setPendingCenterNodeId(branch.anchorNodeId ?? null)
                             }}
                           >
                             <IconChevronUpOutline14 size={16} />
@@ -1177,7 +1175,6 @@ export function ConversationTreeCanvas({
                           branchIds: control.branchIds,
                         })
                       }
-                      setPendingCenterNodeId(control.anchorNodeId)
                     }}
                   >
                     <span className={css.anchorGlyph} aria-hidden="true">

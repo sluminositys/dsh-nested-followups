@@ -116,17 +116,35 @@ describe('conversation tree layout', () => {
       .toMatchObject({ width: 20, height: 20 })
   })
 
-  it('connects branch edges from the anchor right port with a smooth path', () => {
+  it('routes branch edges through the anchor dot control as one hub', () => {
     const layout = layoutConversationTree(treeProjectionFixture())
     const nodes = nodeMap(layout)
     const edge = layout.edges.find(candidate => candidate.edgeId === 'branch:root-a2:branch-1-q')
     const anchor = nodes.get('root-a2')!.rect
+    const control = layout.anchorControls.find(candidate => candidate.anchorNodeId === 'root-a2')!
 
     expect(edge?.start).toEqual({
+      x: control.rect.x + control.rect.width,
+      y: control.rect.y + control.rect.height / 2,
+    })
+    expect(control.start).toEqual({
       x: anchor.x + anchor.width,
       y: anchor.y + anchor.height / 2,
     })
     expect(edge?.path).toMatch(/^M .+ C .+$/u)
+  })
+
+  it('starts capsule edges at the dot control instead of the anchor card', () => {
+    const layout = layoutConversationTree(treeProjectionFixture(), {
+      collapsedBranchIds: new Set(['branch-1']),
+    })
+    const capsule = layout.branchCapsules.find(candidate => candidate.branchId === 'branch-1')!
+    const control = layout.anchorControls.find(candidate => candidate.anchorNodeId === 'root-a2')!
+
+    expect(capsule.start).toEqual({
+      x: control.rect.x + control.rect.width,
+      y: control.rect.y + control.rect.height / 2,
+    })
   })
 
   it('keeps a 200-message mainline finite, ordered, and deterministic', () => {
