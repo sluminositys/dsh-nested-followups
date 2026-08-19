@@ -468,4 +468,18 @@ describe('conversation tree canvas', () => {
     expect(css).toContain('@media (prefers-reduced-motion: reduce)')
     expect(css).toContain('content: none')
   })
+
+  it('preserves focus dimming after the branch-card reveal animation settles', () => {
+    const css = readFileSync(
+      new URL('../src/client/view/ConversationTreeCanvas.module.css', import.meta.url),
+      'utf8',
+    )
+
+    expect(css).toContain('--fold-card-target-opacity: 1')
+    expect(css).toContain('--fold-card-target-opacity: 0.45')
+    expect(css).toContain(
+      'branch-card-reveal 260ms cubic-bezier(0.3, 1.15, 0.5, 1) backwards',
+    )
+    expect(css).toContain('opacity: var(--fold-card-target-opacity)')
+  })
 })
