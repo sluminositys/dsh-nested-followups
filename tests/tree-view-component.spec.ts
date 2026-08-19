@@ -74,12 +74,14 @@ function renderWithViewState(
 function viewState(
   collapsedBranchIds: readonly string[],
   anchorDotIds: readonly string[],
+  focusedNodeId?: string,
 ): TreeViewState {
   return {
     treeId: 'tree-layout',
     viewport: { x: 0, y: 0, zoom: 1 },
     collapsedBranchIds: [...collapsedBranchIds],
     anchorDotIds: [...anchorDotIds],
+    ...(focusedNodeId === undefined ? {} : { focusedNodeId }),
     expandedNodeIds: [],
   }
 }
@@ -279,6 +281,33 @@ describe('conversation tree canvas', () => {
 
     expect(markup).not.toContain('readonly')
     expect(markup).not.toContain('Select source text to quote')
+  })
+
+  it('dims ancestor-branch turns outside the focused context in the rendered tree', () => {
+    const base = treeProjectionFixture()
+    const q = base.nodes.find(node => node.nodeId === 'branch-1-q')!
+    const a = base.nodes.find(node => node.nodeId === 'branch-1-a')!
+    const projection = {
+      ...base,
+      nodes: [
+        ...base.nodes,
+        { ...q, nodeId: 'branch-1-q2', messageId: 'branch-1-q2', seq: 8, localTurnIndex: 2, summary: 'turn two q', text: 'turn two q' },
+        { ...a, nodeId: 'branch-1-a2', messageId: 'branch-1-a2', seq: 9, localTurnIndex: 2, summary: 'turn two a', text: 'turn two a' },
+      ],
+      edges: [
+        ...base.edges,
+        { edgeId: 'sequence:branch-1-a:branch-1-q2', sourceNodeId: 'branch-1-a', targetNodeId: 'branch-1-q2', kind: 'sequence' as const },
+        { edgeId: 'sequence:branch-1-q2:branch-1-a2', sourceNodeId: 'branch-1-q2', targetNodeId: 'branch-1-a2', kind: 'sequence' as const },
+      ],
+      branches: base.branches.map(branch => branch.record.branchId === 'branch-1'
+        ? { ...branch, nodeIds: [...branch.nodeIds, 'branch-1-q2', 'branch-1-a2'] }
+        : branch),
+    }
+    const markup = renderWithViewState(viewState([], [], 'nested-a'), projection)
+    const turnTwoCard = /<article[^>]*aria-label="Q2\.1 #2[^"]*"[^>]*>/u.exec(markup)?.[0] ?? ''
+
+    expect(turnTwoCard).toContain('data-dimmed="true"')
+    expect(markup).toContain('turn two q')
   })
 
   it('discloses the rc.7 archive fallback in the destructive confirmation', () => {
