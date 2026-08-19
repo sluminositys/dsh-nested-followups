@@ -298,7 +298,10 @@
 }
 
 .nodeCard[data-dimmed='true'] {
-  opacity: 0.2;
+  border-color: var(--dsw-alias-border-l1);
+  background: var(--dsw-alias-bg-layer-2);
+  opacity: 0.45;
+  filter: grayscale(1);
 }
 
 .nodeHeader {
