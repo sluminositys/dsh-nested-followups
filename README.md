@@ -39,6 +39,9 @@ conversation never sees it.
   something.
 - **Read-only branches.** A branch can read the workspace but cannot modify it,
   so a follow-up can never disturb work in progress in the main conversation.
+- **Progressive collapse for large trees.** Each anchor folds to a dot, opens
+  into one capsule per branch, and expands one level at a time, so a deep tree
+  stays readable. Folded branches keep streaming and show activity markers.
 - **No interference with the standard interface.** The regular chat view, the
   sidebar, and message rendering are unchanged. Branches do not appear in the
   session list.
