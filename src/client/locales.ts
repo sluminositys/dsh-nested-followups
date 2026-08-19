@@ -6,6 +6,8 @@ export const NS = 'nested-followups' as const
 
 export type NestedFollowupsLocaleKey =
   | 'view.tree'
+  | 'view.openTree'
+  | 'view.returnToChat'
   | 'tree.canvas'
   | 'tree.search'
   | 'tree.searchPlaceholder'
@@ -64,6 +66,8 @@ declare module '@deepseek-ai/dsh-client-ui-slots' {
 
 export const en: Record<NestedFollowupsLocaleKey, string> = {
   'view.tree': 'Tree View',
+  'view.openTree': 'Open Tree View',
+  'view.returnToChat': 'Return to Chat',
   'tree.canvas': 'Conversation tree',
   'tree.search': 'Search messages',
   'tree.searchPlaceholder': 'Search messages or node labels',
@@ -117,6 +121,8 @@ export const en: Record<NestedFollowupsLocaleKey, string> = {
 
 export const zh: Record<NestedFollowupsLocaleKey, string> = {
   'view.tree': '树状视图',
+  'view.openTree': '打开树状视图',
+  'view.returnToChat': '返回聊天',
   'tree.canvas': '会话树',
   'tree.search': '搜索消息',
   'tree.searchPlaceholder': '搜索消息内容或节点编号',

@@ -43,4 +43,12 @@ describe('package contract', () => {
 
     expect(client).toContain("ctx.inject(['remote.nestedFollowups']")
   })
+
+  it('registers both the Tree View body and its native header utility', async () => {
+    const client = await readFile(new URL('../src/client/index.ts', import.meta.url), 'utf8')
+
+    expect(client).toContain("ctx.slots.inject('conversation.view'")
+    expect(client).toContain("ctx.slots.inject('conversation.session.header.utilities'")
+    expect(client).toContain("name: 'conversation.session.header.utilities'")
+  })
 })
