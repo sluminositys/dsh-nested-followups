@@ -995,50 +995,6 @@
   line-height: 1.4;
 }
 
-.selectedQuote {
-  position: relative;
-  max-height: 88px;
-  overflow: auto;
-  padding: 6px 58px 6px 8px;
-  border-left: 2px solid var(--dsw-alias-brand-primary);
-  color: var(--dsw-alias-label-secondary);
-  background: var(--dsw-alias-bg-layer-2);
-  font-size: 10px;
-  line-height: 1.35;
-}
-
-.selectedQuote > span {
-  display: block;
-  margin-bottom: 3px;
-  color: var(--dsw-alias-label-tertiary);
-}
-
-.selectedQuote blockquote {
-  margin: 0;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-}
-
-.clearQuote {
-  position: absolute;
-  top: 5px;
-  right: 6px;
-  padding: 2px 4px;
-  border: 0;
-  border-radius: 4px;
-  color: var(--dsw-alias-label-secondary);
-  background: transparent;
-  font: inherit;
-  font-size: 9px;
-  cursor: pointer;
-}
-
-.clearQuote:hover,
-.clearQuote:focus-visible {
-  color: var(--dsw-alias-label-primary);
-  background: var(--dsw-alias-bg-layer-1);
-}
-
 .composerActions {
   display: flex;
   justify-content: flex-end;
@@ -1261,17 +1217,6 @@
   line-height: 1.4;
 }
 
-.composerQuoteRow {
-  position: relative;
-  padding-right: 24px;
-}
-
-.composerQuoteRow + .composerQuoteRow {
-  margin-top: 6px;
-  padding-top: 6px;
-  border-top: 1px dashed var(--dsw-alias-border-l2);
-}
-
 .savedQuoteList {
   display: flex;
   flex-direction: column;
@@ -1393,4 +1338,17 @@
   border-color: var(--dsw-alias-brand-primary);
   color: var(--dsw-alias-label-inverse, var(--dsw-alias-bg-base));
   background: var(--dsw-alias-brand-primary);
+}
+
+.composerQuoteList {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  max-height: 132px;
+  overflow: auto;
+}
+
+.composerQuoteTitle {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
 }

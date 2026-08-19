@@ -351,15 +351,15 @@ function FollowUpComposer({
         <p className={css.snapNotice} role="status">{labels.snapToTurnTail(branchTargetLabel)}</p>
       )}
       {quotes.length > 0 && (
-        <div className={css.selectedQuote} data-tree-scroll="true">
-          <span>{labels.quoteSelected}</span>
+        <div className={css.composerQuoteList} data-tree-scroll="true">
+          <span className={css.composerQuoteTitle}>{labels.quoteSelected}</span>
           {quotes.map(saved => (
-            <div key={saved.id} className={css.composerQuoteRow}>
-              <blockquote>{saved.text}</blockquote>
-              {saved.note !== '' && <p className={css.savedQuoteNote}>{saved.note}</p>}
+            <div key={saved.id} className={css.savedQuoteChip}>
+              <span className={css.savedQuoteText} title={saved.text}>{saved.text}</span>
+              {saved.note !== '' && <span className={css.savedQuoteNote}>{saved.note}</span>}
               <button
                 type="button"
-                className={css.clearQuote}
+                className={css.savedQuoteRemove}
                 disabled={pending}
                 aria-label={labels.removeQuote}
                 onClick={() => { onRemoveQuote(saved.id) }}
