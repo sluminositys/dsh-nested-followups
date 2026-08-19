@@ -546,6 +546,7 @@ export function ConversationTreeCanvas({
                       type: 'search/select',
                       nodeId: result.nodeId,
                       branchesToExpand: result.branchesToExpand,
+                      anchorDotsToExpand: result.anchorDotsToExpand,
                     })
                     setPendingCenterNodeId(result.nodeId)
                   }}

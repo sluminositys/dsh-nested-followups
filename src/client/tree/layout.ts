@@ -1,7 +1,12 @@
 import type { BranchProjectionView, ConversationTreeProjection, TreeEdgeView } from '../../shared/projection.ts'
 import type { MessageNodeView } from '../../shared/types.ts'
 import { inflateRect, unionRects, type Point, type Rect } from './geometry.ts'
-import { deriveCollapseState, type CollapsedBranchSummary } from './navigation.ts'
+import {
+  deriveCollapseState,
+  type AnchorGroupSummary,
+  type CollapsedBranchSummary,
+  type FoldActivityState,
+} from './navigation.ts'
 
 export interface TreeLayoutOptions {
   nodeWidth?: number
@@ -12,6 +17,7 @@ export interface TreeLayoutOptions {
   canvasPadding?: number
   regionPadding?: number
   collapsedBranchIds?: ReadonlySet<string>
+  anchorDotIds?: ReadonlySet<string>
 }
 
 export interface ResolvedTreeLayoutOptions {
@@ -47,22 +53,51 @@ export interface BranchRegionLayout {
   rect: Rect
 }
 
-export interface CollapsedBranchBadgeLayout {
-  branchId: string
+export interface AnchorGroupControlLayout {
+  anchorDotId: string
   anchorNodeId: string
-  hiddenNodeCount: number
+  branchIds: readonly string[]
+  branchCount: number
+  messageCount: number
   depth: number
+  open: boolean
+  nested: boolean
+  activity: FoldActivityState
   rect: Rect
   start: Point
   end: Point
   path: string
 }
 
+export interface BranchCapsuleLayout {
+  branchId: string
+  anchorDotId: string
+  anchorNodeId: string
+  pathLabel: string
+  firstQuestionSummary: string
+  childBranchCount: number
+  branchCount: number
+  messageCount: number
+  hiddenNodeCount: number
+  depth: number
+  activity: FoldActivityState
+  rect: Rect
+  start: Point
+  end: Point
+  path: string
+}
+
+/** @deprecated Consume branchCapsules. Kept for one compatibility release. */
+export type CollapsedBranchBadgeLayout = BranchCapsuleLayout
+
 export interface ConversationTreeLayout {
   options: ResolvedTreeLayoutOptions
   nodes: readonly TreeNodeLayout[]
   edges: readonly TreeEdgeLayout[]
   branchRegions: readonly BranchRegionLayout[]
+  anchorControls: readonly AnchorGroupControlLayout[]
+  branchCapsules: readonly BranchCapsuleLayout[]
+  /** @deprecated Consume branchCapsules. */
   collapsedBadges: readonly CollapsedBranchBadgeLayout[]
   bounds: Rect
 }
@@ -77,8 +112,11 @@ export const DEFAULT_TREE_LAYOUT_OPTIONS: ResolvedTreeLayoutOptions = Object.fre
   regionPadding: 24,
 })
 
-const BADGE_WIDTH = 108
-const BADGE_HEIGHT = 32
+const CAPSULE_WIDTH = 270
+const CAPSULE_HEIGHT = 40
+const ANCHOR_CONTROL_SIZE = 28
+const NESTED_ANCHOR_CONTROL_SIZE = 20
+const ANCHOR_CONTROL_GAP = 24
 
 function positive(value: number | undefined, fallback: number): number {
   return value === undefined || !Number.isFinite(value) || value <= 0 ? fallback : value
@@ -144,10 +182,7 @@ function isDescendantOrSelf(
   return false
 }
 
-function branchPath(
-  start: Point,
-  end: Point,
-): string {
+function branchPath(start: Point, end: Point): string {
   const distance = Math.max(40, Math.abs(end.x - start.x) * 0.5)
   return `M ${start.x} ${start.y} C ${start.x + distance} ${start.y}, ${end.x - distance} ${end.y}, ${end.x} ${end.y}`
 }
@@ -172,22 +207,41 @@ function edgeGeometry(
   return { start, end, path: sequencePath(start, end) }
 }
 
-function badgeLayout(
+function capsuleLayout(
   summary: CollapsedBranchSummary,
-  anchorNodeId: string,
-  depth: number,
   anchor: Rect,
   x: number,
   y: number,
-): CollapsedBranchBadgeLayout {
-  const rect = { x, y, width: BADGE_WIDTH, height: BADGE_HEIGHT }
+): BranchCapsuleLayout {
+  const rect = { x, y, width: CAPSULE_WIDTH, height: CAPSULE_HEIGHT }
   const start = { x: anchor.x + anchor.width, y: anchor.y + anchor.height / 2 }
   const end = { x: rect.x, y: rect.y + rect.height / 2 }
   return {
-    branchId: summary.branchId,
-    anchorNodeId,
-    hiddenNodeCount: summary.hiddenNodeCount,
-    depth,
+    ...summary,
+    rect,
+    start,
+    end,
+    path: branchPath(start, end),
+  }
+}
+
+function anchorControlLayout(
+  summary: AnchorGroupSummary,
+  anchor: Rect,
+): AnchorGroupControlLayout {
+  const nested = summary.depth > 1
+  const size = nested ? NESTED_ANCHOR_CONTROL_SIZE : ANCHOR_CONTROL_SIZE
+  const rect = {
+    x: anchor.x + anchor.width + ANCHOR_CONTROL_GAP,
+    y: anchor.y + (anchor.height - size) / 2,
+    width: size,
+    height: size,
+  }
+  const start = { x: anchor.x + anchor.width, y: anchor.y + anchor.height / 2 }
+  const end = { x: rect.x, y: rect.y + rect.height / 2 }
+  return {
+    ...summary,
+    nested,
     rect,
     start,
     end,
@@ -198,6 +252,7 @@ function badgeLayout(
 /**
  * Deterministic lane layout. The root session never moves horizontally; every
  * nested session owns one column to the right of its parent branch depth.
+ * Capsules reserve the same lane as cards, so mixed folding cannot overlap.
  */
 export function layoutConversationTree(
   projection: ConversationTreeProjection,
@@ -207,6 +262,7 @@ export function layoutConversationTree(
   const collapsed = deriveCollapseState(
     projection,
     inputOptions.collapsedBranchIds ?? new Set<string>(),
+    inputOptions.anchorDotIds ?? new Set<string>(),
   )
   const nodesById = new Map(projection.nodes.map(node => [node.nodeId, node] as const))
   const branches = new Map(
@@ -236,13 +292,13 @@ export function layoutConversationTree(
     projection.branches.map(branch => [branch.record.branchId, branchDepth(branch, branches)] as const),
   )
   const summaries = new Map(collapsed.summaries.map(summary => [summary.branchId, summary] as const))
-  const collapsedBadges: CollapsedBranchBadgeLayout[] = []
+  const branchCapsules: BranchCapsuleLayout[] = []
   const maximumDepth = Math.max(0, ...branchDepths.values())
 
   for (let depth = 1; depth <= maximumDepth; depth++) {
     const atDepth = projection.branches
       .filter(branch => branchDepths.get(branch.record.branchId) === depth)
-      .filter(branch => !collapsed.hiddenBranchIds.has(branch.record.branchId)
+      .filter(branch => collapsed.visibleBranchIds.has(branch.record.branchId)
         || summaries.has(branch.record.branchId))
       .sort((left, right) => {
         const leftY = left.anchorNodeId === undefined
@@ -264,17 +320,10 @@ export function layoutConversationTree(
       const x = options.canvasPadding + depth * (options.nodeWidth + options.columnGap)
       const summary = summaries.get(branch.record.branchId)
       if (summary !== undefined) {
-        if (anchor !== undefined && summary.anchorNodeId !== undefined) {
-          const badgeY = Math.max(startY, anchor.y + (anchor.height - BADGE_HEIGHT) / 2)
-          collapsedBadges.push(badgeLayout(
-            summary,
-            summary.anchorNodeId,
-            depth,
-            anchor,
-            x,
-            badgeY,
-          ))
-          nextFreeYByDepth.set(depth, badgeY + BADGE_HEIGHT + options.branchGap)
+        if (anchor !== undefined) {
+          const capsuleY = Math.max(startY, anchor.y + (anchor.height - CAPSULE_HEIGHT) / 2)
+          branchCapsules.push(capsuleLayout(summary, anchor, x, capsuleY))
+          nextFreeYByDepth.set(depth, capsuleY + CAPSULE_HEIGHT + options.branchGap)
         }
         continue
       }
@@ -324,7 +373,7 @@ export function layoutConversationTree(
 
   const branchRegions = projection.branches.flatMap((branch): BranchRegionLayout[] => {
     const branchId = branch.record.branchId
-    if (collapsed.hiddenBranchIds.has(branchId)) return []
+    if (!collapsed.visibleBranchIds.has(branchId)) return []
     const descendantRects = orderedNodeLayouts
       .filter(layout => layout.branchId !== null
         && isDescendantOrSelf(layout.branchId, branchId, branches))
@@ -339,17 +388,28 @@ export function layoutConversationTree(
     || left.rect.y - right.rect.y
     || left.branchId.localeCompare(right.branchId))
 
+  const anchorControls = collapsed.anchorGroups.flatMap((summary): AnchorGroupControlLayout[] => {
+    const anchor = nodeLayouts.get(summary.anchorNodeId)?.rect
+    return anchor === undefined ? [] : [anchorControlLayout(summary, anchor)]
+  }).sort((left, right) => left.depth - right.depth
+    || left.rect.y - right.rect.y
+    || left.anchorDotId.localeCompare(right.anchorDotId))
+
   const allRects: Rect[] = [
     ...orderedNodeLayouts.map(layout => layout.rect),
-    ...collapsedBadges.map(badge => badge.rect),
+    ...branchCapsules.map(capsule => capsule.rect),
+    ...anchorControls.map(control => control.rect),
     ...branchRegions.map(region => region.rect),
   ]
+  const frozenCapsules = Object.freeze(branchCapsules)
   return Object.freeze({
     options,
     nodes: Object.freeze(orderedNodeLayouts),
     edges: Object.freeze(edgeLayouts),
     branchRegions: Object.freeze(branchRegions),
-    collapsedBadges: Object.freeze(collapsedBadges),
+    anchorControls: Object.freeze(anchorControls),
+    branchCapsules: frozenCapsules,
+    collapsedBadges: frozenCapsules,
     bounds: unionRects(allRects),
   })
 }

@@ -77,6 +77,7 @@ export interface TreeViewState {
   treeId: string
   viewport: { x: number; y: number; zoom: number }
   collapsedBranchIds: string[]
+  anchorDotIds: string[]
   focusedNodeId?: string
   expandedNodeIds: string[]
 }

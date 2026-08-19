@@ -2,6 +2,7 @@ import type { ConversationTreeProjection } from '../../shared/projection.ts'
 
 export interface TreeInteractionState {
   readonly collapsedBranchIds: ReadonlySet<string>
+  readonly anchorDotIds: ReadonlySet<string>
   readonly expandedNodeIds: ReadonlySet<string>
   readonly focusedNodeId: string | undefined
   readonly composerNodeId: string | undefined
@@ -11,19 +12,37 @@ export interface TreeInteractionState {
 }
 
 export type TreeInteractionAction =
-  | { type: 'branch/toggle'; branchId: string }
+  | { type: 'branch/toggle'; branchId: string; childAnchorDotIds?: readonly string[] }
+  | {
+      type: 'branch/deep-expand'
+      branchIds: readonly string[]
+      anchorDotIds: readonly string[]
+    }
+  | { type: 'anchor/toggle'; anchorDotId: string }
+  | {
+      type: 'anchor/deep-expand'
+      anchorDotIds: readonly string[]
+      branchIds: readonly string[]
+    }
+  | { type: 'anchors/collapse-all'; anchorDotIds: readonly string[] }
   | { type: 'node/toggle-expanded'; nodeId: string }
   | { type: 'focus/set'; nodeId: string | undefined }
   | { type: 'composer/open'; nodeId: string; mode: 'ask' | 'continue' }
   | { type: 'composer/close' }
   | { type: 'selection/set'; nodeId: string | undefined }
   | { type: 'search/set'; query: string }
-  | { type: 'search/select'; nodeId: string; branchesToExpand: readonly string[] }
+  | {
+      type: 'search/select'
+      nodeId: string
+      branchesToExpand: readonly string[]
+      anchorDotsToExpand: readonly string[]
+    }
   | { type: 'projection/reconcile'; projection: ConversationTreeProjection }
 
 export function createTreeInteractionState(): TreeInteractionState {
   return {
     collapsedBranchIds: new Set(),
+    anchorDotIds: new Set(),
     expandedNodeIds: new Set(),
     focusedNodeId: undefined,
     composerNodeId: undefined,
@@ -45,8 +64,31 @@ export function treeInteractionReducer(
   action: TreeInteractionAction,
 ): TreeInteractionState {
   switch (action.type) {
-    case 'branch/toggle':
-      return { ...state, collapsedBranchIds: toggled(state.collapsedBranchIds, action.branchId) }
+    case 'branch/toggle': {
+      const collapsedBranchIds = toggled(state.collapsedBranchIds, action.branchId)
+      if (collapsedBranchIds.has(action.branchId)) return { ...state, collapsedBranchIds }
+      const anchorDotIds = new Set(state.anchorDotIds)
+      for (const anchorDotId of action.childAnchorDotIds ?? []) anchorDotIds.add(anchorDotId)
+      return { ...state, collapsedBranchIds, anchorDotIds }
+    }
+    case 'branch/deep-expand': {
+      const collapsedBranchIds = new Set(state.collapsedBranchIds)
+      for (const branchId of action.branchIds) collapsedBranchIds.delete(branchId)
+      const anchorDotIds = new Set(state.anchorDotIds)
+      for (const anchorDotId of action.anchorDotIds) anchorDotIds.delete(anchorDotId)
+      return { ...state, collapsedBranchIds, anchorDotIds }
+    }
+    case 'anchor/toggle':
+      return { ...state, anchorDotIds: toggled(state.anchorDotIds, action.anchorDotId) }
+    case 'anchor/deep-expand': {
+      const anchorDotIds = new Set(state.anchorDotIds)
+      for (const anchorDotId of action.anchorDotIds) anchorDotIds.delete(anchorDotId)
+      const collapsedBranchIds = new Set(state.collapsedBranchIds)
+      for (const branchId of action.branchIds) collapsedBranchIds.delete(branchId)
+      return { ...state, anchorDotIds, collapsedBranchIds }
+    }
+    case 'anchors/collapse-all':
+      return { ...state, anchorDotIds: new Set(action.anchorDotIds) }
     case 'node/toggle-expanded':
       return { ...state, expandedNodeIds: toggled(state.expandedNodeIds, action.nodeId) }
     case 'focus/set':
@@ -67,9 +109,12 @@ export function treeInteractionReducer(
     case 'search/select': {
       const collapsedBranchIds = new Set(state.collapsedBranchIds)
       for (const branchId of action.branchesToExpand) collapsedBranchIds.delete(branchId)
+      const anchorDotIds = new Set(state.anchorDotIds)
+      for (const anchorDotId of action.anchorDotsToExpand) anchorDotIds.delete(anchorDotId)
       return {
         ...state,
         collapsedBranchIds,
+        anchorDotIds,
         selectedNodeId: action.nodeId,
         searchQuery: '',
       }
@@ -86,10 +131,16 @@ export function reconcileTreeInteractionState(
 ): TreeInteractionState {
   const nodeIds = new Set(projection.nodes.map(node => node.nodeId))
   const branchIds = new Set(projection.branches.map(branch => branch.record.branchId))
+  const anchorDotIds = new Set(
+    projection.branches.map(branch => branch.record.anchorMessageId),
+  )
   return {
     ...state,
     collapsedBranchIds: new Set(
       [...state.collapsedBranchIds].filter(branchId => branchIds.has(branchId)),
+    ),
+    anchorDotIds: new Set(
+      [...state.anchorDotIds].filter(anchorDotId => anchorDotIds.has(anchorDotId)),
     ),
     expandedNodeIds: new Set(
       [...state.expandedNodeIds].filter(nodeId => nodeIds.has(nodeId)),

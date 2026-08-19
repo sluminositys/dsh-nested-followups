@@ -52,7 +52,7 @@ describe('conversation tree layout', () => {
     expect(positions(reordered)).toEqual(positions(projection))
   })
 
-  it('replaces a collapsed branch and all descendants with one counted badge', () => {
+  it('replaces a collapsed branch and all descendants with one anatomical capsule', () => {
     const projection = treeProjectionFixture()
     const expanded = layoutConversationTree(projection)
     const collapsed = layoutConversationTree(projection, {
@@ -63,12 +63,54 @@ describe('conversation tree layout', () => {
     expect(visibleIds.has('branch-1-q')).toBe(false)
     expect(visibleIds.has('nested-q')).toBe(false)
     expect(visibleIds.has('branch-2-q')).toBe(true)
-    expect(collapsed.collapsedBadges).toEqual([
-      expect.objectContaining({ branchId: 'branch-1', anchorNodeId: 'root-a2', hiddenNodeCount: 4 }),
+    expect(collapsed.branchCapsules).toEqual([
+      expect.objectContaining({
+        branchId: 'branch-1',
+        anchorNodeId: 'root-a2',
+        pathLabel: '2.1',
+        firstQuestionSummary: 'branch question',
+        childBranchCount: 1,
+        messageCount: 4,
+      }),
     ])
     const expandedRoot = expanded.nodes.filter(node => node.branchId === null)
     const collapsedRoot = collapsed.nodes.filter(node => node.branchId === null)
     expect(collapsedRoot).toEqual(expandedRoot)
+  })
+
+  it('uses one compact anchor control for a closed group and keeps cards hidden', () => {
+    const layout = layoutConversationTree(treeProjectionFixture(), {
+      anchorDotIds: new Set(['root-a2']),
+    })
+    const visibleIds = new Set(layout.nodes.map(node => node.nodeId))
+
+    expect(visibleIds.has('branch-1-q')).toBe(false)
+    expect(visibleIds.has('branch-2-q')).toBe(false)
+    expect(layout.branchCapsules).toHaveLength(0)
+    expect(layout.anchorControls).toEqual([
+      expect.objectContaining({
+        anchorDotId: 'root-a2',
+        branchCount: 2,
+        messageCount: 6,
+        open: false,
+        nested: false,
+      }),
+    ])
+  })
+
+  it('reserves one lane for a mixed card and capsule composition without overlap', () => {
+    const layout = layoutConversationTree(treeProjectionFixture(), {
+      collapsedBranchIds: new Set(['branch-2']),
+      anchorDotIds: new Set(['branch-1-a']),
+    })
+    const cardBottom = Math.max(...layout.nodes
+      .filter(node => node.branchId === 'branch-1')
+      .map(node => node.rect.y + node.rect.height))
+    const siblingCapsule = layout.branchCapsules.find(capsule => capsule.branchId === 'branch-2')!
+
+    expect(siblingCapsule.rect.y).toBeGreaterThan(cardBottom)
+    expect(layout.anchorControls.some(control => control.anchorDotId === 'branch-1-a'
+      && !control.open && control.nested)).toBe(true)
   })
 
   it('connects branch edges from the anchor right port with a smooth path', () => {
