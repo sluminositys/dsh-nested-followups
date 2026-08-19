@@ -21,7 +21,7 @@ import type { BranchRecord, TreeRecord } from '../shared/types.ts'
 import type { NestedFollowupsBranchService } from './branch-service.ts'
 import type { NestedFollowupsDeleteService } from './delete-service.ts'
 import type { NestedFollowupsMetadataService } from './metadata-service.ts'
-import { projectConversationTree, type SessionLogSnapshot } from './projection.ts'
+import { isDirectlyDeleted, projectConversationTree, type SessionLogSnapshot } from './projection.ts'
 
 const WATCH_TIMEOUT_MS = 15_000
 const STREAM_TOUCH_INTERVAL_MS = 50
@@ -162,7 +162,11 @@ export class NestedFollowupsService extends TypertRemoteService {
 
     const rootLog = await this.readLog(ownership.rootSessionId, 0, persistedHeaders)
     if (rootLog !== undefined) logs.set(ownership.rootSessionId, rootLog)
+    // A marked branch is dropped by the projection, and its session is being
+    // archived or is already gone, so reading its log only costs a persistence
+    // round trip during cascade deletion.
     await Promise.all(branches.map(async (branch) => {
+      if (isDirectlyDeleted(branch)) return
       const log = await this.readLog(branch.sessionId, branch.seedLength, persistedHeaders)
       if (log !== undefined) logs.set(branch.sessionId, log)
     }))

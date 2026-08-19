@@ -39,6 +39,7 @@ class MemoryTable<V> implements KvTable<string, V> {
 
 class MemoryPersistence extends SessionPersistence {
   private readonly records = new Map<SessionId, SessionInspection>()
+  readonly readFromIds: SessionId[] = []
   readonly supportsRawArtifacts = false
 
   store(session: Session): void {
@@ -61,6 +62,7 @@ class MemoryPersistence extends SessionPersistence {
     fromSeq: number,
     _signal?: AbortSignal,
   ): Promise<{ meta: SessionHeader; events: SessionEvent[] }> {
+    this.readFromIds.push(id)
     const stored = await this.load(id)
     return { meta: stored.meta, events: stored.events.filter(event => event.seq >= fromSeq) }
   }
@@ -79,6 +81,8 @@ async function setup(options: { branches?: boolean; cold?: boolean; deletion?: b
   dispose: () => Promise<void>
   service: NestedFollowupsService
   root: ReturnType<SessionStore['create']>
+  repository: TreeMetadataRepository
+  persistence: MemoryPersistence
   deletionCalls: Array<{ request: { ownerSessionId: string; branchId: string }; counts: Map<string, number> }>
 }> {
   const ctx = new Context()
@@ -215,6 +219,8 @@ async function setup(options: { branches?: boolean; cold?: boolean; deletion?: b
     },
     service: ctx.nestedFollowups,
     root,
+    repository,
+    persistence: ctx.sessionPersistence as MemoryPersistence,
     deletionCalls,
   }
 }
@@ -274,6 +280,28 @@ describe('tree projection Remote service', () => {
         'branch-a1',
       ])
       expect(result.value.projection.diagnostics).toEqual([])
+    } finally {
+      await dispose()
+    }
+  })
+
+  it('does not read the log of a branch already marked deleted', async () => {
+    const { dispose, service, repository, persistence } = await setup({ cold: true })
+    try {
+      const branch = repository.getBranch('branch-1')
+      expect(branch).toBeDefined()
+      if (branch === undefined) return
+      await repository.putBranch({ ...branch, status: 'deleted', deletedAt: 10 })
+      persistence.readFromIds.length = 0
+
+      const result = await service.readTree({ sessionId: 'root' })
+
+      expect(result.ok).toBe(true)
+      if (!result.ok) return
+      // The projection drops the branch, so fetching its log would only cost a
+      // persistence round trip while its session is being cleaned up.
+      expect(persistence.readFromIds.map(String)).toEqual(['root'])
+      expect(result.value.projection.nodes.map(node => node.messageId)).toEqual(['q1', 'a1'])
     } finally {
       await dispose()
     }

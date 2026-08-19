@@ -324,7 +324,13 @@ function sequenceEdges(nodes: readonly MessageNodeView[]): TreeEdgeView[] {
   return edges
 }
 
-function isDirectlyDeleted(branch: BranchRecord): boolean {
+/**
+ * Whether a branch carries a deletion mark of its own.
+ *
+ * Cascade deletion marks a whole subtree before it clears any record, so this
+ * also identifies every descendant of a branch being deleted.
+ */
+export function isDirectlyDeleted(branch: BranchRecord): boolean {
   return branch.status === 'deleted' || branch.deletedAt !== undefined
 }
 
