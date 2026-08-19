@@ -83,6 +83,21 @@ describe('tree navigation state', () => {
     expect(collapsed.summaries).toHaveLength(0)
   })
 
+  it('prioritizes failure over streaming in folded activity summaries', () => {
+    const base = treeProjectionFixture()
+    const projection = {
+      ...base,
+      nodes: base.nodes.map(node => node.nodeId === 'branch-1-a'
+        ? { ...node, state: 'error' as const }
+        : node.nodeId === 'nested-a'
+          ? { ...node, state: 'streaming' as const }
+          : node),
+    }
+    const state = deriveCollapseState(projection, new Set(['branch-1']))
+
+    expect(state.summaries[0]).toMatchObject({ activity: 'error', messageCount: 4 })
+  })
+
   it('finds text and display labels and supplies the complete expansion path', () => {
     const projection = treeProjectionFixture()
     const byLabel = searchTreeNodes(projection, 'A2.1.1')

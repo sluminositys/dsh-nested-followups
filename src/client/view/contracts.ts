@@ -50,6 +50,7 @@ export interface TreeViewLabels {
   readonly clearFocus: string
   readonly collapse: string
   readonly expand: string
+  readonly collapseAll: string
   readonly deleteBranch: string
   readonly details: string
   readonly close: string
@@ -77,6 +78,11 @@ export interface TreeViewLabels {
   readonly readonly: string
   readonly nodeCount: (count: number) => string
   readonly collapsedCount: (count: number) => string
+  readonly expandAnchorGroup: (branches: number, messages: number) => string
+  readonly collapseAnchorGroup: (branches: number, messages: number) => string
+  readonly expandBranchPath: (path: string) => string
+  readonly collapseBranchPath: (path: string) => string
+  readonly childBranchCount: (count: number) => string
   readonly deleteDescription: (branches: number, messages: number) => string
 }
 
@@ -100,6 +106,7 @@ export const DEFAULT_TREE_VIEW_LABELS: TreeViewLabels = Object.freeze({
   clearFocus: 'Clear focus',
   collapse: 'Collapse branch',
   expand: 'Expand branch',
+  collapseAll: 'Collapse all',
   deleteBranch: 'Delete branch',
   details: 'Message details',
   close: 'Close',
@@ -127,6 +134,13 @@ export const DEFAULT_TREE_VIEW_LABELS: TreeViewLabels = Object.freeze({
   readonly: 'Tree View is read-only',
   nodeCount: (count: number) => `${count} messages`,
   collapsedCount: (count: number) => `+${count} nodes`,
+  expandAnchorGroup: (branches: number, messages: number) =>
+    `Expand ${branches} branches · +${messages} messages`,
+  collapseAnchorGroup: (branches: number, messages: number) =>
+    `Collapse whole group: ${branches} branches · +${messages} messages`,
+  expandBranchPath: (path: string) => `Expand branch ${path}`,
+  collapseBranchPath: (path: string) => `Collapse branch ${path}`,
+  childBranchCount: (count: number) => `⑂×${count}`,
   deleteDescription: (branches: number, messages: number) =>
     `This removes ${branches} branch${branches === 1 ? '' : 'es'} and ${messages} message${messages === 1 ? '' : 's'}. The root conversation and sibling branches are not changed.`,
 })

@@ -11,6 +11,7 @@ import {
 } from 'react'
 import {
   Button,
+  IconChevronUpOutline14,
   IconCloseOutline16,
   IconSearchOutline16,
   MarkdownText,
@@ -24,14 +25,18 @@ import {
   type Point,
   type Size,
 } from '../tree/geometry.ts'
-import { layoutConversationTree } from '../tree/layout.ts'
+import { layoutConversationTree, type BranchCapsuleLayout } from '../tree/layout.ts'
 import {
   createMinimapModel,
   navigateFromMinimap,
 } from '../tree/minimap.ts'
 import {
+  childAnchorDotIdsForBranch,
+  deepExpansionTargetsForAnchor,
+  deepExpansionTargetsForBranch,
   deriveFocusState,
   searchTreeNodes,
+  topLevelAnchorDotIds,
 } from '../tree/navigation.ts'
 import {
   centerViewportOn,
@@ -51,6 +56,9 @@ import { MessageNodeCard } from './MessageNodeCard.tsx'
 import {
   branchDeleteImpact,
   createTreeInteractionState,
+  loadTreeViewState,
+  saveTreeViewState,
+  toTreeViewState,
   treeInteractionReducer,
 } from './state.ts'
 import { TreeMinimap } from './TreeMinimap.tsx'
@@ -61,6 +69,16 @@ const MINIMAP_SIZE: Size = { width: 190, height: 128 }
 interface PointerPan {
   readonly pointerId: number
   readonly point: Point
+}
+
+interface ExitingCapsule {
+  readonly capsule: BranchCapsuleLayout
+  readonly reverseIndex: number
+}
+
+interface ExitingCard {
+  readonly node: MessageNodeView
+  readonly rect: { x: number; y: number; width: number; height: number }
 }
 
 function useElementSize(ref: React.RefObject<HTMLElement | null>): Size {
@@ -297,18 +315,33 @@ export function ConversationTreeCanvas({
   onDeleteBranch,
   deletionMode = 'delete',
 }: ConversationTreeCanvasProps) {
-  const [interaction, dispatch] = useReducer(treeInteractionReducer, undefined, createTreeInteractionState)
-  const [transform, setTransform] = useState<ViewportTransform>({ x: 0, y: 0, zoom: 1 })
+  const [initialViewState] = useState(() => loadTreeViewState(projection.tree.treeId))
+  const [interaction, dispatch] = useReducer(
+    treeInteractionReducer,
+    initialViewState,
+    state => createTreeInteractionState(state, projection.tree.treeId),
+  )
+  const [transform, setTransform] = useState<ViewportTransform>(
+    initialViewState?.viewport ?? { x: 0, y: 0, zoom: 1 },
+  )
   const [panning, setPanning] = useState(false)
   const [deleteRequest, setDeleteRequest] = useState<DeleteBranchRequest | null>(null)
   const [deletePending, setDeletePending] = useState(false)
   const [deleteFailure, setDeleteFailure] = useState<string | null>(null)
   const [pendingCenterNodeId, setPendingCenterNodeId] = useState<string | null>(null)
+  const [ripplingAnchorId, setRipplingAnchorId] = useState<string | null>(null)
+  const [exitingCapsules, setExitingCapsules] = useState<readonly ExitingCapsule[]>([])
+  const [exitingCards, setExitingCards] = useState<readonly ExitingCard[]>([])
   const viewportRef = useRef<HTMLDivElement>(null)
   const pointerPanRef = useRef<PointerPan | null>(null)
-  const fittedTreeRef = useRef<string | null>(null)
+  const fittedTreeRef = useRef<string | null>(
+    initialViewState === undefined ? null : projection.tree.treeId,
+  )
   const autoFollowStreamingRef = useRef(true)
   const followedLiveNodeIdRef = useRef<string | null>(null)
+  const rippleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const capsuleExitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const cardExitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const viewportSize = useElementSize(viewportRef)
   const timeFormatter = useMemo(
     () => new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }),
@@ -316,12 +349,37 @@ export function ConversationTreeCanvas({
   )
 
   useEffect(() => {
+    if (interaction.treeId === projection.tree.treeId) return
+    const viewState = loadTreeViewState(projection.tree.treeId)
+    dispatch({
+      type: 'view/restore',
+      treeId: projection.tree.treeId,
+      ...(viewState === undefined ? {} : { viewState }),
+    })
+    setTransform(viewState?.viewport ?? { x: 0, y: 0, zoom: 1 })
+    fittedTreeRef.current = viewState === undefined ? null : projection.tree.treeId
+  }, [interaction.treeId, projection.tree.treeId])
+
+  useEffect(() => {
+    if (interaction.treeId !== projection.tree.treeId) return
     dispatch({ type: 'projection/reconcile', projection })
-  }, [projection])
+  }, [interaction.treeId, projection])
+
+  useEffect(() => {
+    if (interaction.treeId !== projection.tree.treeId) return
+    saveTreeViewState(toTreeViewState(interaction, transform))
+  }, [interaction, projection.tree.treeId, transform])
+
+  useEffect(() => () => {
+    if (rippleTimerRef.current !== null) clearTimeout(rippleTimerRef.current)
+    if (capsuleExitTimerRef.current !== null) clearTimeout(capsuleExitTimerRef.current)
+    if (cardExitTimerRef.current !== null) clearTimeout(cardExitTimerRef.current)
+  }, [])
 
   const layout = useMemo(() => layoutConversationTree(projection, {
     collapsedBranchIds: interaction.collapsedBranchIds,
-  }), [interaction.collapsedBranchIds, projection])
+    anchorDotIds: interaction.anchorDotIds,
+  }), [interaction.anchorDotIds, interaction.collapsedBranchIds, projection])
   const focus = useMemo(
     () => deriveFocusState(projection, interaction.focusedNodeId),
     [interaction.focusedNodeId, projection],
@@ -341,6 +399,14 @@ export function ConversationTreeCanvas({
     () => new Map(projection.branches.map(branch => [branch.record.branchId, branch] as const)),
     [projection.branches],
   )
+  const branchRegions = useMemo(
+    () => new Map(layout.branchRegions.map(region => [region.branchId, region] as const)),
+    [layout.branchRegions],
+  )
+  const branchCapsules = useMemo(
+    () => new Map(layout.branchCapsules.map(capsule => [capsule.branchId, capsule] as const)),
+    [layout.branchCapsules],
+  )
   const firstNodeIds = useMemo(() => branchFirstNodeIds(projection.branches), [projection.branches])
   const branchTailNodeIds = useMemo(
     () => new Set(projection.branches.flatMap(branch => {
@@ -349,6 +415,7 @@ export function ConversationTreeCanvas({
     })),
     [projection.branches],
   )
+  const rootAnchorDotIds = useMemo(() => topLevelAnchorDotIds(projection), [projection])
   const searchResults = useMemo(
     () => searchTreeNodes(projection, interaction.searchQuery, 12),
     [interaction.searchQuery, projection],
@@ -514,6 +581,60 @@ export function ConversationTreeCanvas({
     })
   }
 
+  const requestBranchDelete = (branchId: string): void => {
+    const impact = branchDeleteImpact(projection, branchId)
+    setDeleteRequest({ branchId, ...impact })
+  }
+
+  const activityLabel = (activity: 'running' | 'error' | 'complete'): string => {
+    if (activity === 'running') return labels.streaming
+    if (activity === 'error') return labels.error
+    return labels.complete
+  }
+
+  const triggerAnchorRipple = (anchorDotId: string): void => {
+    if (rippleTimerRef.current !== null) clearTimeout(rippleTimerRef.current)
+    setRipplingAnchorId(anchorDotId)
+    rippleTimerRef.current = setTimeout(() => {
+      setRipplingAnchorId(null)
+      rippleTimerRef.current = null
+    }, 450)
+  }
+
+  const startCapsuleExit = (anchorDotIds: readonly string[]): void => {
+    if (globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true) return
+    const targets = new Set(anchorDotIds)
+    const capsules = layout.branchCapsules.filter(capsule => targets.has(capsule.anchorDotId))
+    if (capsules.length === 0) return
+    if (capsuleExitTimerRef.current !== null) clearTimeout(capsuleExitTimerRef.current)
+    setExitingCapsules(capsules.map((capsule, index) => ({
+      capsule,
+      reverseIndex: capsules.length - index - 1,
+    })))
+    capsuleExitTimerRef.current = setTimeout(() => {
+      setExitingCapsules([])
+      capsuleExitTimerRef.current = null
+    }, 260)
+  }
+
+  const startCardExit = (branchIds: readonly string[]): void => {
+    if (globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true) return
+    const subtreeBranchIds = new Set(branchIds.flatMap(branchId =>
+      deepExpansionTargetsForBranch(projection, branchId).branchIds))
+    const cards = layout.nodes.flatMap((position): ExitingCard[] => {
+      if (position.branchId === null || !subtreeBranchIds.has(position.branchId)) return []
+      const node = nodes.get(position.nodeId)
+      return node === undefined ? [] : [{ node, rect: position.rect }]
+    })
+    if (cards.length === 0) return
+    if (cardExitTimerRef.current !== null) clearTimeout(cardExitTimerRef.current)
+    setExitingCards(cards)
+    cardExitTimerRef.current = setTimeout(() => {
+      setExitingCards([])
+      cardExitTimerRef.current = null
+    }, 200)
+  }
+
   return (
     <section className={css.root} aria-label={labels.canvas}>
       <div className={css.toolbar}>
@@ -559,6 +680,22 @@ export function ConversationTreeCanvas({
             </div>
           )}
         </div>
+        {rootAnchorDotIds.length > 0 && (
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => {
+              noteManualViewportChange()
+              startCapsuleExit(rootAnchorDotIds)
+              startCardExit(layout.anchorControls
+                .filter(control => control.depth === 1 && control.open)
+                .flatMap(control => control.branchIds))
+              dispatch({ type: 'anchors/collapse-all', anchorDotIds: rootAnchorDotIds })
+            }}
+          >
+            {labels.collapseAll}
+          </Button>
+        )}
         <span className={css.nodeTotal}>{labels.nodeCount(projection.nodes.length)}</span>
         {focus.active && (
           <Button
@@ -609,22 +746,6 @@ export function ConversationTreeCanvas({
               aria-hidden={false}
             >
               <svg className={css.graph} width={worldWidth} height={worldHeight} aria-hidden="true">
-                {layout.branchRegions.map(region => (
-                  <g
-                    key={region.branchId}
-                    className={css.branchRegion}
-                    data-dimmed={focus.active && !focus.highlightedBranchIds.has(region.branchId) || undefined}
-                  >
-                    <rect
-                      x={region.rect.x}
-                      y={region.rect.y}
-                      width={region.rect.width}
-                      height={region.rect.height}
-                      rx={12}
-                    />
-                    <text x={region.rect.x + 12} y={region.rect.y + 18}>{labels.independentContext}</text>
-                  </g>
-                ))}
                 {layout.edges.map(edge => (
                   <path
                     key={edge.edgeId}
@@ -635,12 +756,21 @@ export function ConversationTreeCanvas({
                     vectorEffect="non-scaling-stroke"
                   />
                 ))}
-                {layout.collapsedBadges.map(badge => (
+                {layout.anchorControls.map(control => (
                   <path
-                    key={`collapsed-edge:${badge.branchId}`}
+                    key={`anchor-control-edge:${control.anchorDotId}`}
                     className={css.edge}
                     data-kind="branch"
-                    d={badge.path}
+                    d={control.path}
+                    vectorEffect="non-scaling-stroke"
+                  />
+                ))}
+                {layout.branchCapsules.map(capsule => (
+                  <path
+                    key={`capsule-edge:${capsule.branchId}`}
+                    className={`${css.edge} ${css.capsuleEdge}`}
+                    data-kind="branch"
+                    d={capsule.path}
                     vectorEffect="non-scaling-stroke"
                   />
                 ))}
@@ -677,11 +807,15 @@ export function ConversationTreeCanvas({
                         : branchTargetNode === undefined
                           ? labels.askUnavailable
                           : undefined
+                const cardStyle = {
+                  ...nodeStyle(position.rect),
+                  '--fold-card-delay': `${Math.max(0, branch?.nodeIds.indexOf(node.nodeId) ?? 0) * 60}ms`,
+                } as React.CSSProperties
                 return (
                   <MessageNodeCard
                     key={node.nodeId}
                     node={node}
-                    style={nodeStyle(position.rect)}
+                    style={cardStyle}
                     labels={labels}
                     timestamp={formatTime(node.time, timeFormatter)}
                     selected={interaction.selectedNodeId === node.nodeId}
@@ -716,32 +850,195 @@ export function ConversationTreeCanvas({
                     onCollapse={() => {
                       if (branch !== undefined) {
                         noteManualViewportChange()
+                        startCardExit([branch.record.branchId])
                         dispatch({ type: 'branch/toggle', branchId: branch.record.branchId })
                       }
                     }}
                     onDelete={() => {
                       if (node.branchId === null) return
-                      const impact = branchDeleteImpact(projection, node.branchId)
-                      if (impact !== undefined) setDeleteRequest({ branchId: node.branchId, ...impact })
+                      requestBranchDelete(node.branchId)
                     }}
                   />
                 )
               })}
-              {layout.collapsedBadges.map(badge => (
-                <button
-                  key={badge.branchId}
-                  type="button"
-                  className={css.collapsedBadge}
-                  style={nodeStyle(badge.rect)}
-                  aria-label={`${labels.expand}: ${labels.collapsedCount(badge.hiddenNodeCount)}`}
-                  onClick={() => {
-                    noteManualViewportChange()
-                    dispatch({ type: 'branch/toggle', branchId: badge.branchId })
-                    setPendingCenterNodeId(badge.anchorNodeId)
-                  }}
+              {projection.branches.map((branch) => {
+                const branchId = branch.record.branchId
+                const capsule = branchCapsules.get(branchId)
+                const region = branchRegions.get(branchId)
+                if (capsule === undefined && region === undefined) return null
+                const collapsed = capsule !== undefined
+                const rect = capsule?.rect ?? region!.rect
+                const pathLabel = branch.branchPath.join('.')
+                const dimmed = focus.active && !focus.highlightedBranchIds.has(branchId)
+                const morphStyle = {
+                  ...nodeStyle(rect),
+                  '--fold-stagger': `${80 + Math.max(0, branch.record.siblingOrdinal - 1) * 70}ms`,
+                } as React.CSSProperties
+                return (
+                  <div
+                    key={branchId}
+                    className={css.branchMorph}
+                    style={morphStyle}
+                    data-mode={collapsed ? 'capsule' : 'expanded'}
+                    data-dimmed={dimmed || undefined}
+                    data-activity={capsule?.activity}
+                  >
+                    {capsule !== undefined
+                      ? (
+                        <>
+                          <button
+                            type="button"
+                            className={css.capsuleMain}
+                            aria-label={`${labels.expandBranchPath(capsule.pathLabel)} · ${labels.collapsedCount(capsule.messageCount)} · ${activityLabel(capsule.activity)}`}
+                            onClick={(event) => {
+                              noteManualViewportChange()
+                              if (event.altKey) {
+                                dispatch({
+                                  type: 'branch/deep-expand',
+                                  ...deepExpansionTargetsForBranch(projection, branchId),
+                                })
+                              } else {
+                                dispatch({
+                                  type: 'branch/toggle',
+                                  branchId,
+                                  childAnchorDotIds: childAnchorDotIdsForBranch(projection, branchId),
+                                })
+                              }
+                              setPendingCenterNodeId(branch.nodeIds[0] ?? capsule.anchorNodeId)
+                            }}
+                          >
+                            {capsule.activity !== 'complete' && (
+                              <span
+                                className={css.capsuleStatus}
+                                data-activity={capsule.activity}
+                                title={activityLabel(capsule.activity)}
+                                aria-label={activityLabel(capsule.activity)}
+                              />
+                            )}
+                            <span className={css.capsulePath}>{capsule.pathLabel}</span>
+                            <span className={css.capsuleSummary}>{capsule.firstQuestionSummary}</span>
+                            {capsule.childBranchCount > 0 && (
+                              <span
+                                className={css.capsuleChildren}
+                                title={labels.childBranchCount(capsule.childBranchCount)}
+                              >
+                                {labels.childBranchCount(capsule.childBranchCount)}
+                              </span>
+                            )}
+                            <span className={css.capsuleCount}>+{capsule.messageCount}</span>
+                            <span className={css.capsuleArrow} aria-hidden="true">›</span>
+                          </button>
+                          {onDeleteBranch !== undefined && (
+                            <button
+                              type="button"
+                              className={css.capsuleDelete}
+                              aria-label={labels.deleteBranch}
+                              onClick={(event) => {
+                                event.stopPropagation()
+                                requestBranchDelete(branchId)
+                              }}
+                            >
+                              <span aria-hidden="true">×</span>
+                            </button>
+                          )}
+                        </>
+                      )
+                      : (
+                        <>
+                          <span className={css.branchRegionLabel}>{labels.independentContext}</span>
+                          <button
+                            type="button"
+                            className={css.collapseHotZone}
+                            aria-label={labels.collapseBranchPath(pathLabel)}
+                            onClick={() => {
+                              noteManualViewportChange()
+                              startCardExit([branchId])
+                              dispatch({ type: 'branch/toggle', branchId })
+                              setPendingCenterNodeId(branch.anchorNodeId ?? null)
+                            }}
+                          >
+                            <IconChevronUpOutline14 size={16} />
+                          </button>
+                        </>
+                      )}
+                  </div>
+                )
+              })}
+              {layout.anchorControls.map(control => {
+                const actionLabel = control.open
+                  ? labels.collapseAnchorGroup(control.branchCount, control.messageCount)
+                  : labels.expandAnchorGroup(control.branchCount, control.messageCount)
+                const dimmed = focus.active
+                  && !control.branchIds.some(branchId => focus.highlightedBranchIds.has(branchId))
+                return (
+                  <button
+                    key={control.anchorDotId}
+                    type="button"
+                    className={css.anchorControl}
+                    style={nodeStyle(control.rect)}
+                    data-open={control.open}
+                    data-nested={control.nested || undefined}
+                    data-activity={control.activity}
+                    data-dimmed={dimmed || undefined}
+                    data-rippling={ripplingAnchorId === control.anchorDotId || undefined}
+                    aria-label={`${actionLabel} · ${activityLabel(control.activity)}`}
+                    title={`${actionLabel} · ${activityLabel(control.activity)}`}
+                    onClick={(event) => {
+                      noteManualViewportChange()
+                      triggerAnchorRipple(control.anchorDotId)
+                      if (control.open) {
+                        startCapsuleExit([control.anchorDotId])
+                        startCardExit(control.branchIds)
+                      }
+                      if (!control.open && event.altKey) {
+                        dispatch({
+                          type: 'anchor/deep-expand',
+                          ...deepExpansionTargetsForAnchor(projection, control.anchorDotId),
+                        })
+                      } else {
+                        dispatch({ type: 'anchor/toggle', anchorDotId: control.anchorDotId })
+                      }
+                      setPendingCenterNodeId(control.anchorNodeId)
+                    }}
+                  >
+                    <span className={css.anchorGlyph} aria-hidden="true">
+                      <span className={css.anchorStrokeVertical} />
+                      <span className={css.anchorStrokeHorizontal} />
+                    </span>
+                  </button>
+                )
+              })}
+              {exitingCapsules.map(({ capsule, reverseIndex }) => (
+                <div
+                  key={`exiting-capsule:${capsule.branchId}`}
+                  className={`${css.branchMorph} ${css.capsuleExit}`}
+                  style={{
+                    ...nodeStyle(capsule.rect),
+                    '--fold-exit-delay': `${Math.min(reverseIndex * 40, 80)}ms`,
+                  } as React.CSSProperties}
+                  aria-hidden="true"
                 >
-                  {labels.collapsedCount(badge.hiddenNodeCount)}
-                </button>
+                  <span className={css.capsuleExitContent}>
+                    <span className={css.capsulePath}>{capsule.pathLabel}</span>
+                    <span className={css.capsuleSummary}>{capsule.firstQuestionSummary}</span>
+                    <span className={css.capsuleCount}>+{capsule.messageCount}</span>
+                  </span>
+                </div>
+              ))}
+              {exitingCards.map(({ node, rect }) => (
+                <div
+                  key={`exiting-card:${node.nodeId}`}
+                  className={`${css.nodeCard} ${css.cardExit}`}
+                  style={nodeStyle(rect)}
+                  data-role={node.role}
+                  aria-hidden="true"
+                >
+                  <div className={css.nodeHeader}>
+                    <strong className={css.nodeLabel}>{displayLabelOf(node)}</strong>
+                    <span className={css.nodeRole}>{node.role === 'user' ? labels.you : labels.assistant}</span>
+                  </div>
+                  <p className={css.nodeSummary}>{node.summary}</p>
+                </div>
               ))}
               {composerNode !== undefined
                 && composerLayout !== undefined
