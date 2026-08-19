@@ -2,7 +2,7 @@
 
 [English](README.md) | 中文
 
-![dsh-nested-followups —— 为 DeepSeek Harness 提供的嵌套追问会话树](assets/banner.png)
+![dsh-nested-followups —— 为 DeepSeek Harness 提供的嵌套追问会话树](https://raw.githubusercontent.com/sluminositys/dsh-nested-followups/main/assets/banner.png)
 
 这是一个 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)
 插件，为其网页界面增加会话树。你可以针对此前的任意一条回答提问，新的问题会作为

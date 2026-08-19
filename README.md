@@ -2,7 +2,7 @@
 
 English | [中文](README.zh.md)
 
-![dsh-nested-followups — a nested follow-up conversation tree for DeepSeek Harness](assets/banner.png)
+![dsh-nested-followups — a nested follow-up conversation tree for DeepSeek Harness](https://raw.githubusercontent.com/sluminositys/dsh-nested-followups/main/assets/banner.png)
 
 A plugin for [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)
 that adds a conversation tree to the web interface. Ask a follow-up question
