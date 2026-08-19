@@ -506,6 +506,8 @@
   gap: 7px;
   padding: 0 10px;
   color: var(--dsw-alias-label-secondary);
+  border-radius: 999px;
+  background: var(--dsw-alias-bg-layer-1);
   font-size: 11px;
 }
 
@@ -540,6 +542,32 @@
   cursor: pointer;
   animation: capsule-reveal 260ms cubic-bezier(0.3, 1.15, 0.5, 1) both;
   animation-delay: var(--fold-stagger, 80ms);
+}
+
+.branchMorph[data-from-cards='true'] .capsuleMain {
+  animation: capsule-row-from-cards 200ms ease-in-out both;
+  animation-delay: 0ms;
+}
+
+.capsuleMorphRow {
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
+  width: 270px;
+  height: 34px;
+  min-width: 0;
+  gap: 7px;
+  padding: 0 10px;
+  color: var(--dsw-alias-label-secondary);
+  border-radius: 999px;
+  background: var(--dsw-alias-bg-layer-1);
+  font-size: 11px;
+  pointer-events: none;
+  animation: capsule-row-out 160ms ease both;
 }
 
 .capsuleMain:hover,
@@ -807,6 +835,26 @@
   to {
     opacity: 1;
     transform: translateX(0) scale(1);
+  }
+}
+
+@keyframes capsule-row-out {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+@keyframes capsule-row-from-cards {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
   }
 }
 
@@ -1191,6 +1239,7 @@
   .branchRegion,
   .branchMorph,
   .capsuleMain,
+  .capsuleMorphRow,
   .capsuleExit,
   .capsuleExitContent,
   .nodeCard.cardExit,

@@ -145,8 +145,12 @@ export function treeInteractionReducer(
 }
 
 function defaultStorage(): TreeViewStateStorage | undefined {
-  const candidate = (globalThis as { localStorage?: TreeViewStateStorage }).localStorage
-  return candidate === undefined ? undefined : candidate
+  try {
+    const candidate = (globalThis as { localStorage?: TreeViewStateStorage }).localStorage
+    return candidate === undefined ? undefined : candidate
+  } catch {
+    return undefined
+  }
 }
 
 function stateStorageKey(treeId: string): string {

@@ -186,4 +186,18 @@ describe('tree interaction state', () => {
     storage.setItem('dsh-nested-followups:tree-view:v1:tree-layout', '{"treeId":"tree-layout"}')
     expect(loadTreeViewState('tree-layout', storage)).toBeUndefined()
   })
+
+  it('treats a browser storage security failure as missing ViewState', () => {
+    const previous = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
+    Object.defineProperty(globalThis, 'localStorage', {
+      configurable: true,
+      get: () => { throw new Error('storage blocked') },
+    })
+    try {
+      expect(loadTreeViewState('tree-layout')).toBeUndefined()
+    } finally {
+      if (previous === undefined) delete (globalThis as { localStorage?: unknown }).localStorage
+      else Object.defineProperty(globalThis, 'localStorage', previous)
+    }
+  })
 })

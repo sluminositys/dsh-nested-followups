@@ -332,6 +332,10 @@ export function ConversationTreeCanvas({
   const [ripplingAnchorId, setRipplingAnchorId] = useState<string | null>(null)
   const [exitingCapsules, setExitingCapsules] = useState<readonly ExitingCapsule[]>([])
   const [exitingCards, setExitingCards] = useState<readonly ExitingCard[]>([])
+  const [expandingCapsule, setExpandingCapsule] = useState<BranchCapsuleLayout | null>(null)
+  const [collapsingToCapsuleIds, setCollapsingToCapsuleIds] = useState<ReadonlySet<string>>(
+    new Set(),
+  )
   const viewportRef = useRef<HTMLDivElement>(null)
   const pointerPanRef = useRef<PointerPan | null>(null)
   const fittedTreeRef = useRef<string | null>(
@@ -342,6 +346,7 @@ export function ConversationTreeCanvas({
   const rippleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const capsuleExitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const cardExitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const capsuleMorphTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const viewportSize = useElementSize(viewportRef)
   const timeFormatter = useMemo(
     () => new Intl.DateTimeFormat(undefined, { hour: '2-digit', minute: '2-digit' }),
@@ -374,6 +379,7 @@ export function ConversationTreeCanvas({
     if (rippleTimerRef.current !== null) clearTimeout(rippleTimerRef.current)
     if (capsuleExitTimerRef.current !== null) clearTimeout(capsuleExitTimerRef.current)
     if (cardExitTimerRef.current !== null) clearTimeout(cardExitTimerRef.current)
+    if (capsuleMorphTimerRef.current !== null) clearTimeout(capsuleMorphTimerRef.current)
   }, [])
 
   const layout = useMemo(() => layoutConversationTree(projection, {
@@ -422,11 +428,12 @@ export function ConversationTreeCanvas({
   )
 
   useEffect(() => {
+    if (interaction.treeId !== projection.tree.treeId) return
     if (projection.nodes.length === 0 || viewportSize.width <= 0 || viewportSize.height <= 0) return
     if (fittedTreeRef.current === projection.tree.treeId) return
     fittedTreeRef.current = projection.tree.treeId
     setTransform(fitViewport(layout.bounds, viewportSize))
-  }, [layout.bounds, projection.nodes.length, projection.tree.treeId, viewportSize])
+  }, [interaction.treeId, layout.bounds, projection.nodes.length, projection.tree.treeId, viewportSize])
 
   useEffect(() => {
     if (pendingCenterNodeId === null || viewportSize.width <= 0 || viewportSize.height <= 0) return
@@ -617,7 +624,7 @@ export function ConversationTreeCanvas({
     }, 260)
   }
 
-  const startCardExit = (branchIds: readonly string[]): void => {
+  const startCardExit = (branchIds: readonly string[], toCapsule = false): void => {
     if (globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true) return
     const subtreeBranchIds = new Set(branchIds.flatMap(branchId =>
       deepExpansionTargetsForBranch(projection, branchId).branchIds))
@@ -629,10 +636,22 @@ export function ConversationTreeCanvas({
     if (cards.length === 0) return
     if (cardExitTimerRef.current !== null) clearTimeout(cardExitTimerRef.current)
     setExitingCards(cards)
+    setCollapsingToCapsuleIds(toCapsule ? new Set(branchIds) : new Set())
     cardExitTimerRef.current = setTimeout(() => {
       setExitingCards([])
+      setCollapsingToCapsuleIds(new Set())
       cardExitTimerRef.current = null
     }, 200)
+  }
+
+  const startCapsuleMorph = (capsule: BranchCapsuleLayout): void => {
+    if (globalThis.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true) return
+    if (capsuleMorphTimerRef.current !== null) clearTimeout(capsuleMorphTimerRef.current)
+    setExpandingCapsule(capsule)
+    capsuleMorphTimerRef.current = setTimeout(() => {
+      setExpandingCapsule(null)
+      capsuleMorphTimerRef.current = null
+    }, 160)
   }
 
   return (
@@ -809,7 +828,7 @@ export function ConversationTreeCanvas({
                           : undefined
                 const cardStyle = {
                   ...nodeStyle(position.rect),
-                  '--fold-card-delay': `${Math.max(0, branch?.nodeIds.indexOf(node.nodeId) ?? 0) * 60}ms`,
+                  '--fold-card-delay': `${Math.max(0, position.depth - 1) * 260 + Math.max(0, branch?.nodeIds.indexOf(node.nodeId) ?? 0) * 60}ms`,
                 } as React.CSSProperties
                 return (
                   <MessageNodeCard
@@ -850,7 +869,7 @@ export function ConversationTreeCanvas({
                     onCollapse={() => {
                       if (branch !== undefined) {
                         noteManualViewportChange()
-                        startCardExit([branch.record.branchId])
+                        startCardExit([branch.record.branchId], true)
                         dispatch({ type: 'branch/toggle', branchId: branch.record.branchId })
                       }
                     }}
@@ -882,6 +901,7 @@ export function ConversationTreeCanvas({
                     data-mode={collapsed ? 'capsule' : 'expanded'}
                     data-dimmed={dimmed || undefined}
                     data-activity={capsule?.activity}
+                    data-from-cards={collapsed && collapsingToCapsuleIds.has(branchId) || undefined}
                   >
                     {capsule !== undefined
                       ? (
@@ -892,6 +912,7 @@ export function ConversationTreeCanvas({
                             aria-label={`${labels.expandBranchPath(capsule.pathLabel)} · ${labels.collapsedCount(capsule.messageCount)} · ${activityLabel(capsule.activity)}`}
                             onClick={(event) => {
                               noteManualViewportChange()
+                              startCapsuleMorph(capsule)
                               if (event.altKey) {
                                 dispatch({
                                   type: 'branch/deep-expand',
@@ -945,6 +966,21 @@ export function ConversationTreeCanvas({
                       )
                       : (
                         <>
+                          {expandingCapsule?.branchId === branchId && (
+                            <span className={css.capsuleMorphRow} aria-hidden="true">
+                              <span className={css.capsulePath}>{expandingCapsule.pathLabel}</span>
+                              <span className={css.capsuleSummary}>
+                                {expandingCapsule.firstQuestionSummary}
+                              </span>
+                              {expandingCapsule.childBranchCount > 0 && (
+                                <span className={css.capsuleChildren}>
+                                  {labels.childBranchCount(expandingCapsule.childBranchCount)}
+                                </span>
+                              )}
+                              <span className={css.capsuleCount}>+{expandingCapsule.messageCount}</span>
+                              <span className={css.capsuleArrow}>›</span>
+                            </span>
+                          )}
                           <span className={css.branchRegionLabel}>{labels.independentContext}</span>
                           <button
                             type="button"
@@ -952,7 +988,7 @@ export function ConversationTreeCanvas({
                             aria-label={labels.collapseBranchPath(pathLabel)}
                             onClick={() => {
                               noteManualViewportChange()
-                              startCardExit([branchId])
+                              startCardExit([branchId], true)
                               dispatch({ type: 'branch/toggle', branchId })
                               setPendingCenterNodeId(branch.anchorNodeId ?? null)
                             }}
