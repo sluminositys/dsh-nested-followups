@@ -195,11 +195,25 @@ function edgeGeometry(
   return { start, end, path: sequencePath(start, end) }
 }
 
-/** The dot sits horizontally centered in the column gap between its anchor and the next lane. */
-function anchorControlRect(anchor: Rect, nested: boolean, columnGap: number): Rect {
+/**
+ * The dot sits centered between the VISIBLE edges of the gap, not the raw
+ * column gap: dashed regions inflate by regionPadding on each side, so a
+ * nested anchor's own frame eats the gap's left edge and the next lane's
+ * frame eats its right edge. A top-level anchor has no frame of its own,
+ * which is why centering on the raw gap looked right nested but sat too far
+ * right at the first level.
+ */
+function anchorControlRect(
+  anchor: Rect,
+  nested: boolean,
+  columnGap: number,
+  regionPadding: number,
+): Rect {
   const size = nested ? NESTED_ANCHOR_CONTROL_SIZE : ANCHOR_CONTROL_SIZE
+  const left = anchor.x + anchor.width + (nested ? regionPadding : 0)
+  const right = anchor.x + anchor.width + columnGap - regionPadding
   return {
-    x: anchor.x + anchor.width + (columnGap - size) / 2,
+    x: left + (right - left - size) / 2,
     y: anchor.y + (anchor.height - size) / 2,
     width: size,
     height: size,
@@ -237,9 +251,10 @@ function anchorControlLayout(
   summary: AnchorGroupSummary,
   anchor: Rect,
   columnGap: number,
+  regionPadding: number,
 ): AnchorGroupControlLayout {
   const nested = summary.depth > 1
-  const rect = anchorControlRect(anchor, nested, columnGap)
+  const rect = anchorControlRect(anchor, nested, columnGap, regionPadding)
   const start = { x: anchor.x + anchor.width, y: anchor.y + anchor.height / 2 }
   const end = { x: rect.x, y: rect.y + rect.height / 2 }
   return {
@@ -330,7 +345,7 @@ export function layoutConversationTree(
             cursor.y,
             anchor.y + (anchor.height - CAPSULE_HEIGHT) / 2,
           )
-          const control = anchorControlRect(anchor, summary.depth > 1, options.columnGap)
+          const control = anchorControlRect(anchor, summary.depth > 1, options.columnGap, options.regionPadding)
           branchCapsules.push(capsuleLayout(summary, control, x, capsuleY))
           nextFreeYByDepth.set(depth, {
             y: capsuleY + CAPSULE_HEIGHT + CAPSULE_STACK_GAP,
@@ -378,7 +393,7 @@ export function layoutConversationTree(
     const anchor = nodeLayouts.get(summary.anchorNodeId)?.rect
     return anchor === undefined
       ? []
-      : [[summary.anchorNodeId, anchorControlRect(anchor, summary.depth > 1, options.columnGap)] as const]
+      : [[summary.anchorNodeId, anchorControlRect(anchor, summary.depth > 1, options.columnGap, options.regionPadding)] as const]
   }))
   const edgeLayouts = projection.edges.flatMap((edge): TreeEdgeLayout[] => {
     const source = nodeLayouts.get(edge.sourceNodeId)?.rect
@@ -429,7 +444,7 @@ export function layoutConversationTree(
 
   const anchorControls = collapsed.anchorGroups.flatMap((summary): AnchorGroupControlLayout[] => {
     const anchor = nodeLayouts.get(summary.anchorNodeId)?.rect
-    return anchor === undefined ? [] : [anchorControlLayout(summary, anchor, options.columnGap)]
+    return anchor === undefined ? [] : [anchorControlLayout(summary, anchor, options.columnGap, options.regionPadding)]
   }).sort((left, right) => left.depth - right.depth
     || left.rect.y - right.rect.y
     || left.anchorDotId.localeCompare(right.anchorDotId))

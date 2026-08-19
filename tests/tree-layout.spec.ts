@@ -134,15 +134,20 @@ describe('conversation tree layout', () => {
     expect(edge?.path).toMatch(/^M .+ C .+$/u)
   })
 
-  it('centers each dot control horizontally inside its column gap', () => {
+  it('centers each dot control between the visible gap edges per level', () => {
     const layout = layoutConversationTree(treeProjectionFixture())
     const nodes = nodeMap(layout)
-    const control = layout.anchorControls.find(candidate => candidate.anchorNodeId === 'root-a2')!
-    const anchor = nodes.get('root-a2')!.rect
-    const gap = layout.options.columnGap
+    const { columnGap, regionPadding } = layout.options
 
-    expect(control.rect.x + control.rect.width / 2)
-      .toBe(anchor.x + anchor.width + gap / 2)
+    const topControl = layout.anchorControls.find(control => control.anchorNodeId === 'root-a2')!
+    const topAnchor = nodes.get('root-a2')!.rect
+    expect(topControl.rect.x + topControl.rect.width / 2)
+      .toBe(topAnchor.x + topAnchor.width + (columnGap - regionPadding) / 2)
+
+    const nestedControl = layout.anchorControls.find(control => control.nested)!
+    const nestedAnchor = nodes.get(nestedControl.anchorNodeId)!.rect
+    expect(nestedControl.rect.x + nestedControl.rect.width / 2)
+      .toBe(nestedAnchor.x + nestedAnchor.width + columnGap / 2)
   })
 
   it('starts capsule edges at the dot control instead of the anchor card', () => {
