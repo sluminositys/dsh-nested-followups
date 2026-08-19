@@ -5,6 +5,25 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Added
+
+- Collapse v2 with three progressive levels: one anchor-group dot, one capsule
+  per branch, and the existing full message-card group.
+- Sticky per-tree collapse state, partial sibling expansion, Alt-click deep
+  expansion, a Collapse all action, and a 20 px bottom-edge collapse target.
+- Folded activity indicators for streaming and failed descendants, including
+  accessible labels and reduced-motion fallbacks.
+
+### Changed
+
+- Search now opens every folded ancestor before locating a result, and the
+  minimap reflects dot and capsule geometry.
+- The old `+N nodes` badge is replaced by a capsule with branch path, first
+  question summary, child-branch count, full subtree message count, and the
+  existing cascading delete action.
+
 ## [0.1.0] - 2026-08-19
 
 First release, targeting DeepSeek Harness `0.1.0-rc.7`. Published to npm as

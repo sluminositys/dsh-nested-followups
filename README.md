@@ -104,6 +104,22 @@ In Tree View:
 
 Return to **Chat** whenever you want to continue the main task.
 
+### Collapsing a large tree
+
+Folding is progressive. Select the **⊖** beside an answer to reduce all of its
+branches to one dot; select **⊕** to reveal one capsule per branch, then select
+a capsule to restore that branch's message cards. Other capsules stay folded,
+so sibling branches can be expanded independently. To return a card group to
+its capsule, select the up-arrow area along the inside bottom edge of its dashed
+frame, or use **Collapse branch** from the first card's menu.
+
+Alt-select **⊕** or a capsule to expand all descendants at once. **Collapse
+all** reduces every top-level anchor group to a dot. Closing a group does not
+erase the expansion choices beneath it, and the layout is restored per
+conversation after a restart. A pulsing blue marker means a folded descendant
+is still generating; red means one has failed. Search automatically opens the
+folded ancestor chain before centering the matching message.
+
 ### Two actions, two meanings
 
 The difference between the two actions is structural, not just visual:

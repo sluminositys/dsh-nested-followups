@@ -37,10 +37,118 @@ import {
   deletionConfirmationDescription,
 } from '../src/client/view/ConversationTreeCanvas.tsx'
 import { DEFAULT_TREE_VIEW_LABELS } from '../src/client/view/contracts.ts'
+import { saveTreeViewState, type TreeViewStateStorage } from '../src/client/view/state.ts'
+import type { TreeViewState } from '../src/shared/types.ts'
+import type { ConversationTreeProjection } from '../src/shared/projection.ts'
 import { treeProjectionFixture } from './fixtures/tree-projection.ts'
 
 function count(markup: string, fragment: string): number {
   return markup.split(fragment).length - 1
+}
+
+function renderWithViewState(
+  viewState: TreeViewState,
+  projection = treeProjectionFixture(),
+): string {
+  const values = new Map<string, string>()
+  const storage: TreeViewStateStorage = {
+    getItem: key => values.get(key) ?? null,
+    setItem: (key, value) => { values.set(key, value) },
+    removeItem: key => { values.delete(key) },
+  }
+  saveTreeViewState(viewState, storage)
+  const previous = Object.getOwnPropertyDescriptor(globalThis, 'localStorage')
+  Object.defineProperty(globalThis, 'localStorage', {
+    configurable: true,
+    value: storage,
+  })
+  try {
+    return renderToStaticMarkup(createElement(ConversationTreeCanvas, { projection }))
+  } finally {
+    if (previous === undefined) delete (globalThis as { localStorage?: unknown }).localStorage
+    else Object.defineProperty(globalThis, 'localStorage', previous)
+  }
+}
+
+function viewState(
+  collapsedBranchIds: readonly string[],
+  anchorDotIds: readonly string[],
+): TreeViewState {
+  return {
+    treeId: 'tree-layout',
+    viewport: { x: 0, y: 0, zoom: 1 },
+    collapsedBranchIds: [...collapsedBranchIds],
+    anchorDotIds: [...anchorDotIds],
+    expandedNodeIds: [],
+  }
+}
+
+function collapseV2ProjectionFixture(): ConversationTreeProjection {
+  const base = treeProjectionFixture()
+  const templateBranch = base.branches.find(branch => branch.record.branchId === 'branch-2')!
+  const templateQuestion = base.nodes.find(node => node.nodeId === 'branch-2-q')!
+  const templateAnswer = base.nodes.find(node => node.nodeId === 'branch-2-a')!
+  const question = {
+    ...templateQuestion,
+    nodeId: 'branch-3-q',
+    branchId: 'branch-3',
+    sessionId: 'branch-session-3',
+    messageId: 'branch-3-q',
+    turnId: 'branch-session-3:1',
+    branchPath: [2, 3],
+    seq: 12,
+    time: 13,
+    text: 'third sibling question',
+    summary: 'third sibling question',
+  }
+  const answer = {
+    ...templateAnswer,
+    nodeId: 'branch-3-a',
+    branchId: 'branch-3',
+    sessionId: 'branch-session-3',
+    messageId: 'branch-3-a',
+    turnId: 'branch-session-3:1',
+    branchPath: [2, 3],
+    seq: 13,
+    time: 14,
+    text: 'third sibling answer',
+    summary: 'third sibling answer',
+    branchTargetMessageId: 'branch-3-a',
+    branchTargetSeq: 13,
+  }
+  const branch = {
+    ...templateBranch,
+    record: {
+      ...templateBranch.record,
+      branchId: 'branch-3',
+      clientRequestId: 'request-branch-3',
+      sessionId: 'branch-session-3',
+      siblingOrdinal: 3,
+      createdAt: 13,
+    },
+    branchPath: [2, 3],
+    nodeIds: ['branch-3-q', 'branch-3-a'],
+  }
+  return {
+    ...base,
+    nodes: [...base.nodes, question, answer],
+    branches: [...base.branches, branch],
+    edges: [
+      ...base.edges,
+      {
+        edgeId: 'sequence:branch-3-q:branch-3-a',
+        sourceNodeId: 'branch-3-q',
+        targetNodeId: 'branch-3-a',
+        kind: 'sequence',
+      },
+      {
+        edgeId: 'branch:root-a2:branch-3-q',
+        sourceNodeId: 'root-a2',
+        targetNodeId: 'branch-3-q',
+        kind: 'branch',
+      },
+    ],
+  }
 }
 
 describe('conversation tree canvas', () => {
@@ -173,5 +281,111 @@ describe('conversation tree canvas', () => {
     expect(css).not.toMatch(/#[0-9a-f]{3,8}\b/iu)
     expect(css).not.toMatch(/\b(?:rgb|hsl)a?\s*\(/iu)
     expect(css).toContain('var(--dsw-')
+  })
+
+  it('renders a level-zero group as one focusable dot with no delete entry', () => {
+    const markup = renderWithViewState(
+      viewState([], ['root-a2']),
+      collapseV2ProjectionFixture(),
+    )
+
+    expect(count(markup, 'role="treeitem"')).toBe(6)
+    expect(markup).toContain('data-open="false"')
+    expect(markup).toContain('Expand 3 branches · +8 messages')
+    expect(markup).not.toContain('aria-label="Delete branch"')
+  })
+
+  it('renders all three level-one capsules with the full anatomy from AC-10', () => {
+    const markup = renderWithViewState(
+      viewState(['branch-1', 'branch-2', 'branch-3'], []),
+      collapseV2ProjectionFixture(),
+    )
+
+    expect(count(markup, 'data-mode="capsule"')).toBe(3)
+    expect(markup).toContain('Expand branch 2.1')
+    expect(markup).toContain('Expand branch 2.2')
+    expect(markup).toContain('Expand branch 2.3')
+    expect(markup).toContain('branch question')
+    expect(markup).toContain('⑂×1')
+    expect(markup).toContain('+4')
+  })
+
+  it('renders a partial level-one capsule beside an expanded sibling branch', () => {
+    const markup = renderWithViewState(viewState(['branch-1'], []))
+
+    expect(count(markup, 'role="treeitem"')).toBe(8)
+    expect(markup).toContain('data-mode="capsule"')
+    expect(markup).toContain('Expand branch 2.1')
+    expect(markup).toContain('branch question')
+    expect(markup).toContain('⑂×1')
+    expect(markup).toContain('+4')
+    expect(markup).toContain('aria-label="Collapse branch 2.2"')
+  })
+
+  it('keeps a newly revealed nested anchor at the compact 20px level', () => {
+    const markup = renderWithViewState(
+      viewState(['branch-2', 'branch-3'], ['branch-1-a']),
+      collapseV2ProjectionFixture(),
+    )
+
+    expect(markup).toContain('data-nested="true"')
+    expect(markup).toContain('Expand 1 branches · +2 messages')
+    expect(markup).toContain('aria-label="Collapse branch 2.1"')
+    expect(markup).toContain('Expand branch 2.2')
+    expect(markup).toContain('Expand branch 2.3')
+  })
+
+  it('renders Alt-deep-expanded descendants as complete card groups', () => {
+    const projection = collapseV2ProjectionFixture()
+    const markup = renderWithViewState(viewState([], []), projection)
+
+    expect(count(markup, 'role="treeitem"')).toBe(projection.nodes.length)
+    expect(markup).toContain('A2.1.1')
+    expect(markup).toContain('aria-label="Collapse branch 2.1.1"')
+    expect(markup).not.toContain('data-mode="capsule"')
+  })
+
+  it('exposes streaming and failure state through folded controls', () => {
+    const base = treeProjectionFixture()
+    const projection = {
+      ...base,
+      nodes: base.nodes.map(node => node.nodeId === 'branch-1-a'
+        ? { ...node, state: 'streaming' as const }
+        : node),
+    }
+    const markup = renderWithViewState(viewState([], ['root-a2']), projection)
+
+    expect(markup).toContain('data-activity="running"')
+    expect(markup).toContain('Streaming')
+  })
+
+  it('implements the specified morph, stagger, ripple, and reduced-motion fallbacks', () => {
+    const css = readFileSync(
+      new URL('../src/client/view/ConversationTreeCanvas.module.css', import.meta.url),
+      'utf8',
+    )
+    const component = readFileSync(
+      new URL('../src/client/view/ConversationTreeCanvas.tsx', import.meta.url),
+      'utf8',
+    )
+    expect(css).toContain('cubic-bezier(0.3, 1.4, 0.5, 1)')
+    expect(css).toContain('transform: scale(0.88)')
+    expect(css).toContain('transform: rotate(90deg)')
+    expect(css).toContain('opacity 200ms ease 50ms')
+    expect(css).toContain('450ms ease-out')
+    expect(css).toContain('translateX(-10px) scale(0.96)')
+    expect(css).toContain('capsule-absorb 180ms ease-in')
+    expect(css).toContain('cubic-bezier(0.3, 1.15, 0.5, 1)')
+    expect(css).toContain('capsule-row-out 160ms ease')
+    expect(css).toContain('capsule-row-from-cards 200ms ease-in-out')
+    expect(css).toContain('animation-delay: var(--fold-card-delay, 0ms)')
+    expect(css).toContain('branch-card-exit 200ms ease-in-out')
+    expect(css).toContain('opacity 150ms ease, transform 150ms ease')
+    expect(component).toContain('* 70}ms`')
+    expect(component).toContain('* 60}ms`')
+    expect(component).toContain('position.depth - 1) * 260')
+    expect(component).toContain('reverseIndex * 40')
+    expect(css).toContain('@media (prefers-reduced-motion: reduce)')
+    expect(css).toContain('content: none')
   })
 })

@@ -1,6 +1,16 @@
 import type { ConversationTreeProjection } from '../../shared/projection.ts'
+import type { TreeViewState } from '../../shared/types.ts'
+
+export const TREE_VIEW_STATE_STORAGE_PREFIX = 'dsh-nested-followups:tree-view:v1:'
+
+export interface TreeViewStateStorage {
+  readonly getItem: (key: string) => string | null
+  readonly setItem: (key: string, value: string) => void
+  readonly removeItem: (key: string) => void
+}
 
 export interface TreeInteractionState {
+  readonly treeId: string
   readonly collapsedBranchIds: ReadonlySet<string>
   readonly anchorDotIds: ReadonlySet<string>
   readonly expandedNodeIds: ReadonlySet<string>
@@ -25,6 +35,7 @@ export type TreeInteractionAction =
       branchIds: readonly string[]
     }
   | { type: 'anchors/collapse-all'; anchorDotIds: readonly string[] }
+  | { type: 'view/restore'; treeId: string; viewState?: TreeViewState }
   | { type: 'node/toggle-expanded'; nodeId: string }
   | { type: 'focus/set'; nodeId: string | undefined }
   | { type: 'composer/open'; nodeId: string; mode: 'ask' | 'continue' }
@@ -39,12 +50,16 @@ export type TreeInteractionAction =
     }
   | { type: 'projection/reconcile'; projection: ConversationTreeProjection }
 
-export function createTreeInteractionState(): TreeInteractionState {
+export function createTreeInteractionState(
+  viewState?: TreeViewState,
+  treeId = viewState?.treeId ?? '',
+): TreeInteractionState {
   return {
-    collapsedBranchIds: new Set(),
-    anchorDotIds: new Set(),
-    expandedNodeIds: new Set(),
-    focusedNodeId: undefined,
+    treeId,
+    collapsedBranchIds: new Set(viewState?.collapsedBranchIds ?? []),
+    anchorDotIds: new Set(viewState?.anchorDotIds ?? []),
+    expandedNodeIds: new Set(viewState?.expandedNodeIds ?? []),
+    focusedNodeId: viewState?.focusedNodeId,
     composerNodeId: undefined,
     composerMode: undefined,
     selectedNodeId: undefined,
@@ -87,8 +102,13 @@ export function treeInteractionReducer(
       for (const branchId of action.branchIds) collapsedBranchIds.delete(branchId)
       return { ...state, anchorDotIds, collapsedBranchIds }
     }
-    case 'anchors/collapse-all':
-      return { ...state, anchorDotIds: new Set(action.anchorDotIds) }
+    case 'anchors/collapse-all': {
+      const anchorDotIds = new Set(state.anchorDotIds)
+      for (const anchorDotId of action.anchorDotIds) anchorDotIds.add(anchorDotId)
+      return { ...state, anchorDotIds }
+    }
+    case 'view/restore':
+      return createTreeInteractionState(action.viewState, action.treeId)
     case 'node/toggle-expanded':
       return { ...state, expandedNodeIds: toggled(state.expandedNodeIds, action.nodeId) }
     case 'focus/set':
@@ -121,6 +141,107 @@ export function treeInteractionReducer(
     }
     case 'projection/reconcile':
       return reconcileTreeInteractionState(state, action.projection)
+  }
+}
+
+function defaultStorage(): TreeViewStateStorage | undefined {
+  try {
+    const candidate = (globalThis as { localStorage?: TreeViewStateStorage }).localStorage
+    return candidate === undefined ? undefined : candidate
+  } catch {
+    return undefined
+  }
+}
+
+function stateStorageKey(treeId: string): string {
+  return `${TREE_VIEW_STATE_STORAGE_PREFIX}${encodeURIComponent(treeId)}`
+}
+
+function stringArray(value: unknown): string[] | undefined {
+  return Array.isArray(value) && value.every(entry => typeof entry === 'string')
+    ? [...value]
+    : undefined
+}
+
+function viewportValue(value: unknown): TreeViewState['viewport'] | undefined {
+  if (typeof value !== 'object' || value === null) return undefined
+  const record = value as Record<string, unknown>
+  const { x, y, zoom } = record
+  if (typeof x !== 'number' || !Number.isFinite(x)
+    || typeof y !== 'number' || !Number.isFinite(y)
+    || typeof zoom !== 'number' || !Number.isFinite(zoom) || zoom <= 0) return undefined
+  return { x, y, zoom }
+}
+
+/** Read one tree's plugin-local ViewState. Corrupt or mismatched values are ignored. */
+export function loadTreeViewState(
+  treeId: string,
+  storage: TreeViewStateStorage | undefined = defaultStorage(),
+): TreeViewState | undefined {
+  if (storage === undefined || treeId === '') return undefined
+  try {
+    const serialized = storage.getItem(stateStorageKey(treeId))
+    if (serialized === null) return undefined
+    const parsed = JSON.parse(serialized) as Record<string, unknown>
+    const viewport = viewportValue(parsed.viewport)
+    const collapsedBranchIds = stringArray(parsed.collapsedBranchIds)
+    const expandedNodeIds = stringArray(parsed.expandedNodeIds)
+    const anchorDotIds = stringArray(parsed.anchorDotIds)
+    if (parsed.treeId !== treeId || viewport === undefined
+      || collapsedBranchIds === undefined || expandedNodeIds === undefined
+      || anchorDotIds === undefined) return undefined
+    const focusedNodeId = typeof parsed.focusedNodeId === 'string'
+      ? parsed.focusedNodeId
+      : undefined
+    return {
+      treeId,
+      viewport,
+      collapsedBranchIds,
+      anchorDotIds,
+      ...(focusedNodeId === undefined ? {} : { focusedNodeId }),
+      expandedNodeIds,
+    }
+  } catch {
+    return undefined
+  }
+}
+
+/** Persist only durable Tree View state; composer/search/selection remain ephemeral. */
+export function saveTreeViewState(
+  viewState: TreeViewState,
+  storage: TreeViewStateStorage | undefined = defaultStorage(),
+): void {
+  if (storage === undefined || viewState.treeId === '') return
+  try {
+    storage.setItem(stateStorageKey(viewState.treeId), JSON.stringify(viewState))
+  } catch {
+    // Storage quota and privacy-mode failures must not break Tree View.
+  }
+}
+
+export function clearTreeViewState(
+  treeId: string,
+  storage: TreeViewStateStorage | undefined = defaultStorage(),
+): void {
+  if (storage === undefined || treeId === '') return
+  try {
+    storage.removeItem(stateStorageKey(treeId))
+  } catch {
+    // A failed clear has the same non-fatal semantics as a failed save.
+  }
+}
+
+export function toTreeViewState(
+  state: TreeInteractionState,
+  viewport: TreeViewState['viewport'],
+): TreeViewState {
+  return {
+    treeId: state.treeId,
+    viewport,
+    collapsedBranchIds: [...state.collapsedBranchIds],
+    anchorDotIds: [...state.anchorDotIds],
+    ...(state.focusedNodeId === undefined ? {} : { focusedNodeId: state.focusedNodeId }),
+    expandedNodeIds: [...state.expandedNodeIds],
   }
 }
 

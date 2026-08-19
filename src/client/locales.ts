@@ -27,6 +27,7 @@ export type NestedFollowupsLocaleKey =
   | 'tree.clearFocus'
   | 'tree.collapse'
   | 'tree.expand'
+  | 'tree.collapseAll'
   | 'tree.deleteBranch'
   | 'tree.details'
   | 'tree.close'
@@ -55,6 +56,11 @@ export type NestedFollowupsLocaleKey =
   | 'tree.readonlyReason'
   | 'tree.nodeCount'
   | 'tree.collapsedCount'
+  | 'tree.expandAnchorGroup'
+  | 'tree.collapseAnchorGroup'
+  | 'tree.expandBranchPath'
+  | 'tree.collapseBranchPath'
+  | 'tree.childBranchCount'
   | 'tree.deleteDescription'
   | 'tree.loading'
   | 'tree.loadFailed'
@@ -89,6 +95,7 @@ export const en: Record<NestedFollowupsLocaleKey, string> = {
   'tree.clearFocus': 'Clear focus',
   'tree.collapse': 'Collapse branch',
   'tree.expand': 'Expand branch',
+  'tree.collapseAll': 'Collapse all',
   'tree.deleteBranch': 'Delete branch',
   'tree.details': 'Message details',
   'tree.close': 'Close',
@@ -117,6 +124,11 @@ export const en: Record<NestedFollowupsLocaleKey, string> = {
   'tree.readonlyReason': 'This Host cannot gate branch tool execution. Update DeepSeek Harness to create follow-up branches.',
   'tree.nodeCount': '{count} messages',
   'tree.collapsedCount': '+{count} nodes',
+  'tree.expandAnchorGroup': 'Expand {branches} branches · +{messages} messages',
+  'tree.collapseAnchorGroup': 'Collapse whole group: {branches} branches · +{messages} messages',
+  'tree.expandBranchPath': 'Expand branch {path}',
+  'tree.collapseBranchPath': 'Collapse branch {path}',
+  'tree.childBranchCount': '⑂×{count}',
   'tree.deleteDescription': 'This removes {branches} branches and {messages} messages. The root conversation and sibling branches are not changed.',
   'tree.loading': 'Loading conversation tree…',
   'tree.loadFailed': 'The conversation tree could not be loaded.',
@@ -146,6 +158,7 @@ export const zh: Record<NestedFollowupsLocaleKey, string> = {
   'tree.clearFocus': '取消聚焦',
   'tree.collapse': '折叠分支',
   'tree.expand': '展开分支',
+  'tree.collapseAll': '一键全收',
   'tree.deleteBranch': '删除分支',
   'tree.details': '消息详情',
   'tree.close': '关闭',
@@ -174,6 +187,11 @@ export const zh: Record<NestedFollowupsLocaleKey, string> = {
   'tree.readonlyReason': '当前 Host 无法限制分支的工具执行。请升级 DeepSeek Harness 后再创建追问分支。',
   'tree.nodeCount': '{count} 条消息',
   'tree.collapsedCount': '+{count} 个节点',
+  'tree.expandAnchorGroup': '展开 {branches} 条分支 · 共 +{messages} 条消息',
+  'tree.collapseAnchorGroup': '收回整组：{branches} 条分支 · 共 +{messages} 条消息',
+  'tree.expandBranchPath': '展开分支 {path}',
+  'tree.collapseBranchPath': '折叠分支 {path}',
+  'tree.childBranchCount': '⑂×{count}',
   'tree.deleteDescription': '这将删除 {branches} 条分支和 {messages} 条消息，不会改变主会话及兄弟分支。',
   'tree.loading': '正在加载会话树…',
   'tree.loadFailed': '无法加载会话树。',
@@ -201,6 +219,7 @@ export function labelsFrom(t: TranslateNS<typeof NS>): TreeViewLabels {
     clearFocus: t('tree.clearFocus'),
     collapse: t('tree.collapse'),
     expand: t('tree.expand'),
+    collapseAll: t('tree.collapseAll'),
     deleteBranch: t('tree.deleteBranch'),
     details: t('tree.details'),
     close: t('tree.close'),
@@ -228,6 +247,11 @@ export function labelsFrom(t: TranslateNS<typeof NS>): TreeViewLabels {
     readonly: t('tree.readonly'),
     nodeCount: count => t('tree.nodeCount', { count }),
     collapsedCount: count => t('tree.collapsedCount', { count }),
+    expandAnchorGroup: (branches, messages) => t('tree.expandAnchorGroup', { branches, messages }),
+    collapseAnchorGroup: (branches, messages) => t('tree.collapseAnchorGroup', { branches, messages }),
+    expandBranchPath: path => t('tree.expandBranchPath', { path }),
+    collapseBranchPath: path => t('tree.collapseBranchPath', { path }),
+    childBranchCount: count => t('tree.childBranchCount', { count }),
     deleteDescription: (branches, messages) => t('tree.deleteDescription', { branches, messages }),
   }
 }

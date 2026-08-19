@@ -113,7 +113,7 @@ export const DEFAULT_TREE_LAYOUT_OPTIONS: ResolvedTreeLayoutOptions = Object.fre
 })
 
 const CAPSULE_WIDTH = 270
-const CAPSULE_HEIGHT = 40
+const CAPSULE_HEIGHT = 34
 const ANCHOR_CONTROL_SIZE = 28
 const NESTED_ANCHOR_CONTROL_SIZE = 20
 const ANCHOR_CONTROL_GAP = 24
@@ -165,21 +165,6 @@ function branchDepth(
     parentId = parent.record.parentBranchId
   }
   return depth
-}
-
-function isDescendantOrSelf(
-  candidateId: string,
-  ancestorId: string,
-  branches: ReadonlyMap<string, BranchProjectionView>,
-): boolean {
-  let branchId: string | null = candidateId
-  const visited = new Set<string>()
-  while (branchId !== null && !visited.has(branchId)) {
-    if (branchId === ancestorId) return true
-    visited.add(branchId)
-    branchId = branches.get(branchId)?.record.parentBranchId ?? null
-  }
-  return false
 }
 
 function branchPath(start: Point, end: Point): string {
@@ -374,15 +359,14 @@ export function layoutConversationTree(
   const branchRegions = projection.branches.flatMap((branch): BranchRegionLayout[] => {
     const branchId = branch.record.branchId
     if (!collapsed.visibleBranchIds.has(branchId)) return []
-    const descendantRects = orderedNodeLayouts
-      .filter(layout => layout.branchId !== null
-        && isDescendantOrSelf(layout.branchId, branchId, branches))
+    const branchNodeRects = orderedNodeLayouts
+      .filter(layout => layout.branchId === branchId)
       .map(layout => layout.rect)
-    if (descendantRects.length === 0) return []
+    if (branchNodeRects.length === 0) return []
     return [{
       branchId,
       depth: branchDepths.get(branchId) ?? 1,
-      rect: inflateRect(unionRects(descendantRects), options.regionPadding),
+      rect: inflateRect(unionRects(branchNodeRects), options.regionPadding),
     }]
   }).sort((left, right) => left.depth - right.depth
     || left.rect.y - right.rect.y

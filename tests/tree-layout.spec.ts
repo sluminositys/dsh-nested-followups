@@ -96,6 +96,7 @@ describe('conversation tree layout', () => {
         nested: false,
       }),
     ])
+    expect(layout.anchorControls[0]?.rect).toMatchObject({ width: 28, height: 28 })
   })
 
   it('reserves one lane for a mixed card and capsule composition without overlap', () => {
@@ -111,6 +112,8 @@ describe('conversation tree layout', () => {
     expect(siblingCapsule.rect.y).toBeGreaterThan(cardBottom)
     expect(layout.anchorControls.some(control => control.anchorDotId === 'branch-1-a'
       && !control.open && control.nested)).toBe(true)
+    expect(layout.anchorControls.find(control => control.anchorDotId === 'branch-1-a')?.rect)
+      .toMatchObject({ width: 20, height: 20 })
   })
 
   it('connects branch edges from the anchor right port with a smooth path', () => {

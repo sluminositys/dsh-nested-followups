@@ -74,17 +74,43 @@ export function createMinimapModel(
     worldBounds,
     scale,
     offset,
-    nodes: Object.freeze(layout.nodes.map(node => ({
-      nodeId: node.nodeId,
-      branchId: node.branchId,
-      rect: mapRect(node.rect, scale, offset),
-    }))),
-    edges: Object.freeze(layout.edges.map(edge => ({
-      edgeId: edge.edgeId,
-      kind: edge.kind,
-      start: mapPoint(edge.start, scale, offset),
-      end: mapPoint(edge.end, scale, offset),
-    }))),
+    nodes: Object.freeze([
+      ...layout.nodes.map(node => ({
+        nodeId: node.nodeId,
+        branchId: node.branchId,
+        rect: mapRect(node.rect, scale, offset),
+      })),
+      ...layout.anchorControls.map(control => ({
+        nodeId: `anchor:${control.anchorDotId}`,
+        branchId: null,
+        rect: mapRect(control.rect, scale, offset),
+      })),
+      ...layout.branchCapsules.map(capsule => ({
+        nodeId: `capsule:${capsule.branchId}`,
+        branchId: capsule.branchId,
+        rect: mapRect(capsule.rect, scale, offset),
+      })),
+    ]),
+    edges: Object.freeze([
+      ...layout.edges.map(edge => ({
+        edgeId: edge.edgeId,
+        kind: edge.kind,
+        start: mapPoint(edge.start, scale, offset),
+        end: mapPoint(edge.end, scale, offset),
+      })),
+      ...layout.anchorControls.map(control => ({
+        edgeId: `anchor-control:${control.anchorDotId}`,
+        kind: 'branch' as const,
+        start: mapPoint(control.start, scale, offset),
+        end: mapPoint(control.end, scale, offset),
+      })),
+      ...layout.branchCapsules.map(capsule => ({
+        edgeId: `capsule:${capsule.branchId}`,
+        kind: 'branch' as const,
+        start: mapPoint(capsule.start, scale, offset),
+        end: mapPoint(capsule.end, scale, offset),
+      })),
+    ]),
     viewportRect: mapRect(visible, scale, offset),
   })
 }

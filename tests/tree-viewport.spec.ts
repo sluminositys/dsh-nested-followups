@@ -76,8 +76,12 @@ describe('tree viewport and minimap', () => {
     const world = minimapPointToWorld(model, minimapCenter)
     const navigated = navigateFromMinimap(model, minimapCenter, transform, viewportSize)
 
-    expect(model.nodes).toHaveLength(layout.nodes.length)
-    expect(model.edges).toHaveLength(layout.edges.length)
+    expect(model.nodes).toHaveLength(
+      layout.nodes.length + layout.anchorControls.length + layout.branchCapsules.length,
+    )
+    expect(model.edges).toHaveLength(
+      layout.edges.length + layout.anchorControls.length + layout.branchCapsules.length,
+    )
     expect(model.nodes.every(node => node.rect.x >= 0 && node.rect.y >= 0)).toBe(true)
     expect(world.x).toBeCloseTo(layout.bounds.x + layout.bounds.width / 2)
     expect(world.y).toBeCloseTo(layout.bounds.y + layout.bounds.height / 2)
