@@ -1,6 +1,6 @@
 {
   "name": "dsh-nested-followups",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "description": "Message-level nested follow-up branches for DeepSeek Harness conversations.",
   "keywords": [
     "dsh-plugin",
