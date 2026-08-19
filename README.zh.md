@@ -49,21 +49,27 @@ Tree View 还提供完整消息详情、搜索、聚焦、折叠、平移、缩�
 是 Session 归档而非物理删除，插件记录删除后会归档底层 Branch Session，确认框会
 明确说明这一点。
 
-## 隔离与纯聊天执行
+## 隔离与只读执行
 
 每条分支都是一个真实 DSH Session，并从经过验证的完整回合边界获得 seed。主会话
 后续消息不会进入分支，分支消息不会进入主会话，兄弟分支之间也不会交换新增回合。
 
-分支 prompt 由插件 Host 侧直接提交。无论首次创建还是冷恢复，Branch Agent 都会
-被强制放入纯聊天作用域：
+分支 prompt 由插件 Host 侧直接提交。分支以**只读 agent** 运行：可以查看工作区，
+但不能改变任何东西。
 
-- 强制使用 native 工具呈现，禁用 Code Mode；
-- 全局工具 allowlist 为空；
-- 最终执行 guard 拒绝其他插件后来注册的任何局部工具；
-- prompt 最终组装时再次移除任何绕过注册期控制的工具 schema。
+限制完全发生在执行期。作用域内的 guard 放行随发行版提供的读取类工具——`read`、
+`read_image`、`glob`、`grep`、`lsp`、`session_*` 查询工具、`job_list`/`job_output`、
+`terminal_list`/`terminal_read`、`list_agents` 和 `get_goal`——其余一律拒绝，包括
+guard 不认识的任何工具。Code Mode 的 `run_code` 传输保持可用，因为程序调用的每个
+绑定都会重新进入同一个 guard，嵌套的写操作会被逐个拒绝。
 
-因此分支不能执行命令、读写文件或调用工具。插件不会安装 rc.7 的 subagent
-descriptor，也不会安装 `report` 工具。
+请求本身不做任何改写。分支会加入其源会话所使用的 preset，并且不改动工具 schema、
+提示 section 和呈现方式，因此它的请求前缀与主会话在分叉点处的前缀逐字节一致。
+这是刻意为之：前缀一致才能让 provider 复用已缓存的主会话前缀，而不必从冷状态重新
+读取继承来的历史——这正是决定分支多快吐出第一个 token 的因素。裁剪可见工具集会更
+简单，但会白白丢掉这项收益：移除 schema 和拒绝执行拦下的是同一个调用。
+
+插件不会安装 rc.7 的 subagent descriptor，也不会安装 `report` 工具。
 
 ## DeepSeek Harness rc.7 行为
 

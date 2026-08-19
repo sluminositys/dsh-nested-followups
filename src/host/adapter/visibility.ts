@@ -15,6 +15,8 @@ export interface HiddenBranchMeta {
   readonly parentSession: SessionId
   readonly seedLength: number
   readonly origin: typeof HIDDEN_BRANCH_ORIGIN
+  /** Preset the source ran under; recorded so a resumed branch rebuilds it. */
+  readonly agentPreset?: string
 }
 
 const cached = new WeakMap<Context, BranchVisibilityCapability>()
@@ -23,12 +25,14 @@ const cached = new WeakMap<Context, BranchVisibilityCapability>()
 export function hiddenBranchMetaRc7(
   sourceHeader: SessionHeader,
   seedLength: number,
+  agentPreset?: string,
 ): HiddenBranchMeta {
   return {
     ...(sourceHeader.cwd === undefined ? {} : { cwd: sourceHeader.cwd }),
     parentSession: sourceHeader.id,
     seedLength,
     origin: HIDDEN_BRANCH_ORIGIN,
+    ...(agentPreset === undefined ? {} : { agentPreset }),
   }
 }
 

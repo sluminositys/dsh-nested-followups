@@ -58,22 +58,34 @@ rc.7 exposes session archival rather than physical deletion for this path, the
 underlying branch logs are archived after the plugin records the deletion; the
 confirmation states this explicitly.
 
-## Isolation and chat-only execution
+## Isolation and read-only execution
 
 Every branch is a real DSH session seeded at a validated completed-turn
 boundary. Later main-thread messages do not enter the branch, branch messages
 do not enter the main conversation, and sibling branches do not share their new
 turns.
 
-Branch prompts are submitted by the plugin on the Host side. On both initial
-creation and cold resume, the branch Agent is forced into a chat-only scope:
+Branch prompts are submitted by the plugin on the Host side. A branch runs as a
+**read-only agent**: it may inspect the workspace, but it can change nothing.
 
-- native tool presentation is selected, so Code Mode is unavailable;
-- the global tool allowlist is empty;
-- a final execution guard rejects any scope-local tool contributed later; and
-- prompt assembly strips any tool schema that escaped registration-time controls.
+Enforcement happens entirely at execution time. A scoped guard allows the
+shipped read tools — `read`, `read_image`, `glob`, `grep`, `lsp`, the
+`session_*` query tools, `job_list`/`job_output`, `terminal_list`/
+`terminal_read`, `list_agents`, and `get_goal` — and denies everything else,
+including any tool the guard does not recognize. Code Mode's `run_code`
+transport stays available because each binding a program calls re-enters the
+same guard, so nested writes are denied individually.
 
-Branches therefore cannot run commands, read or write files, or call tools.
+Nothing about the request is rewritten. The branch joins the preset its source
+session ran under and leaves the tool schemas, prompt sections, and presentation
+transport untouched, so its request prefix is byte-identical to the main
+conversation's prefix at the fork point. That is deliberate: an identical prefix
+lets the provider reuse its cached prefix for the main conversation instead of
+re-reading the inherited history from cold, which is what determines how quickly
+a branch produces its first token. Restricting the visible tool set would have
+been simpler and would have thrown that away for no additional safety, since a
+removed schema and a denied execution stop the same call.
+
 The plugin does not install the rc.7 subagent descriptor or `report` tool.
 
 ## DeepSeek Harness rc.7 behavior

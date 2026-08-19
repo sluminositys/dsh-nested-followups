@@ -9,6 +9,7 @@ import type {
 } from '../shared/projection.ts'
 import type { AnchorRange, BranchRecord, MessageNodeState, MessageNodeView, TreeRecord } from '../shared/types.ts'
 import { extractAnchoredQuestion } from '../shared/anchored-question.ts'
+import { isBranchExecutableTool } from '../shared/tool-policy.ts'
 
 export { displayLabelOf } from '../shared/labels.ts'
 export type {
@@ -20,6 +21,35 @@ export type {
 } from '../shared/projection.ts'
 
 const SUMMARY_LIMIT = 180
+
+/**
+ * Defence in depth for the read-only execution guard.
+ *
+ * A branch is allowed to call read tools, and a denied mutation still logs its
+ * rejected call — neither is a violation. Only a mutating call that came back
+ * WITHOUT an error means the guard failed to hold, so the call is correlated
+ * with its result before anything is reported.
+ */
+function findSucceededWriteCall(
+  events: readonly SessionEvent[],
+  fromSeq: number,
+): { name: string; seq: number } | undefined {
+  const attempted = new Map<string, { name: string; seq: number }>()
+  for (const event of events) {
+    if (event.seq < fromSeq) continue
+    if (event.type === 'tool/call' && !isBranchExecutableTool(event.data.name)) {
+      attempted.set(String(event.data.callId), { name: event.data.name, seq: event.seq })
+      continue
+    }
+    if (event.type !== 'tool/result') continue
+    const block = event.data.message.content[0]
+    const pending = attempted.get(String(block.toolCallId))
+    if (pending === undefined) continue
+    attempted.delete(String(block.toolCallId))
+    if (block.isError !== true) return pending
+  }
+  return undefined
+}
 
 export interface SessionLogSnapshot {
   sessionId: string
@@ -414,15 +444,13 @@ export function projectConversationTree(
           message: `branch metadata seed length ${branch.seedLength} does not match session header ${log.seedLength}`,
         })
       }
-      const unexpectedToolEvent = log.events.find(event =>
-        event.seq >= branch.seedLength
-        && (event.type === 'tool/call' || event.type === 'tool/result'))
-      if (unexpectedToolEvent !== undefined) {
+      const escapedWrite = findSucceededWriteCall(log.events, branch.seedLength)
+      if (escapedWrite !== undefined) {
         diagnostics.push({
           code: 'branch-tool-event',
           branchId: branch.branchId,
           sessionId: branch.sessionId,
-          message: `chat-only branch '${branch.branchId}' contains unexpected tool event '${unexpectedToolEvent.type}' at seq ${unexpectedToolEvent.seq}`,
+          message: `read-only branch '${branch.branchId}' executed the mutating tool '${escapedWrite.name}' at seq ${escapedWrite.seq}`,
         })
       }
       branchNodes = nodesForSession(tree.treeId, branch.branchId, branchPath, log, branch.seedLength)

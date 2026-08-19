@@ -16,12 +16,12 @@ import type {
 import type { AnchorRange, BranchRecord, TreeRecord } from '../shared/types.ts'
 import { formatAnchoredQuestion } from '../shared/anchored-question.ts'
 import {
-  ChatOnlyCapabilityError,
-  createChatOnlyForkAgentRc7,
-  probeChatOnlyCapabilityRc7,
-  resumeChatOnlyBranchAgentRc7,
-  submitChatOnlyTurnRc7,
-} from './adapter/chat-only.ts'
+  createReadOnlyForkAgentRc7,
+  probeReadOnlyCapabilityRc7,
+  ReadOnlyCapabilityError,
+  resumeReadOnlyBranchAgentRc7,
+  submitBranchTurnRc7,
+} from './adapter/read-only.ts'
 import { probeNativeContinuationCapability } from './adapter/native-continuation.ts'
 import { probeBranchVisibilityRc7 } from './adapter/visibility.ts'
 import type { NestedFollowupsMetadataService } from './metadata-service.ts'
@@ -62,7 +62,7 @@ function commandSuccess(value: BranchCommandValue): BranchCommandResult {
 }
 
 function commandFailure(error: unknown, fallback: BranchCommandErrorCode): BranchCommandResult {
-  if (error instanceof ChatOnlyCapabilityError) {
+  if (error instanceof ReadOnlyCapabilityError) {
     return Object.freeze({
       ok: false,
       error: Object.freeze({ code: 'compatibility', message: error.message }),
@@ -126,15 +126,15 @@ export class NestedFollowupsBranchService extends Service {
   }
 
   capabilities(): TreeMutationCapabilities {
-    const chatOnly = probeChatOnlyCapabilityRc7(this.ctx)
+    const readOnly = probeReadOnlyCapabilityRc7(this.ctx)
     const visibility = probeBranchVisibilityRc7(this.ctx)
     const native = probeNativeContinuationCapability(this.ctx)
     return Object.freeze({
-      askFollowUp: chatOnly.supported && visibility.supported,
-      continueBranch: chatOnly.supported && visibility.supported,
+      askFollowUp: readOnly.supported && visibility.supported,
+      continueBranch: readOnly.supported && visibility.supported,
       nativeBranchContinuation: native.supported,
-      ...chatOnly.reason !== undefined
-        ? { reason: chatOnly.reason }
+      ...readOnly.reason !== undefined
+        ? { reason: readOnly.reason }
         : visibility.reason === undefined
           ? {}
           : { reason: visibility.reason },
@@ -168,9 +168,9 @@ export class NestedFollowupsBranchService extends Service {
   }
 
   private requireMutationCapability(): void {
-    const capability = probeChatOnlyCapabilityRc7(this.ctx)
+    const capability = probeReadOnlyCapabilityRc7(this.ctx)
     if (!capability.supported) {
-      throw new BranchCommandError('compatibility', capability.reason ?? 'Chat-only branches are unavailable.')
+      throw new BranchCommandError('compatibility', capability.reason ?? 'Read-only branches are unavailable.')
     }
     const visibility = probeBranchVisibilityRc7(this.ctx)
     if (!visibility.supported) {
@@ -275,7 +275,7 @@ export class NestedFollowupsBranchService extends Service {
     let handle: AgentHandle | undefined
     try {
       const sourceAgentOptions = this.ctx.agents.get(source.header.id)?.options
-      handle = await createChatOnlyForkAgentRc7(this.ctx.agents, {
+      handle = await createReadOnlyForkAgentRc7(this.ctx, this.ctx.agents, {
         sessionId: childSessionId,
         sourceHeader: source.header,
         seed: boundary.seed,
@@ -296,7 +296,7 @@ export class NestedFollowupsBranchService extends Service {
     this.notify(tree.rootSessionId)
     try {
       const activityEpoch = this.beginActivity(handle)
-      const messageId = submitChatOnlyTurnRc7(
+      const messageId = submitBranchTurnRc7(
         handle.agent,
         prompt,
         request.clientRequestId,
@@ -376,8 +376,9 @@ export class NestedFollowupsBranchService extends Service {
     const liveAgent = this.ctx.agents.get(SessionId(branch.sessionId))
     let handle: AgentHandle
     if (liveAgent === undefined) {
-      handle = await resumeChatOnlyBranchAgentRc7(this.ctx.agents, {
+      handle = await resumeReadOnlyBranchAgentRc7(this.ctx, this.ctx.agents, {
         sessionId: SessionId(branch.sessionId),
+        header: snapshot.header,
         events: snapshot.events,
       })
       this.rememberHandle(handle)
@@ -395,7 +396,7 @@ export class NestedFollowupsBranchService extends Service {
     this.notify(tree.rootSessionId)
     try {
       const activityEpoch = this.beginActivity(handle)
-      const messageId = submitChatOnlyTurnRc7(agent, request.question, request.clientRequestId)
+      const messageId = submitBranchTurnRc7(agent, request.question, request.clientRequestId)
       void this.observeSettlement(handle, branch.branchId, tree.rootSessionId, activityEpoch)
       return commandSuccess({
         action: 'continue-branch',
@@ -526,14 +527,15 @@ export class NestedFollowupsBranchService extends Service {
     if (liveAgent === undefined) {
       const sourceAgentOptions = this.ctx.agents.get(sourceHeader.id)?.options
       handle = snapshot === undefined
-        ? await createChatOnlyForkAgentRc7(this.ctx.agents, {
+        ? await createReadOnlyForkAgentRc7(this.ctx, this.ctx.agents, {
           sessionId: SessionId(branch.sessionId),
           sourceHeader,
           seed,
           ...sourceAgentOptions === undefined ? {} : { fallbackAgentOptions: sourceAgentOptions },
         })
-        : await resumeChatOnlyBranchAgentRc7(this.ctx.agents, {
+        : await resumeReadOnlyBranchAgentRc7(this.ctx, this.ctx.agents, {
           sessionId: SessionId(branch.sessionId),
+          header: snapshot.header,
           events: snapshot.events,
         })
       this.rememberHandle(handle)
@@ -550,7 +552,7 @@ export class NestedFollowupsBranchService extends Service {
     this.notify(rootSessionId)
     try {
       const activityEpoch = this.beginActivity(handle)
-      const messageId = submitChatOnlyTurnRc7(agent, prompt, branch.clientRequestId)
+      const messageId = submitBranchTurnRc7(agent, prompt, branch.clientRequestId)
       void this.observeSettlement(handle, branch.branchId, rootSessionId, activityEpoch)
       return commandSuccess({
         action: 'create-branch',

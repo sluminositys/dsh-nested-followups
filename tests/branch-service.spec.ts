@@ -72,13 +72,13 @@ class MemoryPersistence extends SessionPersistence {
   async listSnapshots(_signal?: AbortSignal): Promise<SessionPersistenceSnapshot[]> { return [] }
 }
 
-interface ChatOnlySetupRecord {
+interface ReadOnlySetupRecord {
   readonly modes: string[]
   readonly restrictions: unknown[]
-  readonly guards: Array<() => string>
+  readonly guards: Array<(execution: { name: string }) => string | undefined>
 }
 
-function setupContext(record: ChatOnlySetupRecord): Context {
+function setupContext(record: ReadOnlySetupRecord): Context {
   const tools = {
     presentAs: (mode: string) => {
       record.modes.push(mode)
@@ -88,7 +88,7 @@ function setupContext(record: ChatOnlySetupRecord): Context {
       record.restrictions.push(restriction)
       return () => {}
     },
-    guard: (guard: () => string) => {
+    guard: (guard: (execution: { name: string }) => string | undefined) => {
       record.guards.push(guard)
       return () => {}
     },
@@ -110,7 +110,7 @@ function appendTextTurn(session: Session, question: Parameters<Agent['followup']
     step,
     message: createAssistantMessage({
       content: [{ type: 'text', text: `text-only answer ${turn}` }],
-      source: { provider: 'test', model: 'chat-only' },
+      source: { provider: 'test', model: 'test-model' },
     }),
   }, { surfaceOp: 'append' })
   session.append('step/end', { turn, step })
@@ -125,7 +125,7 @@ class ToolsCapabilityStub extends Service {
 }
 
 class AgentsStub extends Service {
-  readonly setupRecords: ChatOnlySetupRecord[] = []
+  readonly setupRecords: ReadOnlySetupRecord[] = []
   readonly deliveredPrompts: string[] = []
   failNextCreate = false
   failNextFollowup = false
@@ -157,7 +157,7 @@ class AgentsStub extends Service {
     session: Session,
     setup: CreateAgentOptions['setup'] | ResumeAgentOptions['setup'],
   ): Promise<AgentHandle> {
-    const record: ChatOnlySetupRecord = { modes: [], restrictions: [], guards: [] }
+    const record: ReadOnlySetupRecord = { modes: [], restrictions: [], guards: [] }
     this.setupRecords.push(record)
     await setup?.(setupContext(record))
     const state = { status: 'idle' as 'idle' | 'running' }
@@ -510,12 +510,16 @@ describe('Host branch commands', () => {
       // Every completed branch round is detached so rc.7 classifies a
       // descriptorless child as a settled diagnostic instead of a perpetual
       // creation window. Three Continue rounds therefore resume through the
-      // same chat-only setup before the nested branch is created.
+      // same read-only setup before the nested branch is created.
       expect(runtime.agents.setupRecords).toHaveLength(5)
       for (const record of runtime.agents.setupRecords) {
-        expect(record.modes).toEqual(['native'])
-        expect(record.restrictions).toEqual([{ allow: [] }])
-        expect(record.guards[0]?.()).toContain('chat-only')
+        // Nothing that would alter the request prefix: no presentation
+        // override and no schema restriction, only the execution gate.
+        expect(record.modes).toEqual([])
+        expect(record.restrictions).toEqual([])
+        expect(record.guards).toHaveLength(1)
+        expect(record.guards[0]?.({ name: 'read' })).toBeUndefined()
+        expect(record.guards[0]?.({ name: 'write' })).toContain('read-only')
       }
     } finally {
       await runtime.dispose()

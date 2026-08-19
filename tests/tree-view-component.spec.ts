@@ -70,7 +70,7 @@ describe('conversation tree canvas', () => {
       projection,
       onAskFollowUp,
       onContinueBranch,
-      readOnlyReason: 'This DSH version cannot create isolated chat-only branches.',
+      readOnlyReason: 'This DSH version cannot create isolated read-only branches.',
     }))
 
     expect(writable).toContain('aria-label="Ask follow-up"')
@@ -79,7 +79,7 @@ describe('conversation tree canvas', () => {
     expect(readOnly).toContain('aria-disabled="true"')
     expect(readOnly).not.toContain('aria-label="Continue this branch"')
     expect(readOnly).toContain('Tree View is read-only')
-    expect(readOnly).toContain('This DSH version cannot create isolated chat-only branches.')
+    expect(readOnly).toContain('This DSH version cannot create isolated read-only branches.')
   })
 
   it('distinguishes child branching from linear continuation eligibility', () => {

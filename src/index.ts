@@ -30,14 +30,22 @@ export {
   resolveBranchBoundary,
 } from './host/safe-boundary.ts'
 export {
-  applyChatOnlyScopeRc7,
-  ChatOnlyCapabilityError,
-  createChatOnlyForkAgentRc7,
-  probeChatOnlyCapabilityRc7,
-  resolveChatOnlyAgentOptionsRc7,
-  resumeChatOnlyBranchAgentRc7,
-  submitChatOnlyTurnRc7,
-} from './host/adapter/chat-only.ts'
+  applyReadOnlyScopeRc7,
+  createReadOnlyBranchSetup,
+  createReadOnlyForkAgentRc7,
+  probeReadOnlyCapabilityRc7,
+  readOnlyBranchGuard,
+  ReadOnlyCapabilityError,
+  resolveBranchAgentOptionsRc7,
+  resolveSourcePresetRc7,
+  resumeReadOnlyBranchAgentRc7,
+  submitBranchTurnRc7,
+} from './host/adapter/read-only.ts'
+export {
+  isBranchExecutableTool,
+  READ_ONLY_TOOL_NAMES,
+  TRANSPORT_TOOL_NAMES,
+} from './shared/tool-policy.ts'
 export {
   CHAT_ONLY_CONTINUATION_METHOD,
   probeNativeContinuationCapability,

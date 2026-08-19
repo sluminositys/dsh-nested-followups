@@ -393,26 +393,61 @@ describe('conversation tree projection', () => {
     )
   })
 
-  it('diagnoses tool events in a chat-only branch without rendering tool cards', () => {
-    const withToolEvent = [
-      ...branchOneEvents,
+  it('accepts read tools and denied writes, and diagnoses only a write that succeeded', () => {
+    const toolRound = (
+      name: string,
+      callId: string,
+      isError: boolean,
+      startSeq: number,
+    ): typeof branchOneEvents => [
       sessionEvent({
         type: 'tool/call',
-        seq: 18,
+        seq: startSeq,
         time: 3_000,
-        data: { turn: 3, step: 1, callId: 'call-1', name: 'shell', arguments: '{}' },
+        data: { turn: 3, step: 1, callId, name, arguments: '{}' },
       }),
-    ]
+      sessionEvent({
+        type: 'tool/result',
+        seq: startSeq + 1,
+        time: 3_010,
+        data: {
+          turn: 3,
+          step: 1,
+          message: {
+            id: `${callId}-result`,
+            role: 'user',
+            source: { kind: 'tool', callId },
+            content: [{ type: 'tool-result', toolCallId: callId, content: [], isError }],
+          },
+        },
+      }),
+    ] as unknown as typeof branchOneEvents
+
+    const diagnosticsFor = (extra: typeof branchOneEvents) => projectConversationTree(
+      tree,
+      [branchOne],
+      logs({ branchOneEvents: [...branchOneEvents, ...extra] as typeof branchOneEvents }),
+    ).diagnostics.filter(diagnostic => diagnostic.code === 'branch-tool-event')
+
+    // A read the branch is allowed to run.
+    expect(diagnosticsFor(toolRound('read', 'call-read', false, 18))).toEqual([])
+    // A write the execution guard rejected: the attempt is logged, nothing changed.
+    expect(diagnosticsFor(toolRound('write', 'call-denied', true, 18))).toEqual([])
+    // A write that actually ran means the guard failed to hold.
+    expect(diagnosticsFor(toolRound('write', 'call-escaped', false, 18))).toContainEqual(
+      expect.objectContaining({ code: 'branch-tool-event', branchId: branchOne.branchId }),
+    )
+
     const projection = projectConversationTree(
       tree,
       [branchOne],
-      logs({ branchOneEvents: withToolEvent as typeof branchOneEvents }),
+      logs({
+        branchOneEvents: [
+          ...branchOneEvents,
+          ...toolRound('read', 'call-read', false, 18),
+        ] as typeof branchOneEvents,
+      }),
     )
-
-    expect(projection.diagnostics).toContainEqual(expect.objectContaining({
-      code: 'branch-tool-event',
-      branchId: branchOne.branchId,
-    }))
     expect(projection.nodes.every(node => node.role === 'user' || node.role === 'assistant')).toBe(true)
   })
 })

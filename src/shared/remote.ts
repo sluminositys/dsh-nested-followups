@@ -75,7 +75,7 @@ export interface TreeSnapshot {
 export interface TreeCapabilities {
   /** Host can create an isolated child branch from a safe assistant boundary. */
   readonly askFollowUp: boolean
-  /** Host can append another chat-only turn to an existing branch. */
+  /** Host can append another read-only turn to an existing branch. */
   readonly continueBranch: boolean
   /** A future upstream API can make an Open Branch surface writable natively. */
   readonly nativeBranchContinuation: boolean
