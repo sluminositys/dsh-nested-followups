@@ -26,7 +26,8 @@ Restart the web profile afterwards.
 
 - Node.js 22.19 or later
 - pnpm
-- DeepSeek Harness `0.1.0-rc.7`
+- DeepSeek Harness `0.1.x` (the development suite currently validates
+  `0.1.1-rc.2` and keeps `0.1.0-rc.7` as its compatibility floor)
 
 ## Making a change
 

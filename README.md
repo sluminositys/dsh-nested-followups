@@ -12,7 +12,7 @@ appended to the end of your main conversation.
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22.19-brightgreen.svg)](https://nodejs.org)
 [![npm](https://img.shields.io/npm/v/dsh-nested-followups.svg)](https://www.npmjs.com/package/dsh-nested-followups)
-[![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-0.1.0--rc.7-orange.svg)](https://github.com/deepseek-ai/deepseek-harness)
+[![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-0.1.1--rc.2-orange.svg)](https://github.com/deepseek-ai/deepseek-harness)
 
 ## The problem it solves
 
@@ -53,7 +53,7 @@ conversation never sees it.
 
 | Requirement | Version |
 | --- | --- |
-| DeepSeek Harness | `0.1.0-rc.7` (unmodified) |
+| DeepSeek Harness | `0.1.x` (verified on `0.1.0-rc.7`, `0.1.0-rc.8`, and `0.1.1-rc.2`) |
 | Node.js | 22.19 or later |
 | Package manager | pnpm |
 
@@ -194,10 +194,12 @@ produce the first word of the answer. Restricting the visible tool list would
 have been simpler to implement and would have given up that saving for no gain
 in safety, because hiding a tool and refusing to run it stop the same call.
 
-## Compatibility with DeepSeek Harness 0.1.0-rc.7
+## Compatibility with DeepSeek Harness 0.1.x
 
-This version targets an unmodified `@deepseek-ai/dsh` `0.1.0-rc.7`. Two current
-limitations follow from how that release treats subagent-origin sessions.
+This version is verified against an unmodified `@deepseek-ai/dsh`
+`0.1.1-rc.2` and retains `0.1.0-rc.7` as its compatibility floor. The two
+limitations below remain present across the verified releases because of how
+DeepSeek Harness treats subagent-origin sessions.
 
 **Branches cannot be continued from the standard chat view.** DeepSeek Harness
 uses the subagent origin marker to decide which component owns a session, and it
@@ -207,11 +209,12 @@ therefore has no "open branch in chat" action; reading and continuing branches
 both happen in Tree View.
 
 **Branches may be listed in the Subagent menu.** Because the plugin does not
-install a subagent descriptor, the built-in Subagent menu inside a conversation
-may list branches as disabled rows. These rows cannot be selected, are skipped
-during keyboard navigation, and are excluded from the count of active child
-agents; the menu and the conversation continue to work normally. Branches still
-do not appear in the sidebar session list.
+install a subagent descriptor, the built-in Subagent list may show branches as
+disabled diagnostic rows. In `0.1.1-rc.2`, this list is opened from the session
+header's lineage control. The rows cannot be selected, are skipped during
+keyboard navigation, and are excluded from the count of active child agents;
+the control and the conversation continue to work normally. Branches still do
+not appear in the sidebar session list.
 
 The plugin includes a check for a proposed future DeepSeek Harness capability
 that would allow branches to be continued from the standard chat view. It
@@ -245,9 +248,10 @@ submitting a pull request.
 
 ## Project status
 
-The implementation is verified against an unmodified DeepSeek Harness
-`0.1.0-rc.7`. DeepSeek Harness is in developer preview, so later releases may
-require updates even though this package declares a wider compatibility range.
+The implementation is verified against unmodified DeepSeek Harness
+`0.1.0-rc.7`, `0.1.0-rc.8`, and `0.1.1-rc.2`. DeepSeek Harness is in developer
+preview, so later releases may require updates even though this package declares
+a wider compatibility range.
 
 ## License
 

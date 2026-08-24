@@ -31,6 +31,24 @@ describe('package contract', () => {
     })
   })
 
+  it('declares the verified rc.7 through rc.2 DSH compatibility window', async () => {
+    const manifest = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')) as {
+      peerDependencies?: Record<string, string>
+      devDependencies?: Record<string, string>
+    }
+    const dshPeers = Object.entries(manifest.peerDependencies ?? {})
+      .filter(([name]) => name.startsWith('@deepseek-ai/dsh-'))
+      .map(([, range]) => range)
+    const dshValidationTargets = Object.entries(manifest.devDependencies ?? {})
+      .filter(([name]) => name.startsWith('@deepseek-ai/dsh-'))
+      .map(([, version]) => version)
+
+    expect(new Set(dshPeers)).toEqual(new Set([
+      '>=0.1.0-rc.7 <0.1.1 || >=0.1.1-rc.1 <0.2.0',
+    ]))
+    expect(new Set(dshValidationTargets)).toEqual(new Set(['0.1.1-rc.2']))
+  })
+
   it('inserts one removable Cordis bundle row', async () => {
     const patch = await readFile(new URL('../cordis.patch.yml', import.meta.url), 'utf8')
 

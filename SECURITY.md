@@ -2,8 +2,9 @@
 
 ## Supported versions
 
-This project is in early development and targets DeepSeek Harness
-`0.1.0-rc.7`. Fixes are applied to the main branch only.
+This project is in early development and supports DeepSeek Harness `0.1.x`,
+with `0.1.0-rc.7` as its compatibility floor and `0.1.1-rc.2` as the latest
+verified release. Fixes are applied to the main branch only.
 
 ## Reporting a vulnerability
 

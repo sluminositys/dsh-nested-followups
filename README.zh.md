@@ -11,7 +11,7 @@
 [![许可证: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![Node.js](https://img.shields.io/badge/Node.js-%3E%3D22.19-brightgreen.svg)](https://nodejs.org)
 [![npm](https://img.shields.io/npm/v/dsh-nested-followups.svg)](https://www.npmjs.com/package/dsh-nested-followups)
-[![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-0.1.0--rc.7-orange.svg)](https://github.com/deepseek-ai/deepseek-harness)
+[![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-0.1.1--rc.2-orange.svg)](https://github.com/deepseek-ai/deepseek-harness)
 
 ## 要解决的问题
 
@@ -43,7 +43,7 @@ DeepSeek Harness 的对话是线性的。当你正在完成一项工程任务，
 
 | 项目 | 版本 |
 | --- | --- |
-| DeepSeek Harness | `0.1.0-rc.7`（未经修改） |
+| DeepSeek Harness | `0.1.x`（已在 `0.1.0-rc.7`、`0.1.0-rc.8` 和 `0.1.1-rc.2` 上验证） |
 | Node.js | 22.19 及以上 |
 | 包管理器 | pnpm |
 
@@ -161,19 +161,21 @@ dsh plugin --profile web remove dsh-nested-followups
 继承来的全部对话，才能给出回答的第一个字。限制可见工具列表实现起来更简单，但会白白
 放弃这份收益，而且并不会更安全——隐藏一个工具和拒绝执行它，拦下的是同一次调用。
 
-## 与 DeepSeek Harness 0.1.0-rc.7 的兼容性
+## 与 DeepSeek Harness 0.1.x 的兼容性
 
-当前版本面向未经修改的 `@deepseek-ai/dsh` `0.1.0-rc.7`。以下两项限制源于该版本对
-子代理来源会话的处理方式。
+当前版本已在未经修改的 `@deepseek-ai/dsh` `0.1.1-rc.2` 上验证，并继续以
+`0.1.0-rc.7` 作为兼容下限。以下两项限制在已经验证的各版本中仍然存在，原因是
+DeepSeek Harness 对子代理来源会话的处理方式。
 
 **分支无法在原生对话界面中续聊。** DeepSeek Harness 用子代理来源标记来判断一个会话
 归哪个组件所有，并会拒绝从原生对话界面向这类会话发送消息。原生界面可以显示分支的
 历史，但无法向其中追加内容。因此当前版本没有提供"在对话中打开分支"的功能，阅读和
 续聊都在树视图中完成。
 
-**分支可能出现在子代理菜单中。** 由于插件不会安装子代理描述符，对话内置的子代理菜单
-可能会把分支显示为不可用的条目。这些条目无法选中，键盘浏览时会被跳过，也不计入活跃
-子代理的数量，菜单和对话本身都能正常使用。分支仍然不会出现在侧边栏的会话列表里。
+**分支可能出现在子代理菜单中。** 由于插件不会安装子代理描述符，内置子代理列表可能
+会把分支显示为不可用的诊断条目。在 `0.1.1-rc.2` 中，该列表改由会话顶栏的谱系控件
+打开。这些条目无法选中，键盘浏览时会被跳过，也不计入活跃子代理的数量；控件和对话
+本身都能正常使用。分支仍然不会出现在侧边栏的会话列表里。
 
 插件中预留了对一项尚未发布的 DeepSeek Harness 能力的检测，该能力将允许在原生对话
 界面中续聊分支。检测要求对应版本同时提供该能力并明确声明支持投递用户消息，以免某个
@@ -203,8 +205,9 @@ pnpm run check
 
 ## 项目状态
 
-当前实现已在未经修改的 DeepSeek Harness `0.1.0-rc.7` 上验证通过。DeepSeek Harness
-仍处于开发者预览阶段，即使本软件包声明的兼容范围更宽，后续版本仍可能需要相应更新。
+当前实现已在未经修改的 DeepSeek Harness `0.1.0-rc.7`、`0.1.0-rc.8` 和
+`0.1.1-rc.2` 上验证通过。DeepSeek Harness 仍处于开发者预览阶段，即使本软件包声明
+的兼容范围更宽，后续版本仍可能需要相应更新。
 
 ## 许可证
 
