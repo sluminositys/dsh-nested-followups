@@ -4,6 +4,8 @@
 
 Target: <https://github.com/awesome-dsh-plugin/awesome-dsh-plugin>
 
+Submitted: [awesome-dsh-plugin/awesome-dsh-plugin#3619](https://github.com/awesome-dsh-plugin/awesome-dsh-plugin/pull/3619)
+
 Add `data/plugins/sluminositys__dsh-nested-followups.yml`:
 
 ```yaml
@@ -11,8 +13,8 @@ url: https://github.com/sluminositys/dsh-nested-followups
 name: sluminositys/dsh-nested-followups
 category: session
 description:
-  en: Branch from any completed answer into an isolated session, then continue or nest it in a message-level conversation tree.
-  zh: 从任意已完成回答创建隔离 Session，并在消息级会话树中继续或嵌套分支。
+  en: Branch from any completed answer, then branch again from answers inside the side trail while the main session stays untouched.
+  zh: 从任意已完成回答创建隔离侧线，再从侧线回答继续分叉，主会话始终不受影响。
 ```
 
 PR title:
@@ -32,7 +34,9 @@ The plugin is installable from npm with:
 dsh plugin --profile web add dsh-nested-followups
 ```
 
-The repository declares `dsh.bundle`, ships built artifacts, has a real message-level Tree View, and is tested against unmodified DSH 0.1.x release candidates. The entry deliberately describes session isolation and nesting without making security-review or quality claims.
+Any completed answer can become an isolated session fork point, including answers inside an existing side trail. Each nested level inherits only its ancestor path, while the main session remains untouched. The Tree View is the navigation surface for those recursive follow-ups.
+
+The repository declares `dsh.bundle`, ships built artifacts, and is tested against unmodified DSH 0.1.x release candidates. The entry deliberately describes behavior without making security-review or quality claims.
 ````
 
 Before submitting, run the directory's required generator and checks:
@@ -46,12 +50,30 @@ node scripts/generate-readme.mjs
 
 Target: <https://github.com/ZeroPointRepo/awesome-dsh-plugins>
 
+Submitted: [ZeroPointRepo/awesome-dsh-plugins#5](https://github.com/ZeroPointRepo/awesome-dsh-plugins/pull/5)
+
 Suggested category: `Reshape the interface`.
 
+PR body:
+
 ````markdown
-- **Branch from an earlier answer without contaminating the main session** with
+Adds `dsh-nested-followups` to **Reshape the interface**.
+
+This DSH plugin lets a user branch from any completed answer and then branch again from answers inside the side conversation. Every level is a real, read-only session with only its ancestor context; the main task stays untouched. Tree View keeps the recursive side trail attached to its root conversation.
+
+Install:
+
+```sh
+dsh plugin --profile web add dsh-nested-followups
+```
+````
+
+````markdown
+- **Branch again from answers inside a side conversation** with
   [dsh-nested-followups](https://github.com/sluminositys/dsh-nested-followups) by
-  [sluminositys](https://github.com/sluminositys). Creates real, read-only nested sessions and keeps them in one message-level tree. 16★, MIT.
+  [sluminositys](https://github.com/sluminositys). Every level is a real,
+  read-only session with its own inherited context; the main task remains
+  untouched and the Tree View keeps the recursive trail attached. 16★, MIT.
 
   <details>
   <summary>Install</summary>

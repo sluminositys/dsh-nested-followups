@@ -30,7 +30,8 @@ Create three turns in the main chat:
 2. `Make step 2 concrete: what state should the retry loop track? Keep it under 70 words. Answer only.`
 3. `Now define three acceptance criteria for the main retry implementation. Keep it under 60 words. Answer only.`
 
-Create the side trail in Tree View:
+Create the side trail in Tree View. The third step is the defining moment: the
+answer inside the side trail becomes another independent fork point.
 
 1. On **A1**, use **Ask follow-up**: `What does idempotent mean here? Explain it in one sentence.`
 2. On **A1.1**, use **Continue this branch**: `Give one concrete API example in one sentence.`
@@ -45,12 +46,12 @@ three turns before recording.
 | Time | Screen and mouse action | Caption |
 | --- | --- | --- |
 | 0.0–1.6 s | Chat view, pointer near **Tree View** | `MAIN TASK · 3 LINEAR TURNS` |
-| 1.6–2.8 s | Open Tree View; branches fully folded | `CHOOSE AN EARLIER ANSWER` |
-| 2.8–4.5 s | Open **Ask follow-up** beside A1 and type the question | `ASK THE SIDE QUESTION HERE` |
-| 4.5–5.7 s | Show the first branch as a capsule | `AN ISOLATED BRANCH APPEARS` |
-| 5.7–7.3 s | Expand branch 1.1, including its continued second turn | `CONTINUE DOWN INSIDE THE BRANCH` |
-| 7.3–8.5 s | Reveal branch 1.1.1 as a capsule | `BRANCH AGAIN AT ANY DEPTH` |
-| 8.5–10.4 s | Expand the nested branch | `NESTED CONTEXT STAYS ISOLATED` |
+| 1.6–2.8 s | Open Tree View; branches fully folded | `PICK AN EARLIER ANSWER` |
+| 2.8–4.5 s | Open **Ask follow-up** beside A1 and type the question | `ASK A SIDE QUESTION` |
+| 4.5–5.7 s | Show the first branch as a capsule | `FIRST ISOLATED SIDE BRANCH` |
+| 5.7–7.3 s | Expand branch 1.1, including its continued second turn | `KEEP TALKING INSIDE IT` |
+| 7.3–8.5 s | Reveal branch 1.1.1 from the answer inside branch 1.1 | `THE SIDE ANSWER RAISES ANOTHER QUESTION` |
+| 8.5–10.4 s | Expand branch 1.1.1 | `BRANCH AGAIN FROM THAT ANSWER` |
 | 10.4–11.5 s | Select **Collapse all** | `COLLAPSE THE SIDE TRAIL` |
 | 11.5–13.5 s | Return to Chat; keep the three-turn counter visible | `MAIN TASK · STILL ONLY 3 TURNS` |
 

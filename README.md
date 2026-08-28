@@ -2,12 +2,13 @@
 
 English | [中文](README.zh.md)
 
-**Ask about any earlier answer without polluting your main agent context.**
+**Branch from any answer. Then branch from the branch.**
 
 A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin
-that turns side questions into real, nested session branches. Each branch
-inherits the conversation only through the answer you selected. The main task
-stays linear and untouched.
+for recursively nested, isolated follow-ups. Start a side question from any
+answer; if that side answer raises another question, branch from it again. Each
+level inherits only its ancestor path, while the main task stays linear and
+untouched.
 
 [![npm](https://img.shields.io/npm/v/dsh-nested-followups.svg)](https://www.npmjs.com/package/dsh-nested-followups)
 [![Tests: 156 passing](https://img.shields.io/badge/tests-156%20passing-brightgreen.svg)](tests)
@@ -19,14 +20,14 @@ stays linear and untouched.
 _Recorded in an unmodified DeepSeek Harness `0.1.1-rc.2` web profile. The UI
 and sessions are real; the captions and cursor are added in post._
 
-> **LINEAR CHAT → ASK ABOUT AN EARLIER ANSWER → ISOLATED BRANCH**
+> **MAIN TASK → SIDE QUESTION → QUESTION ABOUT THE SIDE ANSWER → …**
 
-- **Branch from any completed answer.** The branch receives exactly the history
-  that existed at that point.
+- **Start a side trail anywhere.** The first branch receives exactly the history
+  that existed at the selected answer.
+- **Branch from the branch.** Any answer inside that side trail can become the
+  next isolated fork point, at any depth.
 - **Keep the main task clean.** Nothing asked or answered in a branch flows back
   into the main conversation.
-- **Keep going without flattening the tree.** Continue downward inside a branch,
-  or branch right again at any depth.
 
 ## Install
 
@@ -50,18 +51,18 @@ dsh plugin --profile web add .
 
 </details>
 
-## Why not just open another chat?
+## Why not a new chat or a sidebar thread?
 
-| Approach | Relevant earlier context | Main task stays clean | Nested follow-ups | One visible tree |
+| Approach | Relevant earlier context | Main stays clean | Can branch from a side answer | Trail stays attached |
 | --- | --- | --- | --- | --- |
-| Ask in the main chat | Yes | No | No | No |
+| Ask in the main chat | Yes | No | No | Not applicable |
 | Open a new conversation | Lost or copied manually | Yes | No | No |
-| Typical temporary sidebar Q&A | Varies | Usually | Usually not | No |
-| **dsh-nested-followups** | **Exact history through the selected answer** | **Yes** | **Yes** | **Yes** |
+| Typical temporary sidebar Q&A | Varies | Usually | Usually a linear side thread | Usually not |
+| **dsh-nested-followups** | **Exact ancestor path** | **Yes** | **Yes, at any depth** | **Yes** |
 
-The point is not another place to type. It is a message-level branch that keeps
-the useful context, isolates the detour, and remains attached to the root
-conversation instead of becoming another session-list item.
+The distinguishing feature is not the canvas. It is that an answer inside a
+side conversation can itself become a new, isolated fork point. The tree is the
+map that keeps those recursive detours visible and attached to the root session.
 
 ## Use it
 
@@ -84,17 +85,18 @@ conversation instead of becoming another session-list item.
 branch. Main-line nodes never offer it, so the two operations cannot be
 confused.
 
-## Why this is a real branch
+## Why every level is a real branch
 
 This is not a prompt that asks the model to pretend later messages do not
 exist, and it is not a line drawn between unrelated chats.
 
-- Every branch is a real DeepSeek Harness session with durable history.
-- Its seed ends at the selected completed turn, using the same event-boundary
-  semantics as DSH's session fork path.
-- Main-line messages created after the branch point are absent from the branch.
-- Branch messages never flow back to the main session, and sibling branches
-  cannot see one another.
+- Every branch, including a branch created inside another branch, is a real
+  DeepSeek Harness session with durable history.
+- Its seed is the exact ancestor path through the selected completed answer,
+  using the same event-boundary semantics as DSH's session fork path.
+- Later messages from the main task, parent side trail, and sibling branches are
+  absent unless they are ancestors of the new branch point.
+- Messages never flow upward to a parent session or sideways to a sibling.
 - Branch tools are enforced read-only when they execute, protecting the shared
   workspace from side-question activity.
 - The request prefix remains byte-for-byte compatible with the parent at the

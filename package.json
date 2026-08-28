@@ -1,13 +1,16 @@
 {
   "name": "dsh-nested-followups",
   "version": "0.2.2",
-  "description": "Turn linear DeepSeek Harness conversations into real, nested session branches without polluting the main context.",
+  "description": "Recursively nested, isolated follow-ups for DeepSeek Harness: branch from any answer, then branch again without touching the main task.",
   "keywords": [
     "dsh-plugin",
     "deepseek-harness",
     "dsh",
-    "conversation-tree",
     "conversation-branching",
+    "recursive-branching",
+    "nested-conversations",
+    "recursive-followups",
+    "context-isolation",
     "context-management",
     "isolated-session",
     "nested-followups",

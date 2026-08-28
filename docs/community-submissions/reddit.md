@@ -11,11 +11,11 @@ Body:
 ````markdown
 I kept running into a stupidly small problem in long coding-agent sessions.
 
-The agent would explain a plan, I would not understand one term in an old answer, and I would ask about it in the main chat. That temporary detour then became part of the context for every request after it. Opening a new chat kept the main task clean, but I had to copy the relevant history and manage another loose session.
+The agent would explain a plan, I would not understand one term in an old answer, and I would ask about it in the main chat. That temporary detour then became part of the context for every request after it. A sidebar thread only moved the problem: its answer could raise another question, but I still had only one linear side conversation.
 
 So I built `dsh-nested-followups` for DeepSeek Harness.
 
-It lets you pick any completed answer and ask a follow-up from that exact point. The follow-up is a real child session, not a prompt trick. It inherits the parent only through the selected answer, cannot write to the shared workspace, and does not feed anything back into the main conversation. You can continue inside the branch or branch from it again, and the whole thing remains visible as a message-level tree attached to the root session.
+It lets you pick any completed answer and ask a follow-up from that exact point. More importantly, any answer inside that side conversation can become another independent fork point, recursively. Every level is a real child session—not a prompt trick—with only its ancestor context. It cannot write to the shared workspace, does not feed back into a parent or sibling, and remains attached to the root session. The tree is how you navigate the result, not the point of the plugin.
 
 Demo: https://github.com/sluminositys/dsh-nested-followups#readme
 

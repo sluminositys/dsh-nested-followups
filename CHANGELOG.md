@@ -10,7 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Added a 13.5-second demo recorded from a real DeepSeek Harness session. It
-  shows an earlier-answer follow-up, branch continuation, a nested branch,
+  shows a side question, a follow-up on that side answer, recursive isolation,
   collapse, and the untouched main chat.
 - Added a real Tree View screenshot and a repository-owned screenshot manifest
   for compatible plugin directories and storefronts.
@@ -18,12 +18,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Rebuilt the English and Chinese README introductions around the problem the
-  plugin solves, with the demo and install command before implementation detail.
-- Replaced the dense banner and social preview with a simple linear-chat to
-  isolated-branch visual.
-- Updated the npm description and keywords to describe conversation branching
-  and context isolation rather than only the follow-up UI.
+- Rebuilt the English and Chinese README introductions around the project's
+  defining behavior: every side-answer can become another isolated fork point.
+- Replaced the dense banner and social preview with a main task → side branch →
+  branch-from-branch visual.
+- Updated the npm description and keywords to describe recursive conversation
+  branching and context isolation rather than only the Tree View UI.
 
 ## [0.2.2] - 2026-08-24
 

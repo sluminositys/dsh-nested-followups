@@ -1,28 +1,30 @@
 # GitHub release copy
 
+Published on the existing [`v0.2.2` release](https://github.com/sluminositys/dsh-nested-followups/releases/tag/v0.2.2).
+
 Title:
 
 ```text
-dsh-nested-followups: real session branches for side questions
+dsh-nested-followups: branch again inside any side conversation
 ```
 
 Body:
 
 ````markdown
-I built this because I kept wanting to ask one small question about an earlier answer without dragging that detour through the rest of an agent session.
+I built this because I kept wanting to ask one small question about an earlier answer without dragging that detour through the rest of an agent session. Then the side answer would raise another question, and a normal one-level sidebar thread put me back in the same linear-chat problem.
 
-The missing option was neither “ask at the bottom” nor “open another chat”. It was: keep the exact context through that answer, fork a real session there, and leave the main task untouched.
+The missing option was neither “ask at the bottom” nor “open another chat”. It was: keep the exact context through an answer, fork a real session there, and let any answer inside that side trail become the next isolated fork point.
 
-![A real DSH session with nested isolated branches](https://raw.githubusercontent.com/sluminositys/dsh-nested-followups/main/assets/demo.gif)
+![A real DSH session with recursively nested isolated follow-ups](https://raw.githubusercontent.com/sluminositys/dsh-nested-followups/main/assets/demo.gif)
 
-`dsh-nested-followups` now presents that job directly:
+`dsh-nested-followups` does that recursively:
 
-- select any completed answer and ask a follow-up to the right;
-- continue downward inside the isolated branch;
-- branch again at any depth;
+- select any completed answer and ask a side question;
+- continue downward inside the isolated side trail;
+- branch again from any answer inside it, at any depth;
 - collapse the side trail and return to the unchanged main Chat.
 
-Each branch is a durable DSH session seeded only through its branch point. Branch tools are enforced read-only, sibling contexts remain separate, and the provider-compatible request prefix stays reusable. This is session isolation, not a prompt instruction or a visual-only graph.
+Every level is a durable DSH session seeded with exactly its ancestor path. Branch tools are enforced read-only, parent and sibling contexts remain separate, and the provider-compatible request prefix stays reusable. The tree is the map; recursive session isolation is the feature.
 
 Install:
 
