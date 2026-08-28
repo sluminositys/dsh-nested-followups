@@ -66,6 +66,11 @@ depth can become another isolated fork point, and the same rule keeps applying
 to every descendant. The tree is only the map that keeps those recursive
 detours visible and attached to the root session.
 
+![A main task with isolated side trails that can keep branching at any depth](assets/recursive-branching.png)
+
+_The diagram draws two nested levels and then an ellipsis: the same fork action
+remains available on every answer at every later depth._
+
 ## Use it
 
 1. Chat normally. The standard DSH chat, sidebar, composer, and message

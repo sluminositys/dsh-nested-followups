@@ -21,8 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Rebuilt the English and Chinese README introductions around the project's
   defining behavior: every answer at every depth can become another isolated
   fork point, with no plugin-defined nesting limit.
-- Replaced the dense banner and social preview with a main task → side branch →
-  branch-from-branch visual.
+- Kept the fuller DeepSeek Harness social preview and banner, and added a
+  compact any-depth branching diagram to both README files as an explainer.
 - Updated the npm description and keywords to describe recursive conversation
   branching and context isolation rather than only the Tree View UI.
 
