@@ -9,9 +9,10 @@
 - Rewrite the current GitHub Release around the user problem and attach the
   demo in the body.
 
-Success check: a logged-out visitor can explain that a side answer can fork
-again—without affecting its parent, siblings, or the main task—after watching
-the GIF once, and reaches the install command before implementation detail.
+Success check: a logged-out visitor can explain that every descendant answer
+can fork again at any depth—without affecting its parent, siblings, or the main
+task—after watching the GIF once, and reaches the install command before
+implementation detail.
 
 ## Day 1 — enter DSH-native discovery
 

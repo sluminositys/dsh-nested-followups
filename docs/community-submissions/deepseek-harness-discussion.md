@@ -7,7 +7,7 @@ Published: [deepseek-ai/deepseek-harness discussion #4938](https://github.com/de
 Title:
 
 ```text
-DSH | dsh-nested-followups | Branch again inside any side conversation
+DSH | dsh-nested-followups | Isolated side questions at any depth
 ```
 
 Body:
@@ -17,7 +17,7 @@ Project: https://github.com/sluminositys/dsh-nested-followups
 
 I kept running into a small but persistent problem in long agent sessions: I wanted to ask what one part of an earlier answer meant, but putting that question in the main chat dragged the detour through every later request. A one-level side thread was not enough either—its answer often raised another question, and that second detour needed its own clean context too.
 
-`dsh-nested-followups` lets any completed assistant answer become an isolated fork point, including answers inside an existing side branch. Each new level is a real child session seeded only with its ancestor path. Nothing flows back to the parent or across to siblings. The Tree View is the map for navigating those recursively nested side conversations; returning to Chat shows the original main session unchanged.
+`dsh-nested-followups` lets any completed assistant answer become an isolated fork point, including answers at every depth of an existing side branch. The rule keeps applying to every descendant, with no plugin-defined nesting limit. Each new level is a real child session seeded only with its ancestor path. Nothing flows back to the parent or across to siblings. The Tree View is the map for navigating the result; returning to Chat shows the original main session unchanged.
 
 ![Real DSH demo](https://raw.githubusercontent.com/sluminositys/dsh-nested-followups/main/assets/demo.gif)
 

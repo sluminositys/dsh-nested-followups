@@ -5,7 +5,7 @@ Published on the existing [`v0.2.2` release](https://github.com/sluminositys/dsh
 Title:
 
 ```text
-dsh-nested-followups: branch again inside any side conversation
+dsh-nested-followups: isolated side questions at any depth
 ```
 
 Body:
@@ -13,7 +13,7 @@ Body:
 ````markdown
 I built this because I kept wanting to ask one small question about an earlier answer without dragging that detour through the rest of an agent session. Then the side answer would raise another question, and a normal one-level sidebar thread put me back in the same linear-chat problem.
 
-The missing option was neither “ask at the bottom” nor “open another chat”. It was: keep the exact context through an answer, fork a real session there, and let any answer inside that side trail become the next isolated fork point.
+The missing option was neither “ask at the bottom” nor “open another chat”. It was: keep the exact context through an answer, fork a real session there, and keep applying that rule to any answer at every new level, for as many levels as the detour needs.
 
 ![A real DSH session with recursively nested isolated follow-ups](https://raw.githubusercontent.com/sluminositys/dsh-nested-followups/main/assets/demo.gif)
 
@@ -21,10 +21,10 @@ The missing option was neither “ask at the bottom” nor “open another chat�
 
 - select any completed answer and ask a side question;
 - continue downward inside the isolated side trail;
-- branch again from any answer inside it, at any depth;
+- keep branching from any descendant answer, at any depth;
 - collapse the side trail and return to the unchanged main Chat.
 
-Every level is a durable DSH session seeded with exactly its ancestor path. Branch tools are enforced read-only, parent and sibling contexts remain separate, and the provider-compatible request prefix stays reusable. The tree is the map; recursive session isolation is the feature.
+Every level is a durable DSH session seeded with exactly its ancestor path, and the plugin does not impose a nesting-depth limit. Branch tools are enforced read-only, parent and sibling contexts remain separate, and the provider-compatible request prefix stays reusable. The tree is the map; recursive session isolation is the feature.
 
 Install:
 

@@ -13,8 +13,8 @@ url: https://github.com/sluminositys/dsh-nested-followups
 name: sluminositys/dsh-nested-followups
 category: session
 description:
-  en: Branch from any completed answer, then branch again from answers inside the side trail while the main session stays untouched.
-  zh: 从任意已完成回答创建隔离侧线，再从侧线回答继续分叉，主会话始终不受影响。
+  en: Keep branching from any completed answer at any depth while the main session stays untouched.
+  zh: 从任意层级的已完成回答持续创建隔离分支，主会话始终不受影响。
 ```
 
 PR title:
@@ -34,7 +34,7 @@ The plugin is installable from npm with:
 dsh plugin --profile web add dsh-nested-followups
 ```
 
-Any completed answer can become an isolated session fork point, including answers inside an existing side trail. Each nested level inherits only its ancestor path, while the main session remains untouched. The Tree View is the navigation surface for those recursive follow-ups.
+Any completed answer can become an isolated session fork point, including answers at every depth of an existing side trail. The same rule applies recursively without a plugin-defined depth limit. Each level inherits only its ancestor path, while the main session remains untouched. The Tree View is the navigation surface for those follow-ups.
 
 The repository declares `dsh.bundle`, ships built artifacts, and is tested against unmodified DSH 0.1.x release candidates. The entry deliberately describes behavior without making security-review or quality claims.
 ````
@@ -59,7 +59,7 @@ PR body:
 ````markdown
 Adds `dsh-nested-followups` to **Reshape the interface**.
 
-This DSH plugin lets a user branch from any completed answer and then branch again from answers inside the side conversation. Every level is a real, read-only session with only its ancestor context; the main task stays untouched. Tree View keeps the recursive side trail attached to its root conversation.
+This DSH plugin lets a user keep branching from any completed answer at any depth. Every level is a real, read-only session with only its ancestor context; the main task stays untouched. Tree View keeps the recursively expanding side trail attached to its root conversation.
 
 Install:
 
@@ -69,11 +69,11 @@ dsh plugin --profile web add dsh-nested-followups
 ````
 
 ````markdown
-- **Branch again from answers inside a side conversation** with
+- **Keep branching from any answer at any depth** with
   [dsh-nested-followups](https://github.com/sluminositys/dsh-nested-followups) by
-  [sluminositys](https://github.com/sluminositys). Every level is a real,
-  read-only session with its own inherited context; the main task remains
-  untouched and the Tree View keeps the recursive trail attached. 16★, MIT.
+  [sluminositys](https://github.com/sluminositys). The fork rule repeats without
+  a plugin-defined depth limit; every level is a real, read-only session, the
+  main task stays untouched, and Tree View keeps the trail attached. 16★, MIT.
 
   <details>
   <summary>Install</summary>

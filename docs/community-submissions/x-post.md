@@ -5,7 +5,7 @@
 ```text
 I wanted to ask one small question about an old agent answer without dragging that detour through the rest of the task. Then the side answer raised another question.
 
-dsh-nested-followups lets me branch from the answer, then branch again from the side answer. Each level is a real isolated DSH session; the main task stays untouched.
+dsh-nested-followups lets me keep branching from any later answer, at any depth. Each level is a real isolated DSH session; the main task stays untouched.
 
 https://github.com/sluminositys/dsh-nested-followups
 ```
@@ -26,7 +26,7 @@ I built a DSH plugin for the missing third option.
 Post 2:
 
 ```text
-Pick any earlier answer → real isolated session branch → branch again from its answer → return to the untouched main task.
+Pick any earlier answer → real isolated session branch → keep branching at any depth → return to the untouched main task.
 
 Demo and install:
 https://github.com/sluminositys/dsh-nested-followups

@@ -2,30 +2,31 @@
 
 English | [中文](README.zh.md)
 
-**Branch from any answer. Then branch from the branch.**
+**Branch from any answer. Keep branching at any depth.**
 
 A [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) plugin
-for recursively nested, isolated follow-ups. Start a side question from any
-answer; if that side answer raises another question, branch from it again. Each
-level inherits only its ancestor path, while the main task stays linear and
-untouched.
+for isolated follow-ups that can keep branching recursively, with no
+plugin-defined depth limit. Start a side trail from any answer, then turn any
+answer anywhere in that trail into the next isolated fork point. Repeat for as
+many levels as the question needs. Every level inherits only its ancestor path,
+while the main task stays linear and untouched.
 
 [![npm](https://img.shields.io/npm/v/dsh-nested-followups.svg)](https://www.npmjs.com/package/dsh-nested-followups)
 [![Tests: 156 passing](https://img.shields.io/badge/tests-156%20passing-brightgreen.svg)](tests)
 [![DeepSeek Harness: 0.1.x](https://img.shields.io/badge/DeepSeek%20Harness-0.1.x-orange.svg)](https://github.com/deepseek-ai/deepseek-harness)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
-![A real DeepSeek Harness session branching from an earlier answer, continuing inside the branch, and branching again](assets/demo.gif)
+![A real DeepSeek Harness session branching repeatedly from answers at multiple depths](assets/demo.gif)
 
 _Recorded in an unmodified DeepSeek Harness `0.1.1-rc.2` web profile. The UI
 and sessions are real; the captions and cursor are added in post._
 
-> **MAIN TASK → SIDE QUESTION → QUESTION ABOUT THE SIDE ANSWER → …**
+> **MAIN TASK → SIDE QUESTION → NESTED SIDE QUESTION → NEST AGAIN → …**
 
 - **Start a side trail anywhere.** The first branch receives exactly the history
   that existed at the selected answer.
-- **Branch from the branch.** Any answer inside that side trail can become the
-  next isolated fork point, at any depth.
+- **Keep branching at any depth.** Every answer in every side trail can become
+  another isolated fork point. Apply the same action again at every new level.
 - **Keep the main task clean.** Nothing asked or answered in a branch flows back
   into the main conversation.
 
@@ -53,16 +54,17 @@ dsh plugin --profile web add .
 
 ## Why not a new chat or a sidebar thread?
 
-| Approach | Relevant earlier context | Main stays clean | Can branch from a side answer | Trail stays attached |
+| Approach | Relevant earlier context | Main stays clean | Can keep branching at later depths | Trail stays attached |
 | --- | --- | --- | --- | --- |
 | Ask in the main chat | Yes | No | No | Not applicable |
 | Open a new conversation | Lost or copied manually | Yes | No | No |
 | Typical temporary sidebar Q&A | Varies | Usually | Usually a linear side thread | Usually not |
-| **dsh-nested-followups** | **Exact ancestor path** | **Yes** | **Yes, at any depth** | **Yes** |
+| **dsh-nested-followups** | **Exact ancestor path** | **Yes** | **Yes—recursively, with no fixed depth** | **Yes** |
 
-The distinguishing feature is not the canvas. It is that an answer inside a
-side conversation can itself become a new, isolated fork point. The tree is the
-map that keeps those recursive detours visible and attached to the root session.
+The distinguishing feature is not the canvas. It is that any answer at any
+depth can become another isolated fork point, and the same rule keeps applying
+to every descendant. The tree is only the map that keeps those recursive
+detours visible and attached to the root session.
 
 ## Use it
 
@@ -72,7 +74,8 @@ map that keeps those recursive detours visible and attached to the root session.
    select **Ask follow-up**. The question grows to the right in a new branch.
 3. On the latest answer in a branch, use **Continue this branch** to add the
    next turn downward. Use **Ask follow-up** to create another isolated branch
-   to the right.
+   to the right. Repeat **Ask follow-up** on any descendant answer to keep
+   nesting as deeply as needed.
 4. Return to **Chat** whenever you want to continue the main task. Its history
    contains no branch messages.
 
@@ -92,6 +95,8 @@ exist, and it is not a line drawn between unrelated chats.
 
 - Every branch, including a branch created inside another branch, is a real
   DeepSeek Harness session with durable history.
+- The same fork rule applies recursively at every level; the plugin does not
+  impose a nesting-depth limit.
 - Its seed is the exact ancestor path through the selected completed answer,
   using the same event-boundary semantics as DSH's session fork path.
 - Later messages from the main task, parent side trail, and sibling branches are

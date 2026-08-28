@@ -19,7 +19,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Rebuilt the English and Chinese README introductions around the project's
-  defining behavior: every side-answer can become another isolated fork point.
+  defining behavior: every answer at every depth can become another isolated
+  fork point, with no plugin-defined nesting limit.
 - Replaced the dense banner and social preview with a main task → side branch →
   branch-from-branch visual.
 - Updated the npm description and keywords to describe recursive conversation

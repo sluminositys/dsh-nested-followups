@@ -15,7 +15,7 @@ The agent would explain a plan, I would not understand one term in an old answer
 
 So I built `dsh-nested-followups` for DeepSeek Harness.
 
-It lets you pick any completed answer and ask a follow-up from that exact point. More importantly, any answer inside that side conversation can become another independent fork point, recursively. Every level is a real child session—not a prompt trick—with only its ancestor context. It cannot write to the shared workspace, does not feed back into a parent or sibling, and remains attached to the root session. The tree is how you navigate the result, not the point of the plugin.
+It lets you pick any completed answer and ask a follow-up from that exact point. More importantly, every answer produced at every later depth can become another independent fork point; the same rule keeps repeating without a plugin-defined nesting limit. Every level is a real child session—not a prompt trick—with only its ancestor context. It cannot write to the shared workspace, does not feed back into a parent or sibling, and remains attached to the root session. The tree is how you navigate the result, not the point of the plugin.
 
 Demo: https://github.com/sluminositys/dsh-nested-followups#readme
 
