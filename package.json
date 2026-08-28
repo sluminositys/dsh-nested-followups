@@ -1,15 +1,18 @@
 {
   "name": "dsh-nested-followups",
   "version": "0.2.2",
-  "description": "Message-level nested follow-up branches for DeepSeek Harness conversations.",
+  "description": "Turn linear DeepSeek Harness conversations into real, nested session branches without polluting the main context.",
   "keywords": [
     "dsh-plugin",
     "deepseek-harness",
     "dsh",
-    "conversation",
-    "follow-up",
-    "branching",
-    "tree-view"
+    "conversation-tree",
+    "conversation-branching",
+    "context-management",
+    "isolated-session",
+    "nested-followups",
+    "agent-ui",
+    "ai-agent"
   ],
   "license": "MIT",
   "type": "module",
