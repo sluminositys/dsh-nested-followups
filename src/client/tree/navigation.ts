@@ -1,6 +1,7 @@
 import { displayLabelOf } from '../../shared/labels.ts'
 import type { BranchProjectionView, ConversationTreeProjection } from '../../shared/projection.ts'
 import type { MessageNodeView } from '../../shared/types.ts'
+import { buildProjectionGraphIndex } from './projection-graph.ts'
 
 export type FoldActivityState = 'running' | 'error' | 'complete'
 
@@ -403,9 +404,10 @@ export function deriveFocusState(
   projection: ConversationTreeProjection,
   focusedNodeId: string | undefined,
 ): FocusState {
-  const allNodeIds = new Set(projection.nodes.map(node => node.nodeId))
-  const allEdgeIds = new Set(projection.edges.map(edge => edge.edgeId))
-  if (focusedNodeId === undefined || !allNodeIds.has(focusedNodeId)) {
+  const graph = buildProjectionGraphIndex(projection)
+  const allNodeIds = new Set(graph.nodesById.keys())
+  const allEdgeIds = new Set(graph.edgesById.keys())
+  if (focusedNodeId === undefined || !graph.nodesById.has(focusedNodeId)) {
     return {
       active: false,
       highlightedNodeIds: allNodeIds,
@@ -462,7 +464,7 @@ export function deriveFocusState(
       .filter(edgeId => !highlightedEdgeIds.has(edgeId)),
   )
   const highlightedBranchIds = new Set(
-    projection.nodes
+    [...graph.nodesById.values()]
       .filter(node => highlightedNodeIds.has(node.nodeId) && node.branchId !== null)
       .map(node => node.branchId as string),
   )
