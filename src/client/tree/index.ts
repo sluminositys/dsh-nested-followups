@@ -1,3 +1,4 @@
+export * from './context-preview.ts'
 export * from './geometry.ts'
 export * from './layout.ts'
 export * from './minimap.ts'
