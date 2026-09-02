@@ -9,9 +9,11 @@ import SessionStore, {
 import { describe, expect, it } from 'vitest'
 
 import {
+  createSubagentFork,
   createSubagentForkRc7,
   selectForkSeedRc7,
 } from '../src/host/adapter/session-fork.ts'
+import { sessionSeedLength, snapshotSessionEvents } from '../src/host/adapter/session-compat.ts'
 import { textTurn } from './fixtures/session-events.ts'
 
 function openTurn(startSeq: number, turn: number): SessionEvent[] {
@@ -44,7 +46,7 @@ async function setup(): Promise<{ ctx: Context; sessions: SessionStore }> {
 }
 
 function inheritedSeed(session: Session): readonly SessionEvent[] {
-  return session.events.slice(0, session.header.seedLength ?? 0)
+  return snapshotSessionEvents(session).slice(0, sessionSeedLength(session) ?? 0)
 }
 
 function forkErrorCode(action: () => unknown): SessionForkErrorCode {
@@ -69,15 +71,15 @@ describe('rc.7 subagent fork adapter', () => {
     })
 
     const official = sessions.fork(source, 5, SessionId('official-child'))
-    const adapted = createSubagentForkRc7(sessions, source, 5, SessionId('adapted-child'))
+    const adapted = createSubagentFork(sessions, source, 5, SessionId('adapted-child'))
 
     expect(inheritedSeed(adapted)).toEqual(inheritedSeed(official))
     expect(adapted.header).toMatchObject({
       cwd: 'D:\\workspace\\project',
       parentSession: source.id,
-      seedLength: 6,
       origin: 'subagent',
     })
+    expect(sessionSeedLength(adapted)).toBe(6)
     expect(official.header.origin).toBeUndefined()
   })
 
@@ -96,7 +98,7 @@ describe('rc.7 subagent fork adapter', () => {
     )
 
     expect(inheritedSeed(adapted)).toEqual(inheritedSeed(official))
-    expect(adapted.header.seedLength).toBe(official.header.seedLength)
+    expect(sessionSeedLength(adapted)).toBe(sessionSeedLength(official))
   })
 
   it('forks an earlier completed boundary while the source has a later open turn', async () => {
@@ -117,8 +119,9 @@ describe('rc.7 subagent fork adapter', () => {
     )
 
     expect(inheritedSeed(adapted)).toEqual(inheritedSeed(official))
-    expect(adapted.header.seedLength).toBe(6)
-    expect(source.events.some(event => event.type === 'turn/start' && event.data.turn === 2)).toBe(true)
+    expect(sessionSeedLength(adapted)).toBe(6)
+    expect(snapshotSessionEvents(source)
+      .some(event => event.type === 'turn/start' && event.data.turn === 2)).toBe(true)
   })
 
   it('matches official error classifications for invalid and open-turn boundaries', async () => {
@@ -129,14 +132,15 @@ describe('rc.7 subagent fork adapter', () => {
         ...openTurn(6, 2),
       ],
     })
-    const boundaries = [-1, 0.5, Number.MAX_SAFE_INTEGER + 1, source.events.length, 6, 7]
+    const sourceEvents = snapshotSessionEvents(source)
+    const boundaries = [-1, 0.5, Number.MAX_SAFE_INTEGER + 1, sourceEvents.length, 6, 7]
 
     for (const boundary of boundaries) {
       const officialCode = forkErrorCode(() => {
         sessions.fork(source, boundary, SessionId(`official-error-${String(boundary)}`))
       })
       const adaptedCode = forkErrorCode(() => {
-        selectForkSeedRc7(source.id, source.events, boundary)
+        selectForkSeedRc7(source.id, sourceEvents, boundary)
       })
       expect(adaptedCode).toBe(officialCode)
     }

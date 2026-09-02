@@ -16,6 +16,7 @@ import { describe, expect, it } from 'vitest'
 
 import { TreeMetadataRepository } from '../src/host/storage.ts'
 import { NestedFollowupsService } from '../src/host/tree-service.ts'
+import { sessionSeedLength, snapshotSessionEvents } from '../src/host/adapter/session-compat.ts'
 import type { BranchRecord, TreeRecord } from '../src/shared/types.ts'
 import { textTurn } from './fixtures/session-events.ts'
 
@@ -38,33 +39,47 @@ class MemoryTable<V> implements KvTable<string, V> {
 }
 
 class MemoryPersistence extends SessionPersistence {
-  private readonly records = new Map<SessionId, SessionInspection>()
+  private readonly records = new Map<SessionId, SessionInspection & {
+    readonly inheritedEventCount: number
+  }>()
   readonly readFromIds: SessionId[] = []
   readonly supportsRawArtifacts = false
 
   store(session: Session): void {
-    this.records.set(session.id, { meta: session.header, events: session.events })
+    this.records.set(session.id, {
+      meta: session.header,
+      events: snapshotSessionEvents(session),
+      inheritedEventCount: sessionSeedLength(session) ?? 0,
+    } as SessionInspection & { readonly inheritedEventCount: number })
   }
 
   locate(_meta: SessionHeader): SessionLocation | undefined { return undefined }
   async create(_meta: SessionHeader): Promise<void> {}
   async append(_id: SessionId, _events: readonly SessionEvent[]): Promise<void> {}
-  async load(id: SessionId): Promise<SessionInspection> {
+  async load(id: SessionId): Promise<SessionInspection & { readonly inheritedEventCount: number }> {
     const stored = this.records.get(id)
     if (stored === undefined) throw new Error('not persisted')
     return stored
   }
-  async inspect(id: SessionId, _signal?: AbortSignal): Promise<SessionInspection> {
+  async inspect(
+    id: SessionId,
+    _signal?: AbortSignal,
+  ): Promise<SessionInspection & { readonly inheritedEventCount: number }> {
     return this.load(id)
   }
   async readFrom(
     id: SessionId,
     fromSeq: number,
     _signal?: AbortSignal,
-  ): Promise<{ meta: SessionHeader; events: SessionEvent[] }> {
+  ) {
     this.readFromIds.push(id)
     const stored = await this.load(id)
-    return { meta: stored.meta, events: stored.events.filter(event => event.seq >= fromSeq) }
+    return {
+      meta: stored.meta,
+      inheritedEventCount: stored.inheritedEventCount,
+      fromSeq,
+      events: stored.events.filter(event => event.seq >= fromSeq),
+    }
   }
   async list(_signal?: AbortSignal): Promise<SessionHeader[]> {
     return [...this.records.values()].map(record => record.meta)

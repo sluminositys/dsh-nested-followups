@@ -6,7 +6,19 @@ import {
   type SessionId,
   type SessionStore,
 } from '@deepseek-ai/dsh-session'
-import { hiddenBranchMetaRc7 } from './visibility.ts'
+import { snapshotSessionEvents } from './session-compat.ts'
+import { hiddenBranchCreation } from './visibility.ts'
+
+interface CompatibleSessionStore {
+  create(
+    id?: SessionId,
+    options?: {
+      readonly seed?: readonly SessionEvent[]
+      readonly inheritedEventCount?: number
+      readonly meta?: Record<string, unknown>
+    },
+  ): Session
+}
 
 /**
  * rc.7 equivalent of SessionStore's private `_forkSeed` method. Keep this
@@ -88,7 +100,7 @@ function resolveLiveSourceRc7(
  * Create a fork-equivalent child whose immutable header is classified as a
  * subagent. SessionStore.fork cannot carry `origin` in rc.7.
  */
-export function createSubagentForkRc7(
+export function createSubagentFork(
   sessions: SessionStore,
   source: SessionForkSource,
   boundary?: number,
@@ -101,9 +113,16 @@ export function createSubagentForkRc7(
     )
   }
   const liveSource = resolveLiveSourceRc7(sessions, source)
-  const seed = selectForkSeedRc7(liveSource.id, liveSource.events, boundary)
-  return sessions.create(childSessionId, {
+  const seed = selectForkSeedRc7(liveSource.id, snapshotSessionEvents(liveSource), boundary)
+  const creation = hiddenBranchCreation(liveSource.header, seed.length)
+  return (sessions as unknown as CompatibleSessionStore).create(childSessionId, {
     seed,
-    meta: hiddenBranchMetaRc7(liveSource.header, seed.length),
+    meta: creation.meta as unknown as Record<string, unknown>,
+    ...(creation.inheritedEventCount === undefined
+      ? {}
+      : { inheritedEventCount: creation.inheritedEventCount }),
   })
 }
+
+/** @deprecated Use {@link createSubagentFork}; retained for API compatibility. */
+export const createSubagentForkRc7 = createSubagentFork

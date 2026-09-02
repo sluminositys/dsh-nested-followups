@@ -22,6 +22,10 @@ import type { KvTable } from '@deepseek-ai/dsh-storage-domain'
 import { describe, expect, it, vi } from 'vitest'
 
 import { NestedFollowupsBranchService } from '../src/host/branch-service.ts'
+import {
+  sessionSeedLength,
+  snapshotSessionEvents,
+} from '../src/host/adapter/session-compat.ts'
 import { projectConversationTree, type SessionLogSnapshot } from '../src/host/projection.ts'
 import { TreeMetadataRepository } from '../src/host/storage.ts'
 import type { BranchRecord, TreeRecord } from '../src/shared/types.ts'
@@ -100,7 +104,8 @@ function setupContext(record: ReadOnlySetupRecord): Context {
 }
 
 function appendTextTurn(session: Session, question: Parameters<Agent['followup']>[0]): void {
-  const turn = (session.events.findLast(event => event.type === 'turn/start')?.data.turn ?? 0) + 1
+  const turn = (snapshotSessionEvents(session)
+    .findLast(event => event.type === 'turn/start')?.data.turn ?? 0) + 1
   const step = 1
   session.append('turn/start', { turn })
   session.append('user/message', question, { surfaceOp: 'append' })
@@ -140,9 +145,15 @@ class AgentsStub extends Service {
       this.failNextCreate = false
       throw new Error('injected branch session creation failure')
     }
-    const session = this.ctx.sessions.create(options.sessionId, {
+    const compatible = options as unknown as { readonly inheritedEventCount?: number }
+    const session = (this.ctx.sessions as unknown as {
+      create(id: SessionId, input: Record<string, unknown>): Session
+    }).create(options.sessionId, {
       ...(options.seed === undefined ? {} : { seed: options.seed }),
       ...(options.meta === undefined ? {} : { meta: options.meta }),
+      ...(compatible.inheritedEventCount === undefined
+        ? {}
+        : { inheritedEventCount: compatible.inheritedEventCount }),
     })
     return this.publish(session, options.setup)
   }
@@ -189,7 +200,7 @@ class AgentsStub extends Service {
 }
 
 function latestAssistant(session: Session): SessionEvent<'assistant/message'> {
-  const event = session.events.findLast(
+  const event = snapshotSessionEvents(session).findLast(
     (candidate): candidate is SessionEvent<'assistant/message'> => candidate.type === 'assistant/message',
   )
   if (event === undefined) throw new Error('assistant message missing')
@@ -259,16 +270,15 @@ function projection(
   if (tree === undefined) throw new Error('tree missing')
   const records = repository.listBranches(tree.treeId)
   const logs = new Map<string, SessionLogSnapshot>()
-  logs.set(String(root.id), { sessionId: String(root.id), events: root.events })
+  logs.set(String(root.id), { sessionId: String(root.id), events: snapshotSessionEvents(root) })
   for (const record of records) {
     const session = ctx.sessions.get(SessionId(record.sessionId))
     if (session !== undefined) {
+      const seedLength = sessionSeedLength(session)
       logs.set(record.sessionId, {
         sessionId: record.sessionId,
-        events: session.events,
-        ...(session.header.seedLength === undefined
-          ? {}
-          : { seedLength: session.header.seedLength }),
+        events: snapshotSessionEvents(session),
+        ...(seedLength === undefined ? {} : { seedLength }),
       })
     }
   }
@@ -279,7 +289,7 @@ describe('Host branch commands', () => {
   it('persists a UTF-16 text anchor and sends its quote only to the branch', async () => {
     const runtime = await setup()
     try {
-      const rootEventCount = runtime.root.events.length
+      const rootEventCount = snapshotSessionEvents(runtime.root).length
       const request = {
         ownerSessionId: 'root',
         clientRequestId: 'request-text-anchor',
@@ -300,12 +310,13 @@ describe('Host branch commands', () => {
 
       const branchSession = runtime.ctx.sessions.get(SessionId(created.value.sessionId))
       if (branchSession === undefined) throw new Error('branch session missing')
-      const delivered = branchSession.events.find((event): event is SessionEvent<'user/message'> =>
+      const delivered = snapshotSessionEvents(branchSession)
+        .find((event): event is SessionEvent<'user/message'> =>
         event.type === 'user/message' && String(event.data.id) === request.clientRequestId)
       expect(delivered?.data.content).toEqual([
         { type: 'text', text: '> root\n\nWhat does this word mean?' },
       ])
-      expect(runtime.root.events).toHaveLength(rootEventCount)
+      expect(snapshotSessionEvents(runtime.root)).toHaveLength(rootEventCount)
 
       const projected = projection(runtime.repository, runtime.root, runtime.ctx)
       expect(projected.branches[0]?.anchorStatus).toBe('range-valid')
@@ -317,7 +328,7 @@ describe('Host branch commands', () => {
 
       const repeated = await runtime.service.createBranch(request)
       expect(repeated).toEqual(created)
-      expect(branchSession.events.filter(event =>
+      expect(snapshotSessionEvents(branchSession).filter(event =>
         event.type === 'user/message' && String(event.data.id) === request.clientRequestId))
         .toHaveLength(1)
     } finally {
@@ -383,7 +394,7 @@ describe('Host branch commands', () => {
     const runtime = await setup()
     try {
       runtime.agents.failNextCreate = true
-      const rootBefore = JSON.stringify(runtime.root.events)
+      const rootBefore = JSON.stringify(snapshotSessionEvents(runtime.root))
       const result = await runtime.service.createBranch({
         ownerSessionId: 'root',
         clientRequestId: 'request-fork-failure',
@@ -394,7 +405,7 @@ describe('Host branch commands', () => {
       expect(result).toMatchObject({ ok: false, error: { code: 'fork-failed' } })
       expect(runtime.repository.listBranches('root')).toEqual([])
       expect(runtime.agents.deliveredPrompts).toEqual([])
-      expect(JSON.stringify(runtime.root.events)).toBe(rootBefore)
+      expect(JSON.stringify(snapshotSessionEvents(runtime.root))).toBe(rootBefore)
     } finally {
       await runtime.dispose()
     }
@@ -403,9 +414,9 @@ describe('Host branch commands', () => {
   it('creates concurrent siblings from a completed turn while the root keeps streaming', async () => {
     const runtime = await setup(new YieldingMemoryTable<BranchRecord>())
     try {
-      const completedPrefixLength = runtime.root.events.length
+      const completedPrefixLength = snapshotSessionEvents(runtime.root).length
       appendOpenStreamingTurn(runtime.root, 2, 'ROOT_STILL_STREAMING')
-      const rootBefore = JSON.stringify(runtime.root.events)
+      const rootBefore = JSON.stringify(snapshotSessionEvents(runtime.root))
       const results = await Promise.all([
         runtime.service.createBranch({
           ownerSessionId: 'root',
@@ -431,13 +442,14 @@ describe('Host branch commands', () => {
       for (const record of records) {
         const session = runtime.ctx.sessions.get(SessionId(record.sessionId))
         expect(session?.header.origin).toBe('subagent')
-        expect(JSON.stringify(session?.events)).not.toContain('ROOT_STILL_STREAMING')
+        expect(JSON.stringify(session === undefined ? [] : snapshotSessionEvents(session)))
+          .not.toContain('ROOT_STILL_STREAMING')
       }
       expect(runtime.agents.deliveredPrompts.sort()).toEqual([
         'concurrent-sibling-1',
         'concurrent-sibling-2',
       ])
-      expect(JSON.stringify(runtime.root.events)).toBe(rootBefore)
+      expect(JSON.stringify(snapshotSessionEvents(runtime.root))).toBe(rootBefore)
     } finally {
       await runtime.dispose()
     }
@@ -505,7 +517,7 @@ describe('Host branch commands', () => {
       const restored = projection(restartedRepository, runtime.root, runtime.ctx)
       expect(restored).toEqual(complete)
 
-      expect(branchSession.events.some(event =>
+      expect(snapshotSessionEvents(branchSession).some(event =>
         event.type === 'tool/call' || event.type === 'tool/result')).toBe(false)
       // Every completed branch round is detached so rc.7 classifies a
       // descriptorless child as a settled diagnostic instead of a perpetual
@@ -547,7 +559,7 @@ describe('Host branch commands', () => {
       if (!created.ok) throw new Error('branch creation failed')
       const branchSession = runtime.ctx.sessions.get(SessionId(created.value.sessionId))
       if (branchSession === undefined) throw new Error('branch session missing')
-      const firstQuestion = branchSession.events.find(
+      const firstQuestion = snapshotSessionEvents(branchSession).find(
         (event): event is SessionEvent<'user/message'> =>
           event.type === 'user/message' && String(event.data.id) === 'request-create-2',
       )

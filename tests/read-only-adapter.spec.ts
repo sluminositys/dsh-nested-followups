@@ -5,7 +5,6 @@ import type {
   CreateAgentOptions,
   ResumeAgentOptions,
 } from '@deepseek-ai/dsh-agent'
-import { CallId } from '@deepseek-ai/dsh-llm'
 import { createScope } from '@deepseek-ai/dsh-scope'
 import { Session, SessionId, type SessionEvent, type SessionHeader } from '@deepseek-ai/dsh-session'
 import SystemPrompt from '@deepseek-ai/dsh-system-prompt'
@@ -15,7 +14,7 @@ import { describe, expect, it, vi } from 'vitest'
 import {
   applyReadOnlyScopeRc7,
   createReadOnlyBranchSetup,
-  createReadOnlyForkAgentRc7,
+  createReadOnlyForkAgent,
   probeReadOnlyCapabilityRc7,
   readOnlyBranchGuard,
   resolveBranchAgentOptionsRc7,
@@ -24,6 +23,10 @@ import {
   submitBranchTurnRc7,
   type BranchAgentRegistry,
 } from '../src/host/adapter/read-only.ts'
+import {
+  snapshotSessionEvents,
+  usesInheritedEventCount,
+} from '../src/host/adapter/session-compat.ts'
 
 function execution(name: string): Readonly<ToolExecution> {
   return { name } as unknown as Readonly<ToolExecution>
@@ -51,6 +54,22 @@ function readTool(name: string): ToolDefinition {
     },
     execute: () => Promise.resolve(`${name} ran`),
   }
+}
+
+function compatibleHeader(
+  id: string,
+  fields: Record<string, unknown> = {},
+): SessionHeader {
+  const generation = Session.create(SessionId(`header-probe-${id}`)).header as unknown as {
+    readonly isSeeded?: boolean
+  }
+  return {
+    version: 1,
+    id: SessionId(id),
+    createdAt: 1,
+    ...(typeof generation.isSeeded === 'boolean' ? { isSeeded: false } : {}),
+    ...fields,
+  } as unknown as SessionHeader
 }
 
 describe('rc.7 read-only branch adapter', () => {
@@ -132,7 +151,7 @@ describe('rc.7 read-only branch adapter', () => {
 
     const allowed = await ctx.tools.execute({
       signal: new AbortController().signal,
-      callId: CallId('read-call'),
+      callId: 'read-call' as never,
       name: 'read',
       arguments: {},
       agent: key,
@@ -143,7 +162,7 @@ describe('rc.7 read-only branch adapter', () => {
 
     const denied = await ctx.tools.execute({
       signal: new AbortController().signal,
-      callId: CallId('write-call'),
+      callId: 'write-call' as never,
       name: 'write',
       arguments: {},
       agent: key,
@@ -175,12 +194,9 @@ describe('rc.7 read-only branch adapter', () => {
   })
 
   it('reads the preset the source history actually ran under', () => {
-    const header: SessionHeader = {
-      version: 1,
-      id: SessionId('root'),
-      createdAt: 1,
+    const header = compatibleHeader('root', {
       agentPreset: 'creation-preset',
-    }
+    })
     expect(resolveSourcePresetRc7(header, [])).toBe('creation-preset')
 
     const switched = [{
@@ -190,7 +206,7 @@ describe('rc.7 read-only branch adapter', () => {
     }] as unknown as SessionEvent[]
     expect(resolveSourcePresetRc7(header, switched)).toBe('switched-preset')
 
-    const noPreset: SessionHeader = { version: 1, id: SessionId('root'), createdAt: 1 }
+    const noPreset = compatibleHeader('root')
     expect(resolveSourcePresetRc7(noPreset, [])).toBeUndefined()
   })
 
@@ -200,17 +216,14 @@ describe('rc.7 read-only branch adapter', () => {
     const resume = vi.fn(async (_options: ResumeAgentOptions) => branchHandle)
     const agents = { get: vi.fn(), create, resume } as unknown as BranchAgentRegistry
     const hostCtx = { get: () => undefined } as unknown as Context
-    const header: SessionHeader = {
-      version: 1,
-      id: SessionId('root'),
-      createdAt: 1,
+    const header = compatibleHeader('root', {
       cwd: 'D:\\workspace\\project',
       agentPreset: 'engineering',
-    }
+    })
     const seed = [] as SessionEvent[]
     const fallbackAgentOptions = { provider: 'mock-provider', model: 'mock-model', maxTokens: 321 }
 
-    await createReadOnlyForkAgentRc7(hostCtx, agents, {
+    await createReadOnlyForkAgent(hostCtx, agents, {
       sessionId: SessionId('branch'),
       sourceHeader: header,
       seed,
@@ -228,10 +241,16 @@ describe('rc.7 read-only branch adapter', () => {
     expect(createOptions?.meta).toMatchObject({
       cwd: 'D:\\workspace\\project',
       parentSession: SessionId('root'),
-      seedLength: 0,
       origin: 'subagent',
       agentPreset: 'engineering',
     })
+    if (usesInheritedEventCount(header)) {
+      expect(createOptions?.meta).toMatchObject({ isSeeded: true })
+      expect((createOptions as unknown as { inheritedEventCount?: number })?.inheritedEventCount)
+        .toBe(0)
+    } else {
+      expect(createOptions?.meta).toMatchObject({ seedLength: 0 })
+    }
     expect(createOptions?.agentOptions).toEqual(fallbackAgentOptions)
     expect(resumeOptions?.agentOptions).toEqual(fallbackAgentOptions)
     expect(typeof createOptions?.setup).toBe('function')
@@ -252,7 +271,7 @@ describe('rc.7 read-only branch adapter', () => {
       reason: 'initial',
     })
 
-    expect(resolveBranchAgentOptionsRc7(session.events, {
+    expect(resolveBranchAgentOptionsRc7(snapshotSessionEvents(session), {
       provider: 'stale-provider',
       model: 'stale-model',
       maxTokens: 123,
@@ -271,7 +290,7 @@ describe('rc.7 read-only branch adapter', () => {
       },
       reason: 'change',
     })
-    expect(resolveBranchAgentOptionsRc7(session.events)).toEqual({
+    expect(resolveBranchAgentOptionsRc7(snapshotSessionEvents(session))).toEqual({
       provider: 'selected-provider',
       model: 'selected-model',
       maxTokens: 456,

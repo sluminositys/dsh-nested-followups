@@ -22,6 +22,12 @@ import type { NestedFollowupsBranchService } from './branch-service.ts'
 import type { NestedFollowupsDeleteService } from './delete-service.ts'
 import type { NestedFollowupsMetadataService } from './metadata-service.ts'
 import { isDirectlyDeleted, projectConversationTree, type SessionLogSnapshot } from './projection.ts'
+import {
+  persistedSeedLength,
+  readPersistedSessionFrom,
+  sessionSeedLength,
+  snapshotSessionEvents,
+} from './adapter/session-compat.ts'
 
 const WATCH_TIMEOUT_MS = 15_000
 const STREAM_TOUCH_INTERVAL_MS = 50
@@ -285,18 +291,24 @@ export class NestedFollowupsService extends TypertRemoteService {
   ): Promise<SessionLogSnapshot | undefined> {
     const live = this.liveSession(sessionId)
     if (live !== undefined) {
+      const seedLength = sessionSeedLength(live)
       return {
         sessionId,
-        events: live.events.filter(event => event.seq >= fromSeq),
-        ...(live.header.seedLength === undefined ? {} : { seedLength: live.header.seedLength }),
+        events: snapshotSessionEvents(live).filter(event => event.seq >= fromSeq),
+        ...(seedLength === undefined ? {} : { seedLength }),
       }
     }
     if (!persistedHeaders.has(sessionId)) return undefined
-    const stored = await this.ctx.sessionPersistence.readFrom(sessionId as SessionId, fromSeq)
+    const stored = await readPersistedSessionFrom(
+      this.ctx.sessionPersistence,
+      sessionId as SessionId,
+      fromSeq,
+    )
+    const seedLength = persistedSeedLength(stored)
     return {
       sessionId,
       events: stored.events,
-      ...(stored.meta.seedLength === undefined ? {} : { seedLength: stored.meta.seedLength }),
+      ...(seedLength === undefined ? {} : { seedLength }),
     }
   }
 

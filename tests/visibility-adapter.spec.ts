@@ -1,9 +1,11 @@
 import { Context, type Fiber } from '@deepseek-ai/cordis'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
+import type { SessionHeader } from '@deepseek-ai/dsh-session'
 import { describe, expect, it, vi } from 'vitest'
 
 import {
   HIDDEN_BRANCH_ORIGIN,
+  hiddenBranchCreation,
   hiddenBranchMetaRc7,
   probeBranchVisibilityRc7,
 } from '../src/host/adapter/visibility.ts'
@@ -34,16 +36,46 @@ describe('rc.7 branch visibility adapter', () => {
   })
 
   it('constructs the exact immutable lineage and visibility fields', () => {
-    expect(hiddenBranchMetaRc7({
+    const rcHeader = {
       version: 0,
       id: SessionId('parent'),
       createdAt: 1,
       cwd: 'D:\\workspace\\project',
-    }, 12)).toEqual({
+    } as unknown as SessionHeader
+    expect(hiddenBranchMetaRc7(rcHeader, 12)).toEqual({
       cwd: 'D:\\workspace\\project',
       parentSession: 'parent',
       seedLength: 12,
       origin: 'subagent',
+    })
+    expect(hiddenBranchCreation(rcHeader, 12)).toEqual({
+      meta: {
+        cwd: 'D:\\workspace\\project',
+        parentSession: 'parent',
+        seedLength: 12,
+        origin: 'subagent',
+      },
+    })
+  })
+
+  it('constructs the 0.1.2 seeded-session representation', () => {
+    const alphaHeader = {
+      version: 1,
+      id: SessionId('parent'),
+      createdAt: 1,
+      cwd: 'D:\\workspace\\project',
+      isSeeded: false,
+    } as unknown as SessionHeader
+
+    expect(hiddenBranchCreation(alphaHeader, 12, 'engineering')).toEqual({
+      meta: {
+        cwd: 'D:\\workspace\\project',
+        parentSession: 'parent',
+        isSeeded: true,
+        origin: 'subagent',
+        agentPreset: 'engineering',
+      },
+      inheritedEventCount: 12,
     })
   })
 
