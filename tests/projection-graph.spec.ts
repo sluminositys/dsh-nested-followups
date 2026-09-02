@@ -21,4 +21,25 @@ describe('projection graph index', () => {
     )
     expect(Object.isFrozen(graph)).toBe(true)
   })
+
+  it('indexes incoming and outgoing edges in projection order', () => {
+    const projection = nestedContextPreviewProjectionFixture()
+    const graph = buildProjectionGraphIndex(projection)
+
+    expect(graph.incomingEdgesByNodeId.get('root-a2')?.map(edge => edge.edgeId)).toEqual([
+      'sequence:root-q2:root-a2',
+    ])
+    expect(graph.outgoingEdgesByNodeId.get('root-a2')?.map(edge => edge.edgeId)).toEqual([
+      'sequence:root-a2:root-q3',
+      'branch:root-a2:branch-1-q',
+      'branch:root-a2:branch-2-q',
+    ])
+    expect(graph.outgoingEdgesByNodeId.get('branch-1-a')?.map(edge => edge.edgeId)).toEqual([
+      'branch:branch-1-a:nested-q',
+      'sequence:branch-1-a:branch-1-q2',
+    ])
+    expect(graph.outgoingEdgesByNodeId.get('branch-1-a2')).toEqual([])
+    expect(Object.isFrozen(graph.incomingEdgesByNodeId.get('root-a2'))).toBe(true)
+    expect(Object.isFrozen(graph.outgoingEdgesByNodeId.get('branch-1-a2'))).toBe(true)
+  })
 })

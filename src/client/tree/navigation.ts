@@ -418,17 +418,6 @@ export function deriveFocusState(
     }
   }
 
-  const incoming = new Map<string, typeof projection.edges[number][]>()
-  const outgoing = new Map<string, typeof projection.edges[number][]>()
-  for (const edge of projection.edges) {
-    const targetEdges = incoming.get(edge.targetNodeId) ?? []
-    targetEdges.push(edge)
-    incoming.set(edge.targetNodeId, targetEdges)
-    const sourceEdges = outgoing.get(edge.sourceNodeId) ?? []
-    sourceEdges.push(edge)
-    outgoing.set(edge.sourceNodeId, sourceEdges)
-  }
-
   const highlightedNodeIds = new Set([focusedNodeId])
   const highlightedEdgeIds = new Set<string>()
   const visit = (
@@ -450,8 +439,8 @@ export function deriveFocusState(
       }
     }
   }
-  visit(focusedNodeId, incoming, edge => edge.sourceNodeId)
-  visit(focusedNodeId, outgoing, edge => edge.targetNodeId)
+  visit(focusedNodeId, graph.incomingEdgesByNodeId, edge => edge.sourceNodeId)
+  visit(focusedNodeId, graph.outgoingEdgesByNodeId, edge => edge.targetNodeId)
 
   const dimmedNodeIds = new Set(
     projection.nodes
