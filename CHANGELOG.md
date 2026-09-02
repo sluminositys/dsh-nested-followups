@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added a dual-contract compatibility layer for the stable DSH rc line and
+  the `0.1.2-alpha` line, including session event snapshots, seeded-session
+  lineage, fork-equivalent creation metadata, and the renamed browser view
+  store contract.
+- Added a version-by-version installation and maintainer verification guide.
 - Added a 13.5-second demo recorded from a real DeepSeek Harness session. It
   shows a side question, a follow-up on that side answer, recursive isolation,
   collapse, and the untouched main chat.
@@ -18,6 +23,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Kept npm `0.2.2` as the stable rc artifact. DSH `0.1.2-alpha` support is
+  source-only on `compat/dsh-0.1.2-alpha`; a new plugin version and npm release
+  are deferred until DSH publishes the stable replacement contract.
+- Expanded the compatibility test matrix to 162 tests and verified both
+  `0.1.1-rc.2` and `0.1.2-alpha.4`, including a source-linked alpha Web boot.
 - Rebuilt the English and Chinese README introductions around the project's
   defining behavior: every answer at every depth can become another isolated
   fork point, with no plugin-defined nesting limit.

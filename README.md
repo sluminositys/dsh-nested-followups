@@ -12,7 +12,7 @@ many levels as the question needs. Every level inherits only its ancestor path,
 while the main task stays linear and untouched.
 
 [![npm](https://img.shields.io/npm/v/dsh-nested-followups.svg)](https://www.npmjs.com/package/dsh-nested-followups)
-[![Tests: 156 passing](https://img.shields.io/badge/tests-156%20passing-brightgreen.svg)](tests)
+[![Tests: 162 passing](https://img.shields.io/badge/tests-162%20passing-brightgreen.svg)](tests)
 [![DeepSeek Harness: 0.1.x](https://img.shields.io/badge/DeepSeek%20Harness-0.1.x-orange.svg)](https://github.com/deepseek-ai/deepseek-harness)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
@@ -32,25 +32,42 @@ and sessions are real; the captions and cursor are added in post._
 
 ## Install
 
+Choose the install path that matches your DeepSeek Harness line:
+
+| DeepSeek Harness | Plugin source | Status |
+| --- | --- | --- |
+| `0.1.0-rc.7` through `0.1.1-rc.2` | npm `dsh-nested-followups@0.2.2` | Stable plugin track |
+| `0.1.2-alpha.x` | Git branch `compat/dsh-0.1.2-alpha` | Preview source track; verified on `0.1.2-alpha.4` |
+| Future stable `0.1.2` | Next plugin release | Not claimed until DSH publishes the stable contract |
+
+### Stable DSH release candidates
+
 ```sh
-dsh plugin --profile web add dsh-nested-followups
+dsh plugin --profile web add dsh-nested-followups@0.2.2
 ```
 
 Restart the DeepSeek Harness web profile if it is already running, open a
 conversation, and select **Tree View**.
 
-<details>
-<summary>Install from source</summary>
+### DSH 0.1.2 alpha
+
+The alpha line is intentionally not published to npm. Clone the compatibility
+branch, build it locally, and invoke the matching alpha CLI so an older global
+`dsh` binary cannot install it into the wrong profile contract:
 
 ```sh
-git clone https://github.com/sluminositys/dsh-nested-followups.git
+git clone --branch compat/dsh-0.1.2-alpha --single-branch https://github.com/sluminositys/dsh-nested-followups.git
 cd dsh-nested-followups
-pnpm install
-pnpm run check
-dsh plugin --profile web add .
+corepack pnpm install --frozen-lockfile
+corepack pnpm run check
+corepack pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.4 plugin --profile web add .
+corepack pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.4 web
 ```
 
-</details>
+This creates a `link:` installation to the checkout. After pulling an update,
+run `corepack pnpm run check` again and restart the alpha web profile. Do not
+install npm `0.2.2` into the alpha line; it is the stable-rc artifact and does
+not contain this compatibility branch.
 
 ## Why not a new chat or a sidebar thread?
 
@@ -161,16 +178,30 @@ inherited conversation again.
 
 | Requirement | Version |
 | --- | --- |
-| DeepSeek Harness | `0.1.x` (verified on `0.1.0-rc.7`, `0.1.0-rc.8`, and `0.1.1-rc.2`) |
+| DeepSeek Harness | Stable track: `0.1.0-rc.7` through `0.1.1-rc.2`; source-preview track: `0.1.2-alpha.x` (verified on `alpha.4`) |
 | Node.js | 22.19 or later |
 | Package manager | pnpm |
 
 ## Compatibility notes
 
-This release is verified against an unmodified `@deepseek-ai/dsh`
-`0.1.1-rc.2` and keeps `0.1.0-rc.7` as its compatibility floor. DeepSeek
-Harness is still in developer preview, so later prereleases may require an
-adapter update.
+The compatibility branch uses one source tree for both DSH contract families.
+On the host it adapts the rc `session.events` / `header.seedLength` model and
+the alpha `snapshotEvents()` / `inheritedEventCount` / `isSeeded` model. In the
+browser it depends only on the shared structural conversation-view contract,
+because the alpha line renamed and split the former chat store. The plugin does
+not patch DSH in either mode.
+
+The stable matrix (`0.1.1-rc.2`) and alpha matrix (`0.1.2-alpha.4`) both pass
+all 162 tests, type checking, production builds, smoke tests, and package
+validation. The source-built stable artifact has also been linked into an
+unmodified alpha.4 web profile and loaded without browser warnings or errors.
+See [DSH version compatibility](docs/dsh-version-compatibility.md) for the
+contract mapping and maintainer verification procedure.
+
+`0.1.2-alpha.x` remains an upstream preview. This branch deliberately keeps
+the plugin version at `0.2.2` and is not published to npm. Once DSH publishes a
+stable contract, the adapter will be rechecked against that exact release,
+then the plugin will receive its next version and npm release.
 
 **Branches cannot be continued from the standard chat view.** DSH currently
 rejects user messages sent from the normal chat UI to a subagent-origin
@@ -200,7 +231,7 @@ pnpm install
 pnpm run check
 ```
 
-`pnpm run check` runs linting, host and browser type checking, 156 unit and
+`pnpm run check` runs linting, host and browser type checking, 162 unit and
 integration tests, a production build, a smoke test, and package validation.
 
 | Command | Purpose |

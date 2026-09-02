@@ -10,7 +10,7 @@
 同一操作，需要多少级就分多少级。每一级只继承自己的祖先链，主任务始终是一条干净的线。
 
 [![npm](https://img.shields.io/npm/v/dsh-nested-followups.svg)](https://www.npmjs.com/package/dsh-nested-followups)
-[![测试：156 项通过](https://img.shields.io/badge/tests-156%20passing-brightgreen.svg)](tests)
+[![测试：162 项通过](https://img.shields.io/badge/tests-162%20passing-brightgreen.svg)](tests)
 [![DeepSeek Harness：0.1.x](https://img.shields.io/badge/DeepSeek%20Harness-0.1.x-orange.svg)](https://github.com/deepseek-ai/deepseek-harness)
 [![许可证：MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
@@ -28,25 +28,40 @@ Session 都是真实的，后期只添加了说明字幕和鼠标指针。_
 
 ## 安装
 
+请先按自己的 DeepSeek Harness 版本选择安装方式：
+
+| DeepSeek Harness | 插件来源 | 状态 |
+| --- | --- | --- |
+| `0.1.0-rc.7` 至 `0.1.1-rc.2` | npm `dsh-nested-followups@0.2.2` | 稳定插件路线 |
+| `0.1.2-alpha.x` | Git 分支 `compat/dsh-0.1.2-alpha` | 源码预览路线；已实测 `0.1.2-alpha.4` |
+| 未来的正式版 `0.1.2` | 插件的下一个正式版本 | 等 DSH 正式契约发布后再确认，不提前承诺 |
+
+### DSH 稳定 RC 版本
+
 ```sh
-dsh plugin --profile web add dsh-nested-followups
+dsh plugin --profile web add dsh-nested-followups@0.2.2
 ```
 
 如果 Web Profile 已经在运行，请重启一次。随后照常打开会话，点击顶栏的
 **Tree View**。
 
-<details>
-<summary>从源码安装</summary>
+### DSH 0.1.2 alpha
+
+alpha 适配暂时不发布 npm 包，只从兼容分支安装源码。下面显式调用对应版本的 alpha
+CLI，避免电脑里旧的全局 `dsh` 把插件装进错误的 Profile 契约：
 
 ```sh
-git clone https://github.com/sluminositys/dsh-nested-followups.git
+git clone --branch compat/dsh-0.1.2-alpha --single-branch https://github.com/sluminositys/dsh-nested-followups.git
 cd dsh-nested-followups
-pnpm install
-pnpm run check
-dsh plugin --profile web add .
+corepack pnpm install --frozen-lockfile
+corepack pnpm run check
+corepack pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.4 plugin --profile web add .
+corepack pnpm dlx @deepseek-ai/dsh@0.1.2-alpha.4 web
 ```
 
-</details>
+安装后，Profile 里记录的是指向当前源码目录的 `link:`。以后拉取更新，需要重新运行
+`corepack pnpm run check` 并重启 alpha Web Profile。不要把 npm `0.2.2` 直接装进
+alpha：它是稳定 RC 路线的发布产物，不包含这个兼容分支。
 
 ## 为什么不新开对话或做普通侧栏？
 
@@ -138,15 +153,25 @@ _图中画出两层嵌套后以省略号继续：后续每一级的每条回答�
 
 | 项目 | 版本 |
 | --- | --- |
-| DeepSeek Harness | `0.1.x`（已在 `0.1.0-rc.7`、`0.1.0-rc.8` 和 `0.1.1-rc.2` 上验证） |
+| DeepSeek Harness | 稳定路线：`0.1.0-rc.7` 至 `0.1.1-rc.2`；源码预览路线：`0.1.2-alpha.x`（已实测 `alpha.4`） |
 | Node.js | 22.19 及以上 |
 | 包管理器 | pnpm |
 
 ## 兼容性说明
 
-当前版本已在未经修改的 `@deepseek-ai/dsh` `0.1.1-rc.2` 上验证，并继续以
-`0.1.0-rc.7` 作为兼容下限。DeepSeek Harness 仍处于开发者预览阶段，后续预发布
-版本可能需要更新适配器。
+兼容分支用同一套源码处理两代 DSH 契约。Host 侧同时适配 RC 的
+`session.events` / `header.seedLength`，以及 alpha 的 `snapshotEvents()` /
+`inheritedEventCount` / `isSeeded`；浏览器端只依赖稳定的结构化会话视图契约，避开
+alpha 对原 Chat Store 的改名与拆分。两种模式都不需要给 DSH 打补丁。
+
+稳定矩阵（`0.1.1-rc.2`）和 alpha 矩阵（`0.1.2-alpha.4`）均已通过 162 项测试、
+类型检查、生产构建、冒烟测试和包校验。用稳定 RC 依赖构建出的同一份源码产物，也已
+实际链接进未经修改的 alpha.4 Web Profile，页面加载时浏览器没有 warning 或 error。
+具体契约映射与维护者验证流程见 [DSH 版本兼容说明](docs/dsh-version-compatibility.md)。
+
+`0.1.2-alpha.x` 仍是上游预览版。因此本分支继续保留插件版本 `0.2.2`，不发布 npm。
+等 DSH 正式契约落地后，再针对那个确切版本复核适配器，随后升级插件版本并发布新的
+npm 包。
 
 **分支目前不能在原生 Chat 里续聊。** DSH 会拒绝从普通对话界面向 subagent-origin
 Session 发送用户消息，因此分支的阅读和续聊都在 Tree View 中完成。插件已经预留对
@@ -171,7 +196,7 @@ pnpm install
 pnpm run check
 ```
 
-`pnpm run check` 会执行静态检查、宿主端与浏览器端类型检查、156 项单元与集成测试、
+`pnpm run check` 会执行静态检查、宿主端与浏览器端类型检查、162 项单元与集成测试、
 生产构建、冒烟测试和发布包校验。
 
 | 命令 | 用途 |
