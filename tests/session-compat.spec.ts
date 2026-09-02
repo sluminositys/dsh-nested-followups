@@ -59,7 +59,7 @@ describe('DSH Session compatibility boundary', () => {
         id: SessionId('rc-stored'),
         createdAt: 1,
         seedLength: 2,
-      } as SessionHeader,
+      } as unknown as SessionHeader,
       events: [event],
     }
     const alpha = {

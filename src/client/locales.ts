@@ -45,6 +45,9 @@ export type NestedFollowupsLocaleKey =
   | 'tree.saveQuote'
   | 'tree.removeQuote'
   | 'tree.quoteNotePlaceholder'
+  | 'tree.markdownCopy'
+  | 'tree.markdownCopied'
+  | 'tree.markdownFootnotes'
 
   | 'tree.quoteInvalid'
   | 'tree.snapToTurnTail'
@@ -118,6 +121,9 @@ export const en: Record<NestedFollowupsLocaleKey, string> = {
   'tree.saveQuote': 'Save quote',
   'tree.removeQuote': 'Remove quote',
   'tree.quoteNotePlaceholder': 'Add an optional comment, Enter saves the quote',
+  'tree.markdownCopy': 'Copy code',
+  'tree.markdownCopied': 'Copied',
+  'tree.markdownFootnotes': 'Footnotes',
   'tree.quoteInvalid': 'The quoted source changed; this branch now anchors to the whole message.',
   'tree.snapToTurnTail': 'Context will include the completed turn through {label}.',
   'tree.send': 'Send',
@@ -185,6 +191,9 @@ export const zh: Record<NestedFollowupsLocaleKey, string> = {
   'tree.saveQuote': '保存引用',
   'tree.removeQuote': '删除引用',
   'tree.quoteNotePlaceholder': '补充说明（可选），回车保存引用',
+  'tree.markdownCopy': '复制代码',
+  'tree.markdownCopied': '已复制',
+  'tree.markdownFootnotes': '脚注',
   'tree.quoteInvalid': '引用原文已发生变化；该分支现已降级为整条消息锚点。',
   'tree.snapToTurnTail': '上下文将继承到该回合结束（{label}）。',
   'tree.send': '发送',
@@ -250,6 +259,9 @@ export function labelsFrom(t: TranslateNS<typeof NS>): TreeViewLabels {
     saveQuote: t('tree.saveQuote'),
     removeQuote: t('tree.removeQuote'),
     quoteNotePlaceholder: t('tree.quoteNotePlaceholder'),
+    markdownCopy: t('tree.markdownCopy'),
+    markdownCopied: t('tree.markdownCopied'),
+    markdownFootnotes: t('tree.markdownFootnotes'),
     quoteInvalid: t('tree.quoteInvalid'),
     snapToTurnTail: label => t('tree.snapToTurnTail', { label }),
     send: t('tree.send'),

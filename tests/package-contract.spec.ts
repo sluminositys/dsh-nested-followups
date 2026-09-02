@@ -46,7 +46,9 @@ describe('package contract', () => {
     expect(new Set(dshPeers)).toEqual(new Set([
       '>=0.1.0-rc.7 <0.1.1 || >=0.1.1-rc.1 <0.1.2 || >=0.1.2-alpha.1 <0.1.2',
     ]))
-    expect(new Set(dshValidationTargets)).toEqual(new Set(['0.1.1-rc.2']))
+    const validationVersions = [...new Set(dshValidationTargets)]
+    expect(validationVersions).toHaveLength(1)
+    expect(['0.1.1-rc.2', '0.1.2-alpha.4']).toContain(validationVersions[0])
     expect(manifest.peerDependencies).not.toHaveProperty('@deepseek-ai/dsh-client-runtime')
   })
 

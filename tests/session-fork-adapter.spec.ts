@@ -70,7 +70,7 @@ describe('rc.7 subagent fork adapter', () => {
       meta: { cwd: 'D:\\workspace\\project' },
     })
 
-    const official = sessions.fork(source, 5, SessionId('official-child'))
+    const official = sessions.fork(source, 5 as never, SessionId('official-child'))
     const adapted = createSubagentFork(sessions, source, 5, SessionId('adapted-child'))
 
     expect(inheritedSeed(adapted)).toEqual(inheritedSeed(official))
@@ -110,7 +110,7 @@ describe('rc.7 subagent fork adapter', () => {
       ],
     })
 
-    const official = sessions.fork(source, 5, SessionId('official-busy-child'))
+    const official = sessions.fork(source, 5 as never, SessionId('official-busy-child'))
     const adapted = createSubagentForkRc7(
       sessions,
       source,
@@ -137,7 +137,7 @@ describe('rc.7 subagent fork adapter', () => {
 
     for (const boundary of boundaries) {
       const officialCode = forkErrorCode(() => {
-        sessions.fork(source, boundary, SessionId(`official-error-${String(boundary)}`))
+        sessions.fork(source, boundary as never, SessionId(`official-error-${String(boundary)}`))
       })
       const adaptedCode = forkErrorCode(() => {
         selectForkSeedRc7(source.id, sourceEvents, boundary)

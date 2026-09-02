@@ -118,7 +118,10 @@ describe('safe branch boundary', () => {
   })
 
   it('rejects a non-contiguous or unknown anchor log before attempting a fork', () => {
-    expect(() => resolveBranchBoundary([{ ...textTurn(0, 1, 'q1', 'a1', 'q', 'a')[0]!, seq: 1 }], 'a1'))
+    const nonContiguous = [
+      { ...textTurn(0, 1, 'q1', 'a1', 'q', 'a')[0]!, seq: 1 },
+    ] as unknown as SessionEvent[]
+    expect(() => resolveBranchBoundary(nonContiguous, 'a1'))
       .toThrow(expect.objectContaining<Partial<BranchBoundaryError>>({ code: 'invalid-log' }))
     expect(() => resolveBranchBoundary(textTurn(0, 1, 'q1', 'a1', 'q', 'a'), 'missing'))
       .toThrow(expect.objectContaining<Partial<BranchBoundaryError>>({ code: 'anchor-not-found' }))

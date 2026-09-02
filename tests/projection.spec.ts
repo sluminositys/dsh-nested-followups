@@ -283,7 +283,7 @@ describe('conversation tree projection', () => {
       rootEvents[0]!,
       pluginContext(1, 'workspace instructions'),
       ...rootEvents.slice(1).map((event, index) => ({ ...event, seq: index + 2 })),
-    ]
+    ] as unknown as import('@deepseek-ai/dsh-session/types').SessionEvent[]
     const projection = projectConversationTree(
       tree,
       [],

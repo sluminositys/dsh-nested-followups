@@ -17,6 +17,7 @@ import { describe, expect, it } from 'vitest'
 import { TreeMetadataRepository } from '../src/host/storage.ts'
 import { NestedFollowupsService } from '../src/host/tree-service.ts'
 import { sessionSeedLength, snapshotSessionEvents } from '../src/host/adapter/session-compat.ts'
+import { hiddenBranchCreation } from '../src/host/adapter/visibility.ts'
 import type { BranchRecord, TreeRecord } from '../src/shared/types.ts'
 import { textTurn } from './fixtures/session-events.ts'
 
@@ -67,6 +68,9 @@ class MemoryPersistence extends SessionPersistence {
   ): Promise<SessionInspection & { readonly inheritedEventCount: number }> {
     return this.load(id)
   }
+  async borrowSession(_id: SessionId, _signal?: AbortSignal): Promise<never> {
+    throw new Error('borrow is not used by the tree read model')
+  }
   async readFrom(
     id: SessionId,
     fromSeq: number,
@@ -77,7 +81,7 @@ class MemoryPersistence extends SessionPersistence {
     return {
       meta: stored.meta,
       inheritedEventCount: stored.inheritedEventCount,
-      fromSeq,
+      fromSeq: fromSeq as never,
       events: stored.events.filter(event => event.seq >= fromSeq),
     }
   }
@@ -90,6 +94,56 @@ class MemoryPersistence extends SessionPersistence {
       revision: `memory-${index}` as SessionPersistenceSnapshot['revision'],
     }))
   }
+}
+
+interface CompatibleSessionStatic {
+  create(
+    id: SessionId,
+    seed: readonly SessionEvent[],
+    header: Record<string, unknown>,
+    inheritedEventCount?: number,
+  ): Session
+}
+
+function detachedSession(
+  id: SessionId,
+  events: readonly SessionEvent[],
+  createdAt: number,
+  lineage?: { readonly parentSession: SessionId; readonly seedLength: number },
+): Session {
+  const generation = Session.create(SessionId(`generation-probe-${id}`)).header as unknown as {
+    readonly version: number
+    readonly isSeeded?: boolean
+  }
+  const alpha = typeof generation.isSeeded === 'boolean'
+  return (Session as unknown as CompatibleSessionStatic).create(id, events, {
+    version: generation.version,
+    id,
+    createdAt,
+    ...(lineage === undefined ? {} : { parentSession: lineage.parentSession, origin: 'subagent' }),
+    ...(alpha
+      ? { isSeeded: lineage !== undefined }
+      : lineage === undefined ? {} : { seedLength: lineage.seedLength }),
+  }, alpha ? lineage?.seedLength ?? 0 : undefined)
+}
+
+function liveBranchSession(
+  ctx: Context,
+  id: SessionId,
+  events: readonly SessionEvent[],
+  source: Session,
+  seedLength: number,
+): Session {
+  const creation = hiddenBranchCreation(source.header, seedLength)
+  return (ctx.sessions as unknown as {
+    create(id: SessionId, options: Record<string, unknown>): Session
+  }).create(id, {
+    seed: events,
+    meta: creation.meta,
+    ...(creation.inheritedEventCount === undefined
+      ? {}
+      : { inheritedEventCount: creation.inheritedEventCount }),
+  })
 }
 
 async function setup(options: { branches?: boolean; cold?: boolean; deletion?: boolean } = {}): Promise<{
@@ -197,31 +251,16 @@ async function setup(options: { branches?: boolean; cold?: boolean; deletion?: b
     ...textTurn(6, 2, 'branch-q1', 'branch-a1', 'follow-up', 'isolated answer'),
   ]
   const root = options.cold === true
-    ? Session.create(SessionId('root'), rootEvents, {
-      version: 0,
-      id: SessionId('root'),
-      createdAt: 1,
-    })
+    ? detachedSession(SessionId('root'), rootEvents, 1)
     : ctx.sessions.create(SessionId('root'), { seed: rootEvents })
   const branchSession = options.cold === true
-    ? Session.create(SessionId('branch-session'), branchEvents, {
-      version: 0,
-      id: SessionId('branch-session'),
-      createdAt: 2,
+    ? detachedSession(SessionId('branch-session'), branchEvents, 2, {
       parentSession: root.id,
       seedLength: 6,
-      origin: 'subagent',
     })
-    : ctx.sessions.create(SessionId('branch-session'), {
-      seed: branchEvents,
-      meta: {
-        parentSession: root.id,
-        seedLength: 6,
-        origin: 'subagent',
-      },
-    })
+    : liveBranchSession(ctx, SessionId('branch-session'), branchEvents, root, 6)
   if (options.cold === true) {
-    const persistence = ctx.sessionPersistence as MemoryPersistence
+    const persistence = ctx.sessionPersistence as unknown as MemoryPersistence
     persistence.store(root)
     persistence.store(branchSession)
   }
@@ -235,7 +274,7 @@ async function setup(options: { branches?: boolean; cold?: boolean; deletion?: b
     service: ctx.nestedFollowups,
     root,
     repository,
-    persistence: ctx.sessionPersistence as MemoryPersistence,
+    persistence: ctx.sessionPersistence as unknown as MemoryPersistence,
     deletionCalls,
   }
 }

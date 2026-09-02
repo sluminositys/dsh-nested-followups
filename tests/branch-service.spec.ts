@@ -65,11 +65,14 @@ class MemoryPersistence extends SessionPersistence {
   async inspect(_id: SessionId, _signal?: AbortSignal): Promise<SessionInspection> {
     throw new Error('not persisted')
   }
+  async borrowSession(_id: SessionId, _signal?: AbortSignal): Promise<never> {
+    throw new Error('not persisted')
+  }
   async readFrom(
     _id: SessionId,
     _fromSeq: number,
     _signal?: AbortSignal,
-  ): Promise<{ meta: SessionHeader; events: SessionEvent[] }> {
+  ): Promise<never> {
     throw new Error('not persisted')
   }
   async list(_signal?: AbortSignal): Promise<SessionHeader[]> { return [] }
