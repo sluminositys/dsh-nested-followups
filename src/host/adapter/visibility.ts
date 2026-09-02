@@ -85,7 +85,7 @@ export function hiddenBranchCreation(
  * half without creating, announcing, or persisting a probe session. The rc.7
  * Web workspace projection is separately pinned by its upstream tests.
  */
-export function probeBranchVisibilityRc7(ctx: Context): BranchVisibilityCapability {
+export function probeBranchVisibility(ctx: Context): BranchVisibilityCapability {
   const previous = cached.get(ctx)
   if (previous !== undefined) return previous
   const sessions = ctx.get('sessions')
@@ -121,3 +121,6 @@ export function probeBranchVisibilityRc7(ctx: Context): BranchVisibilityCapabili
     return capability
   }
 }
+
+/** @deprecated Use the version-neutral {@link probeBranchVisibility}. */
+export const probeBranchVisibilityRc7 = probeBranchVisibility

@@ -28,7 +28,7 @@ import {
   snapshotSessionEvents,
 } from './adapter/session-compat.ts'
 import { probeNativeContinuationCapability } from './adapter/native-continuation.ts'
-import { probeBranchVisibilityRc7 } from './adapter/visibility.ts'
+import { probeBranchVisibility } from './adapter/visibility.ts'
 import type { NestedFollowupsMetadataService } from './metadata-service.ts'
 import { resolveBranchBoundary } from './safe-boundary.ts'
 
@@ -133,7 +133,7 @@ export class NestedFollowupsBranchService extends Service {
 
   capabilities(): TreeMutationCapabilities {
     const readOnly = probeReadOnlyCapabilityRc7(this.ctx)
-    const visibility = probeBranchVisibilityRc7(this.ctx)
+    const visibility = probeBranchVisibility(this.ctx)
     const native = probeNativeContinuationCapability(this.ctx)
     return Object.freeze({
       askFollowUp: readOnly.supported && visibility.supported,
@@ -178,7 +178,7 @@ export class NestedFollowupsBranchService extends Service {
     if (!capability.supported) {
       throw new BranchCommandError('compatibility', capability.reason ?? 'Read-only branches are unavailable.')
     }
-    const visibility = probeBranchVisibilityRc7(this.ctx)
+    const visibility = probeBranchVisibility(this.ctx)
     if (!visibility.supported) {
       throw new BranchCommandError('compatibility', visibility.reason ?? 'Hidden branches are unavailable.')
     }

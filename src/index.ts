@@ -60,6 +60,7 @@ export {
   HIDDEN_BRANCH_ORIGIN,
   hiddenBranchCreation,
   hiddenBranchMetaRc7,
+  probeBranchVisibility,
   probeBranchVisibilityRc7,
 } from './host/adapter/visibility.ts'
 export {
