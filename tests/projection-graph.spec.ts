@@ -42,4 +42,37 @@ describe('projection graph index', () => {
     expect(Object.isFrozen(graph.incomingEdgesByNodeId.get('root-a2'))).toBe(true)
     expect(Object.isFrozen(graph.outgoingEdgesByNodeId.get('branch-1-a2'))).toBe(true)
   })
+
+  it('indexes branch lineage and anchor relationships in projection order', () => {
+    const projection = nestedContextPreviewProjectionFixture()
+    const graph = buildProjectionGraphIndex(projection)
+    const branchOne = graph.branchesById.get('branch-1')
+    const rootAnswer = graph.nodesById.get('root-a2')
+
+    expect(graph.parentBranchesByBranchId.get('branch-1-1')).toBe(branchOne)
+    expect(graph.parentBranchesByBranchId.has('branch-1')).toBe(false)
+    expect(graph.childBranchesByParentBranchId.get(null)?.map(
+      branch => branch.record.branchId,
+    )).toEqual(['branch-2', 'branch-1'])
+    expect(graph.childBranchesByParentBranchId.get('branch-1')?.map(
+      branch => branch.record.branchId,
+    )).toEqual(['branch-1-1'])
+    expect(graph.childBranchesByParentBranchId.get('branch-1-1')).toEqual([])
+
+    expect(graph.anchorNodesByBranchId.get('branch-1')).toBe(rootAnswer)
+    expect(graph.anchorNodesByBranchId.get('branch-2')).toBe(rootAnswer)
+    expect(graph.anchorNodesByBranchId.get('branch-1-1')).toBe(
+      graph.nodesById.get('branch-1-a'),
+    )
+    expect(graph.branchesByAnchorNodeId.get('root-a2')?.map(
+      branch => branch.record.branchId,
+    )).toEqual(['branch-2', 'branch-1'])
+    expect(graph.branchesByAnchorNodeId.get('branch-1-a')?.map(
+      branch => branch.record.branchId,
+    )).toEqual(['branch-1-1'])
+    expect(graph.branchesByAnchorNodeId.get('branch-1-a2')).toEqual([])
+
+    expect(Object.isFrozen(graph.childBranchesByParentBranchId.get('branch-1'))).toBe(true)
+    expect(Object.isFrozen(graph.branchesByAnchorNodeId.get('root-a2'))).toBe(true)
+  })
 })

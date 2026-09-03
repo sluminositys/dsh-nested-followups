@@ -11,25 +11,30 @@ export interface ProjectionGraphIndex {
   readonly nodesById: ReadonlyMap<string, MessageNodeView>
   readonly edgesById: ReadonlyMap<string, TreeEdgeView>
   readonly branchesById: ReadonlyMap<string, BranchProjectionView>
+  readonly parentBranchesByBranchId: ReadonlyMap<string, BranchProjectionView>
+  readonly childBranchesByParentBranchId: ReadonlyMap<string | null, readonly BranchProjectionView[]>
+  readonly anchorNodesByBranchId: ReadonlyMap<string, MessageNodeView>
+  readonly branchesByAnchorNodeId: ReadonlyMap<string, readonly BranchProjectionView[]>
   readonly incomingEdgesByNodeId: ReadonlyMap<string, readonly TreeEdgeView[]>
   readonly outgoingEdgesByNodeId: ReadonlyMap<string, readonly TreeEdgeView[]>
 }
 
-function indexEdgesByEndpoint(
-  nodeIds: Iterable<string>,
-  edges: readonly TreeEdgeView[],
-  endpointOf: (edge: TreeEdgeView) => string,
-): ReadonlyMap<string, readonly TreeEdgeView[]> {
-  const grouped = new Map<string, TreeEdgeView[]>()
-  for (const nodeId of nodeIds) grouped.set(nodeId, [])
-  for (const edge of edges) {
-    const endpoint = endpointOf(edge)
-    const group = grouped.get(endpoint)
-    if (group === undefined) grouped.set(endpoint, [edge])
-    else group.push(edge)
+function indexManyByKey<Key, Value>(
+  initialKeys: Iterable<Key>,
+  values: readonly Value[],
+  keyOf: (value: Value) => Key | undefined,
+): ReadonlyMap<Key, readonly Value[]> {
+  const grouped = new Map<Key, Value[]>()
+  for (const key of initialKeys) grouped.set(key, [])
+  for (const value of values) {
+    const key = keyOf(value)
+    if (key === undefined) continue
+    const group = grouped.get(key)
+    if (group === undefined) grouped.set(key, [value])
+    else group.push(value)
   }
   return new Map(
-    [...grouped].map(([nodeId, group]) => [nodeId, Object.freeze(group)] as const),
+    [...grouped].map(([key, group]) => [key, Object.freeze(group)] as const),
   )
 }
 
@@ -42,19 +47,41 @@ export function buildProjectionGraphIndex(
   projection: ConversationTreeProjection,
 ): ProjectionGraphIndex {
   const nodesById = new Map(projection.nodes.map(node => [node.nodeId, node] as const))
+  const branchesById = new Map(
+    projection.branches.map(branch => [branch.record.branchId, branch] as const),
+  )
   return Object.freeze({
     projection,
     nodesById,
     edgesById: new Map(projection.edges.map(edge => [edge.edgeId, edge] as const)),
-    branchesById: new Map(
-      projection.branches.map(branch => [branch.record.branchId, branch] as const),
+    branchesById,
+    parentBranchesByBranchId: new Map(projection.branches.flatMap((branch) => {
+      const parentId = branch.record.parentBranchId
+      const parent = parentId === null ? undefined : branchesById.get(parentId)
+      return parent === undefined ? [] : [[branch.record.branchId, parent] as const]
+    })),
+    childBranchesByParentBranchId: indexManyByKey(
+      [null, ...branchesById.keys()],
+      projection.branches,
+      branch => branch.record.parentBranchId,
     ),
-    incomingEdgesByNodeId: indexEdgesByEndpoint(
+    anchorNodesByBranchId: new Map(projection.branches.flatMap((branch) => {
+      const anchor = branch.anchorNodeId === undefined
+        ? undefined
+        : nodesById.get(branch.anchorNodeId)
+      return anchor === undefined ? [] : [[branch.record.branchId, anchor] as const]
+    })),
+    branchesByAnchorNodeId: indexManyByKey(
+      nodesById.keys(),
+      projection.branches,
+      branch => branch.anchorNodeId,
+    ),
+    incomingEdgesByNodeId: indexManyByKey(
       nodesById.keys(),
       projection.edges,
       edge => edge.targetNodeId,
     ),
-    outgoingEdgesByNodeId: indexEdgesByEndpoint(
+    outgoingEdgesByNodeId: indexManyByKey(
       nodesById.keys(),
       projection.edges,
       edge => edge.sourceNodeId,
