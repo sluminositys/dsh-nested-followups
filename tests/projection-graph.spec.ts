@@ -75,4 +75,43 @@ describe('projection graph index', () => {
     expect(Object.isFrozen(graph.childBranchesByParentBranchId.get('branch-1'))).toBe(true)
     expect(Object.isFrozen(graph.branchesByAnchorNodeId.get('root-a2'))).toBe(true)
   })
+
+  it('indexes deterministic sequence order within each session', () => {
+    const fixture = nestedContextPreviewProjectionFixture()
+    const branchQuestion = fixture.nodes.find(node => node.nodeId === 'branch-1-q2')
+    if (branchQuestion === undefined) throw new Error('context fixture is missing branch turn two')
+    const projection = {
+      ...fixture,
+      nodes: [
+        { ...branchQuestion, nodeId: 'tie-z', messageId: 'tie-z' },
+        { ...branchQuestion, nodeId: 'tie-a', messageId: 'tie-a' },
+        ...fixture.nodes.toReversed(),
+      ],
+    }
+    const graph = buildProjectionGraphIndex(projection)
+    const sessionNodes = graph.nodesBySessionId.get('branch-session-1') ?? []
+
+    expect(sessionNodes.map(node => node.nodeId)).toEqual([
+      'branch-1-q',
+      'branch-1-a',
+      'branch-1-q2',
+      'tie-a',
+      'tie-z',
+      'branch-1-a2',
+    ])
+    expect(sessionNodes[0]).toBe(graph.nodesById.get('branch-1-q'))
+    expect(graph.sessionSequenceIndexByNodeId.get('branch-1-q')).toBe(0)
+    expect(graph.sessionSequenceIndexByNodeId.get('branch-1-q2')).toBe(2)
+    expect(graph.sessionSequenceIndexByNodeId.get('tie-z')).toBe(4)
+    expect(graph.sessionSequenceIndexByNodeId.get('branch-1-a2')).toBe(5)
+    expect(graph.nodesBySessionId.get('root')?.map(node => node.nodeId)).toEqual([
+      'root-q1',
+      'root-a1',
+      'root-q2',
+      'root-a2',
+      'root-q3',
+      'root-a3',
+    ])
+    expect(Object.isFrozen(sessionNodes)).toBe(true)
+  })
 })

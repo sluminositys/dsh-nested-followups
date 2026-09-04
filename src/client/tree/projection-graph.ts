@@ -15,6 +15,8 @@ export interface ProjectionGraphIndex {
   readonly childBranchesByParentBranchId: ReadonlyMap<string | null, readonly BranchProjectionView[]>
   readonly anchorNodesByBranchId: ReadonlyMap<string, MessageNodeView>
   readonly branchesByAnchorNodeId: ReadonlyMap<string, readonly BranchProjectionView[]>
+  readonly nodesBySessionId: ReadonlyMap<string, readonly MessageNodeView[]>
+  readonly sessionSequenceIndexByNodeId: ReadonlyMap<string, number>
   readonly incomingEdgesByNodeId: ReadonlyMap<string, readonly TreeEdgeView[]>
   readonly outgoingEdgesByNodeId: ReadonlyMap<string, readonly TreeEdgeView[]>
 }
@@ -23,6 +25,7 @@ function indexManyByKey<Key, Value>(
   initialKeys: Iterable<Key>,
   values: readonly Value[],
   keyOf: (value: Value) => Key | undefined,
+  compare?: (left: Value, right: Value) => number,
 ): ReadonlyMap<Key, readonly Value[]> {
   const grouped = new Map<Key, Value[]>()
   for (const key of initialKeys) grouped.set(key, [])
@@ -34,8 +37,15 @@ function indexManyByKey<Key, Value>(
     else group.push(value)
   }
   return new Map(
-    [...grouped].map(([key, group]) => [key, Object.freeze(group)] as const),
+    [...grouped].map(([key, group]) => [
+      key,
+      Object.freeze(compare === undefined ? group : group.sort(compare)),
+    ] as const),
   )
+}
+
+function compareSessionNodes(left: MessageNodeView, right: MessageNodeView): number {
+  return left.seq - right.seq || left.nodeId.localeCompare(right.nodeId)
 }
 
 /**
@@ -50,6 +60,16 @@ export function buildProjectionGraphIndex(
   const branchesById = new Map(
     projection.branches.map(branch => [branch.record.branchId, branch] as const),
   )
+  const nodesBySessionId = indexManyByKey(
+    [projection.tree.rootSessionId, ...projection.branches.map(branch => branch.record.sessionId)],
+    projection.nodes,
+    node => node.sessionId,
+    compareSessionNodes,
+  )
+  const sessionSequenceIndexByNodeId = new Map<string, number>()
+  for (const sessionNodes of nodesBySessionId.values()) {
+    sessionNodes.forEach((node, index) => sessionSequenceIndexByNodeId.set(node.nodeId, index))
+  }
   return Object.freeze({
     projection,
     nodesById,
@@ -76,6 +96,8 @@ export function buildProjectionGraphIndex(
       projection.branches,
       branch => branch.anchorNodeId,
     ),
+    nodesBySessionId,
+    sessionSequenceIndexByNodeId,
     incomingEdgesByNodeId: indexManyByKey(
       nodesById.keys(),
       projection.edges,
