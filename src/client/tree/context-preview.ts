@@ -51,6 +51,12 @@ export type ContextBoundaryEligibility =
     readonly reason: ContextBoundaryIneligibilityReason
   }
 
+/** Stable message totals used by compact Context Preview surfaces. */
+export interface ContextPreviewSummary {
+  readonly inheritedMessageCount: number
+  readonly excludedMessageCount: number
+}
+
 /**
  * The exact model context represented by one eligible message boundary.
  *
@@ -66,6 +72,7 @@ export type ContextBoundaryEligibility =
 export interface ContextPreview {
   readonly targetNodeId: string
   readonly boundary: ContextBoundaryEligibility
+  readonly summary: ContextPreviewSummary
   readonly inheritedNodeIds: readonly string[]
   readonly inheritedEdgeIds: readonly string[]
   readonly excludedGroups: readonly ContextExclusionGroup[]
@@ -269,7 +276,8 @@ function stabilizeExclusionGroups(
  * Each branch contributes only its session-local prefix through the selected
  * node (or through the child branch's anchor). Parent-session tails, sibling
  * branches, and descendant branches are therefore never pulled into the
- * inherited path. Boundary eligibility is added by a later derivation stage.
+ * inherited path. Boundary eligibility and aggregate message totals describe
+ * the same immutable projection result for downstream UI surfaces.
  */
 export function deriveContextPreview(
   projection: ConversationTreeProjection,
@@ -317,16 +325,24 @@ export function deriveContextPreview(
   const branchTail = branchSessionTailGroup(graph, segments.slice(1))
   const siblingBranches = siblingBranchGroup(graph, inheritedBranches)
   const descendantBranches = descendantBranchGroup(graph)
+  const excludedGroups = stabilizeExclusionGroups(graph, inheritedNodes, [
+    rootTail,
+    branchTail,
+    siblingBranches,
+    descendantBranches,
+  ])
   return Object.freeze({
     targetNodeId,
     boundary,
+    summary: Object.freeze({
+      inheritedMessageCount: inheritedNodes.length,
+      excludedMessageCount: excludedGroups.reduce(
+        (count, group) => count + group.nodeIds.length,
+        0,
+      ),
+    }),
     inheritedNodeIds: Object.freeze(inheritedNodes.map(node => node.nodeId)),
     inheritedEdgeIds: inheritedEdges(graph, inheritedNodes),
-    excludedGroups: stabilizeExclusionGroups(graph, inheritedNodes, [
-      rootTail,
-      branchTail,
-      siblingBranches,
-      descendantBranches,
-    ]),
+    excludedGroups,
   })
 }

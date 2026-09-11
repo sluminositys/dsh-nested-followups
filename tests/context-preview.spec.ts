@@ -11,6 +11,10 @@ describe('context preview', () => {
       boundaryNodeId: 'root-a2',
       snappedToTurnTail: false,
     })
+    expect(preview?.summary).toEqual({
+      inheritedMessageCount: 4,
+      excludedMessageCount: 10,
+    })
     expect(preview?.inheritedNodeIds).toEqual([
       'root-q1',
       'root-a1',
@@ -68,6 +72,10 @@ describe('context preview', () => {
     expect(preview?.inheritedNodeIds).not.toContain('root-q3')
     expect(preview?.inheritedNodeIds).not.toContain('branch-1-q2')
     expect(preview?.inheritedNodeIds).not.toContain('branch-2-q')
+    expect(preview?.summary).toEqual({
+      inheritedMessageCount: 8,
+      excludedMessageCount: 6,
+    })
     expect(preview?.excludedGroups).toEqual([
       {
         reason: 'root-session-tail',
@@ -102,6 +110,7 @@ describe('context preview', () => {
     ])
     expect(Object.isFrozen(preview)).toBe(true)
     expect(Object.isFrozen(preview?.boundary)).toBe(true)
+    expect(Object.isFrozen(preview?.summary)).toBe(true)
     expect(Object.isFrozen(preview?.inheritedNodeIds)).toBe(true)
     expect(Object.isFrozen(preview?.inheritedEdgeIds)).toBe(true)
     expect(preview?.excludedGroups).toEqual([
@@ -194,6 +203,10 @@ describe('context preview', () => {
     const excludedNodeIds = preview?.excludedGroups.flatMap(group => group.nodeIds) ?? []
 
     expect(excludedNodeIds).toEqual([...new Set(excludedNodeIds)])
+    expect(preview?.summary).toEqual({
+      inheritedMessageCount: 6,
+      excludedMessageCount: 8,
+    })
     expect(preview?.excludedGroups).toEqual([
       {
         reason: 'root-session-tail',
