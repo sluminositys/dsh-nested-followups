@@ -1,6 +1,24 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { deriveContextPreview } from '../src/client/tree/context-preview.ts'
+import { deriveFocusState } from '../src/client/tree/navigation.ts'
 import { nestedContextPreviewProjectionFixture } from './fixtures/context-preview.ts'
+
+describe('shared context and focus indexing', () => {
+  it('builds node lookups once across focus and different preview selections', () => {
+    const projection = nestedContextPreviewProjectionFixture()
+    const mapNodes = vi.spyOn(projection.nodes, 'map')
+    try {
+      expect(deriveFocusState(projection, undefined).active).toBe(false)
+      expect(deriveContextPreview(projection, 'root-a2')?.inheritedNodeIds)
+        .toEqual(['root-q1', 'root-a1', 'root-q2', 'root-a2'])
+      expect(deriveContextPreview(projection, 'nested-a')?.inheritedNodeIds)
+        .toContain('branch-1-a')
+      expect(mapNodes).toHaveBeenCalledTimes(1)
+    } finally {
+      mapNodes.mockRestore()
+    }
+  })
+})
 
 describe('context preview', () => {
   it('derives a root-session prefix through the selected node', () => {

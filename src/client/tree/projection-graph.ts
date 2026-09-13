@@ -21,6 +21,24 @@ export interface ProjectionGraphIndex {
   readonly outgoingEdgesByNodeId: ReadonlyMap<string, readonly TreeEdgeView[]>
 }
 
+const projectionGraphIndexes = new WeakMap<ConversationTreeProjection, ProjectionGraphIndex>()
+
+/**
+ * Share an index across consumers of the same immutable projection snapshot.
+ * Host updates and optimistic changes replace the projection object, so even
+ * snapshots with identical tree/message IDs receive fresh indexes. Weak keys
+ * let discarded snapshots and their indexes be collected together.
+ */
+export function getProjectionGraphIndex(
+  projection: ConversationTreeProjection,
+): ProjectionGraphIndex {
+  const cached = projectionGraphIndexes.get(projection)
+  if (cached !== undefined) return cached
+  const graph = buildProjectionGraphIndex(projection)
+  projectionGraphIndexes.set(projection, graph)
+  return graph
+}
+
 function indexManyByKey<Key, Value>(
   initialKeys: Iterable<Key>,
   values: readonly Value[],

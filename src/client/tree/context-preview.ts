@@ -4,7 +4,7 @@ import type {
 } from '../../shared/projection.ts'
 import type { MessageNodeView } from '../../shared/types.ts'
 import {
-  buildProjectionGraphIndex,
+  getProjectionGraphIndex,
   type ProjectionGraphIndex,
 } from './projection-graph.ts'
 
@@ -283,7 +283,7 @@ export function deriveContextPreview(
   projection: ConversationTreeProjection,
   targetNodeId: string,
 ): ContextPreview | undefined {
-  const graph = buildProjectionGraphIndex(projection)
+  const graph = getProjectionGraphIndex(projection)
   const selected = graph.nodesById.get(targetNodeId)
   if (selected === undefined) return undefined
   const boundary = deriveBoundaryEligibility(graph, selected)

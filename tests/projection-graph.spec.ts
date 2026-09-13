@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { buildProjectionGraphIndex } from '../src/client/tree/projection-graph.ts'
+import { deriveContextPreview } from '../src/client/tree/context-preview.ts'
+import { deriveFocusState } from '../src/client/tree/navigation.ts'
+import { buildProjectionGraphIndex, getProjectionGraphIndex } from '../src/client/tree/projection-graph.ts'
 import { nestedContextPreviewProjectionFixture } from './fixtures/context-preview.ts'
 
 describe('projection graph index', () => {
@@ -113,5 +115,78 @@ describe('projection graph index', () => {
       'root-a3',
     ])
     expect(Object.isFrozen(sessionNodes)).toBe(true)
+  })
+
+  it('reuses one graph index for the same immutable projection snapshot', () => {
+    const projection = Object.freeze(nestedContextPreviewProjectionFixture())
+    const graph = getProjectionGraphIndex(projection)
+
+    expect(getProjectionGraphIndex(projection)).toBe(graph)
+    expect(getProjectionGraphIndex(projection).nodesBySessionId).toBe(graph.nodesBySessionId)
+    expect(graph.projection).toBe(projection)
+    expect(Object.isFrozen(graph)).toBe(true)
+    expect(graph).toEqual(buildProjectionGraphIndex(projection))
+  })
+
+  it('keeps interleaved projection snapshots separate even when all IDs match', () => {
+    const first = nestedContextPreviewProjectionFixture()
+    const second = structuredClone(first)
+    const firstGraph = getProjectionGraphIndex(first)
+    const secondGraph = getProjectionGraphIndex(second)
+
+    expect(first.tree.treeId).toBe(second.tree.treeId)
+    expect(secondGraph).not.toBe(firstGraph)
+    expect(secondGraph.projection).toBe(second)
+    expect(secondGraph.nodesById.get('root-a2')).not.toBe(firstGraph.nodesById.get('root-a2'))
+    expect(getProjectionGraphIndex(first)).toBe(firstGraph)
+    expect(getProjectionGraphIndex(second)).toBe(secondGraph)
+  })
+
+  it('refreshes message records and boundary eligibility for a new streaming snapshot', () => {
+    const previous = nestedContextPreviewProjectionFixture()
+    const previousGraph = getProjectionGraphIndex(previous)
+    const streaming = {
+      ...previous,
+      nodes: previous.nodes.map(node => node.nodeId === 'root-a3'
+        ? { ...node, state: 'streaming' as const, text: 'new partial answer' }
+        : node),
+    }
+    const streamingGraph = getProjectionGraphIndex(streaming)
+
+    expect(streaming.nodes).toHaveLength(previous.nodes.length)
+    expect(streamingGraph).not.toBe(previousGraph)
+    expect(streamingGraph.nodesById.get('root-a3')?.text).toBe('new partial answer')
+    expect(deriveContextPreview(streaming, 'root-a3')?.boundary).toEqual({
+      eligible: false,
+      reason: 'turn-open',
+    })
+    expect(deriveContextPreview(previous, 'root-a3')?.boundary.eligible).toBe(true)
+    expect(getProjectionGraphIndex(previous)).toBe(previousGraph)
+  })
+
+  it('refreshes branch and edge lookups after a branch disappears from the next snapshot', () => {
+    const previous = nestedContextPreviewProjectionFixture()
+    const previousGraph = getProjectionGraphIndex(previous)
+    const removedNodeIds = new Set(['nested-q', 'nested-a'])
+    const updated = {
+      ...previous,
+      nodes: previous.nodes.filter(node => !removedNodeIds.has(node.nodeId)),
+      branches: previous.branches.filter(branch => branch.record.branchId !== 'branch-1-1'),
+      edges: previous.edges.filter(edge => (
+        !removedNodeIds.has(edge.sourceNodeId) && !removedNodeIds.has(edge.targetNodeId)
+      )),
+    }
+    const updatedGraph = getProjectionGraphIndex(updated)
+
+    expect(updatedGraph).not.toBe(previousGraph)
+    expect(updatedGraph.nodesById.has('nested-a')).toBe(false)
+    expect(updatedGraph.branchesById.has('branch-1-1')).toBe(false)
+    expect(updatedGraph.childBranchesByParentBranchId.get('branch-1')).toEqual([])
+    expect(updatedGraph.outgoingEdgesByNodeId.get('branch-1-a')?.map(edge => edge.edgeId))
+      .toEqual(['sequence:branch-1-a:branch-1-q2'])
+    expect(deriveContextPreview(updated, 'nested-a')).toBeUndefined()
+    expect(deriveFocusState(updated, 'nested-a').active).toBe(false)
+    expect(previousGraph.branchesById.has('branch-1-1')).toBe(true)
+    expect(previousGraph.nodesById.has('nested-a')).toBe(true)
   })
 })
