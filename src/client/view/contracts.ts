@@ -1,5 +1,9 @@
 import type { ConversationTreeProjection } from '../../shared/projection.ts'
 import type { AnchorRange, MessageNodeView } from '../../shared/types.ts'
+import type {
+  ContextBoundaryIneligibilityReason,
+  ContextExclusionReason,
+} from '../tree/context-preview.ts'
 
 export interface AskFollowUpRequest {
   readonly clientRequestId: string
@@ -30,7 +34,24 @@ export interface ConversationTreeCanvasProps {
   readonly deletionMode?: 'delete' | 'archive'
 }
 
+/** Shared copy for Context Preview actions, summaries and detail groups. */
+export interface ContextPreviewLabels {
+  readonly title: string
+  readonly tab: string
+  readonly description: string
+  readonly inherited: string
+  readonly excluded: string
+  readonly summary: (inherited: number, excluded: number) => string
+  readonly noExclusions: string
+  readonly boundaryThrough: (label: string) => string
+  readonly showDetails: string
+  readonly revealMessage: (label: string) => string
+  readonly unavailableReasons: Readonly<Record<ContextBoundaryIneligibilityReason, string>>
+  readonly exclusionReasons: Readonly<Record<ContextExclusionReason, string>>
+}
+
 export interface TreeViewLabels {
+  readonly contextPreview: ContextPreviewLabels
   readonly canvas: string
   readonly search: string
   readonly searchPlaceholder: string
@@ -90,6 +111,30 @@ export interface TreeViewLabels {
 }
 
 export const DEFAULT_TREE_VIEW_LABELS: TreeViewLabels = Object.freeze({
+  contextPreview: Object.freeze({
+    title: 'Context Preview',
+    tab: 'Context',
+    description: 'See which messages a new branch would inherit through the completed answer, and which messages stay outside it.',
+    inherited: 'Inherited messages',
+    excluded: 'Excluded messages',
+    summary: (inherited: number, excluded: number) =>
+      `Inherited messages: ${inherited}; excluded messages: ${excluded}.`,
+    noExclusions: 'No messages are excluded.',
+    boundaryThrough: (label: string) => `Context is inherited through ${label}.`,
+    showDetails: 'View context details',
+    revealMessage: (label: string) => `Show ${label} in the tree`,
+    unavailableReasons: Object.freeze({
+      'user-message': 'Select the assistant answer from this turn to preview its context.',
+      'turn-open': 'Wait for this turn to finish before previewing its context.',
+      'turn-tail-unavailable': 'This turn has no completed assistant answer to use as a branch point.',
+    }),
+    exclusionReasons: Object.freeze({
+      'root-session-tail': 'Main conversation messages after the branch point',
+      'current-branch-tail': 'Later messages in this branch or its parent branches',
+      'sibling-branch': 'Sibling branches',
+      'descendant-branch': 'Nested branches outside the inherited path',
+    }),
+  }),
   canvas: 'Conversation tree',
   search: 'Search messages',
   searchPlaceholder: 'Search messages or node labels',

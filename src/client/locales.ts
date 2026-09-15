@@ -69,6 +69,23 @@ export type NestedFollowupsLocaleKey =
   | 'tree.loading'
   | 'tree.loadFailed'
   | 'tree.retry'
+  | 'context.title'
+  | 'context.tab'
+  | 'context.description'
+  | 'context.inherited'
+  | 'context.excluded'
+  | 'context.summary'
+  | 'context.noExclusions'
+  | 'context.boundaryThrough'
+  | 'context.showDetails'
+  | 'context.revealMessage'
+  | 'context.unavailable.userMessage'
+  | 'context.unavailable.turnOpen'
+  | 'context.unavailable.turnTailUnavailable'
+  | 'context.excluded.rootSessionTail'
+  | 'context.excluded.currentBranchTail'
+  | 'context.excluded.siblingBranch'
+  | 'context.excluded.descendantBranch'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -141,6 +158,23 @@ export const en: Record<NestedFollowupsLocaleKey, string> = {
   'tree.loading': 'Loading conversation tree…',
   'tree.loadFailed': 'The conversation tree could not be loaded.',
   'tree.retry': 'Retry',
+  'context.title': 'Context Preview',
+  'context.tab': 'Context',
+  'context.description': 'See which messages a new branch would inherit through the completed answer, and which messages stay outside it.',
+  'context.inherited': 'Inherited messages',
+  'context.excluded': 'Excluded messages',
+  'context.summary': 'Inherited messages: {inherited}; excluded messages: {excluded}.',
+  'context.noExclusions': 'No messages are excluded.',
+  'context.boundaryThrough': 'Context is inherited through {label}.',
+  'context.showDetails': 'View context details',
+  'context.revealMessage': 'Show {label} in the tree',
+  'context.unavailable.userMessage': 'Select the assistant answer from this turn to preview its context.',
+  'context.unavailable.turnOpen': 'Wait for this turn to finish before previewing its context.',
+  'context.unavailable.turnTailUnavailable': 'This turn has no completed assistant answer to use as a branch point.',
+  'context.excluded.rootSessionTail': 'Main conversation messages after the branch point',
+  'context.excluded.currentBranchTail': 'Later messages in this branch or its parent branches',
+  'context.excluded.siblingBranch': 'Sibling branches',
+  'context.excluded.descendantBranch': 'Nested branches outside the inherited path',
 }
 
 export const zh: Record<NestedFollowupsLocaleKey, string> = {
@@ -208,10 +242,50 @@ export const zh: Record<NestedFollowupsLocaleKey, string> = {
   'tree.loading': '正在加载会话树…',
   'tree.loadFailed': '无法加载会话树。',
   'tree.retry': '重试',
+  'context.title': '上下文预览',
+  'context.tab': '上下文',
+  'context.description': '查看从这条完整回答创建分支时，会继承哪些消息，以及哪些消息不会带入新分支。',
+  'context.inherited': '继承的消息',
+  'context.excluded': '不带入的消息',
+  'context.summary': '继承的消息：{inherited} 条；不带入的消息：{excluded} 条。',
+  'context.noExclusions': '没有需要排除的消息。',
+  'context.boundaryThrough': '上下文继承到 {label}。',
+  'context.showDetails': '查看上下文详情',
+  'context.revealMessage': '在树状视图中定位 {label}',
+  'context.unavailable.userMessage': '请在这一轮的助手回答上查看上下文。',
+  'context.unavailable.turnOpen': '这一轮尚未结束，请等待回答完成后再查看上下文。',
+  'context.unavailable.turnTailUnavailable': '这一轮没有可作为分支起点的完整助手回答。',
+  'context.excluded.rootSessionTail': '主会话中分支起点之后的消息',
+  'context.excluded.currentBranchTail': '当前分支及上级分支中未继承的后续消息',
+  'context.excluded.siblingBranch': '同级分支',
+  'context.excluded.descendantBranch': '继承路径之外的更深层分支',
 }
 
 export function labelsFrom(t: TranslateNS<typeof NS>): TreeViewLabels {
   return {
+    contextPreview: {
+      title: t('context.title'),
+      tab: t('context.tab'),
+      description: t('context.description'),
+      inherited: t('context.inherited'),
+      excluded: t('context.excluded'),
+      summary: (inherited, excluded) => t('context.summary', { inherited, excluded }),
+      noExclusions: t('context.noExclusions'),
+      boundaryThrough: label => t('context.boundaryThrough', { label }),
+      showDetails: t('context.showDetails'),
+      revealMessage: label => t('context.revealMessage', { label }),
+      unavailableReasons: {
+        'user-message': t('context.unavailable.userMessage'),
+        'turn-open': t('context.unavailable.turnOpen'),
+        'turn-tail-unavailable': t('context.unavailable.turnTailUnavailable'),
+      },
+      exclusionReasons: {
+        'root-session-tail': t('context.excluded.rootSessionTail'),
+        'current-branch-tail': t('context.excluded.currentBranchTail'),
+        'sibling-branch': t('context.excluded.siblingBranch'),
+        'descendant-branch': t('context.excluded.descendantBranch'),
+      },
+    },
     canvas: t('tree.canvas'),
     search: t('tree.search'),
     searchPlaceholder: t('tree.searchPlaceholder'),
