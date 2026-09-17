@@ -18,6 +18,8 @@ export interface TreeInteractionState {
   readonly composerNodeId: string | undefined
   readonly composerMode: 'ask' | 'continue' | undefined
   readonly selectedNodeId: string | undefined
+  /** Transient preview target, independent of focus and the message-details selection. */
+  readonly contextPreviewNodeId: string | undefined
   readonly searchQuery: string
 }
 
@@ -63,6 +65,7 @@ export function createTreeInteractionState(
     composerNodeId: undefined,
     composerMode: undefined,
     selectedNodeId: undefined,
+    contextPreviewNodeId: undefined,
     searchQuery: '',
   }
 }
@@ -238,6 +241,7 @@ export function clearTreeViewState(
   }
 }
 
+/** Explicit durable-field projection: never save context previews or other transient UI. */
 export function toTreeViewState(
   state: TreeInteractionState,
   viewport: TreeViewState['viewport'],
@@ -284,6 +288,10 @@ export function reconcileTreeInteractionState(
       : undefined,
     selectedNodeId: state.selectedNodeId !== undefined && nodeIds.has(state.selectedNodeId)
       ? state.selectedNodeId
+      : undefined,
+    contextPreviewNodeId: state.treeId === projection.tree.treeId
+      && state.contextPreviewNodeId !== undefined && nodeIds.has(state.contextPreviewNodeId)
+      ? state.contextPreviewNodeId
       : undefined,
   }
 }
