@@ -56,6 +56,71 @@ describe('ephemeral context preview selection', () => {
     expect(initial).toEqual(previewState())
   })
 
+  it('opens, retargets and closes a preview without changing the surrounding interaction', () => {
+    const initial: TreeInteractionState = {
+      ...createTreeInteractionState(undefined, 'tree-layout'),
+      focusedNodeId: 'root-a2',
+      selectedNodeId: 'root-a1',
+      composerNodeId: 'branch-1-a2',
+      composerMode: 'continue',
+      searchQuery: 'question',
+      collapsedBranchIds: new Set(['branch-2']),
+      anchorDotIds: new Set(['root-a2']),
+    }
+    const opened = treeInteractionReducer(initial, { type: 'preview/open', nodeId: 'nested-a' })
+    const retargeted = treeInteractionReducer(opened, {
+      type: 'preview/open', nodeId: 'branch-1-a',
+    })
+    const closed = treeInteractionReducer(retargeted, { type: 'preview/close' })
+
+    expect(opened).toEqual({ ...initial, contextPreviewNodeId: 'nested-a' })
+    expect(retargeted).toEqual({ ...initial, contextPreviewNodeId: 'branch-1-a' })
+    expect(closed).toEqual(initial)
+    expect(treeInteractionReducer(closed, { type: 'preview/close' })).toEqual(initial)
+    expect(initial.contextPreviewNodeId).toBeUndefined()
+  })
+
+  it('reveals a folded context row without changing the preview target or other folds', () => {
+    const initial: TreeInteractionState = {
+      ...previewState(),
+      focusedNodeId: 'root-a2',
+      selectedNodeId: 'root-a1',
+      composerNodeId: 'branch-1-a2',
+      composerMode: 'continue',
+      searchQuery: 'nested',
+      collapsedBranchIds: new Set(['branch-1', 'branch-1-1', 'branch-2']),
+      anchorDotIds: new Set(['root-a2', 'branch-1-a', 'root-a3']),
+    }
+    const revealed = treeInteractionReducer(initial, {
+      type: 'preview/reveal',
+      nodeId: 'nested-a',
+      branchesToExpand: ['branch-1', 'branch-1-1'],
+      anchorDotsToExpand: ['root-a2', 'branch-1-a'],
+    })
+
+    expect(revealed).toEqual({
+      ...initial,
+      selectedNodeId: 'nested-a',
+      collapsedBranchIds: new Set(['branch-2']),
+      anchorDotIds: new Set(['root-a3']),
+    })
+    expect(initial.collapsedBranchIds).toEqual(new Set(['branch-1', 'branch-1-1', 'branch-2']))
+    expect(initial.anchorDotIds).toEqual(new Set(['root-a2', 'branch-1-a', 'root-a3']))
+  })
+
+  it('can reveal a different context row while keeping the original preview open', () => {
+    const revealed = treeInteractionReducer(previewState(), {
+      type: 'preview/reveal',
+      nodeId: 'root-a1',
+      branchesToExpand: [],
+      anchorDotsToExpand: [],
+    })
+
+    expect(revealed.contextPreviewNodeId).toBe('nested-a')
+    expect(revealed.selectedNodeId).toBe('root-a1')
+    expect(revealed.expandedNodeIds.size).toBe(0)
+  })
+
   it('omits the preview from serialization while preserving durable preferences', () => {
     const values = new Map<string, string>()
     const storage: TreeViewStateStorage = {

@@ -43,6 +43,14 @@ export type TreeInteractionAction =
   | { type: 'composer/open'; nodeId: string; mode: 'ask' | 'continue' }
   | { type: 'composer/close' }
   | { type: 'selection/set'; nodeId: string | undefined }
+  | { type: 'preview/open'; nodeId: string }
+  | { type: 'preview/close' }
+  | {
+      type: 'preview/reveal'
+      nodeId: string
+      branchesToExpand: readonly string[]
+      anchorDotsToExpand: readonly string[]
+    }
   | { type: 'search/set'; query: string }
   | {
       type: 'search/select'
@@ -75,6 +83,18 @@ function toggled(values: ReadonlySet<string>, value: string): ReadonlySet<string
   if (next.has(value)) next.delete(value)
   else next.add(value)
   return next
+}
+
+function revealedFolds(
+  state: TreeInteractionState,
+  branchesToExpand: readonly string[],
+  anchorDotsToExpand: readonly string[],
+): Pick<TreeInteractionState, 'collapsedBranchIds' | 'anchorDotIds'> {
+  const collapsedBranchIds = new Set(state.collapsedBranchIds)
+  for (const branchId of branchesToExpand) collapsedBranchIds.delete(branchId)
+  const anchorDotIds = new Set(state.anchorDotIds)
+  for (const anchorDotId of anchorDotsToExpand) anchorDotIds.delete(anchorDotId)
+  return { collapsedBranchIds, anchorDotIds }
 }
 
 export function treeInteractionReducer(
@@ -134,21 +154,25 @@ export function treeInteractionReducer(
       return { ...state, composerNodeId: undefined, composerMode: undefined }
     case 'selection/set':
       return { ...state, selectedNodeId: action.nodeId }
-    case 'search/set':
-      return { ...state, searchQuery: action.query }
-    case 'search/select': {
-      const collapsedBranchIds = new Set(state.collapsedBranchIds)
-      for (const branchId of action.branchesToExpand) collapsedBranchIds.delete(branchId)
-      const anchorDotIds = new Set(state.anchorDotIds)
-      for (const anchorDotId of action.anchorDotsToExpand) anchorDotIds.delete(anchorDotId)
+    case 'preview/open':
+      return { ...state, contextPreviewNodeId: action.nodeId }
+    case 'preview/close':
+      return { ...state, contextPreviewNodeId: undefined }
+    case 'preview/reveal':
       return {
         ...state,
-        collapsedBranchIds,
-        anchorDotIds,
+        ...revealedFolds(state, action.branchesToExpand, action.anchorDotsToExpand),
+        selectedNodeId: action.nodeId,
+      }
+    case 'search/set':
+      return { ...state, searchQuery: action.query }
+    case 'search/select':
+      return {
+        ...state,
+        ...revealedFolds(state, action.branchesToExpand, action.anchorDotsToExpand),
         selectedNodeId: action.nodeId,
         searchQuery: '',
       }
-    }
     case 'projection/reconcile':
       return reconcileTreeInteractionState(state, action.projection)
   }
