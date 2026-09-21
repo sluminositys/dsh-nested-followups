@@ -205,6 +205,18 @@ describe('conversation tree canvas', () => {
     expect(markup).not.toContain('Open branch')
   })
 
+  it('offers Context Preview only at safe assistant boundaries, including read-only mode', () => {
+    const projection = treeProjectionFixture()
+    const writable = renderWithViewState(viewState([], []), projection)
+    const readOnly = renderWithViewState(viewState([], []), projection, {
+      readOnlyReason: 'This DSH version cannot create isolated read-only branches.',
+    })
+
+    expect(count(writable, 'aria-label="Context Preview"')).toBe(6)
+    expect(count(writable, 'aria-label="Context Preview" aria-pressed="false"')).toBe(6)
+    expect(count(readOnly, 'aria-label="Context Preview"')).toBe(6)
+  })
+
   it('keeps finalized failed turns branchable while disabling an open turn with a reason', () => {
     const base = treeProjectionFixture()
     const projection = {

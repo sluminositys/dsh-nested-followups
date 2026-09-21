@@ -1,6 +1,7 @@
 import type { CSSProperties, KeyboardEvent, MouseEvent } from 'react'
 import {
   IconChevronDownOutline14,
+  IconInspectOutline12,
   IconPlusOutline16,
   IconTrashOutline16,
   StateDot,
@@ -26,10 +27,13 @@ interface MessageNodeCardProps {
   readonly quoteInvalid: boolean
   readonly canAsk: boolean
   readonly askDisabledReason?: string
+  readonly canPreview: boolean
+  readonly previewing: boolean
   readonly canContinue: boolean
   readonly canDelete: boolean
   readonly onSelect: () => void
   readonly onAsk: () => void
+  readonly onPreview: () => void
   readonly onContinue: () => void
   readonly onFocus: () => void
   readonly onDelete: () => void
@@ -86,10 +90,13 @@ export function MessageNodeCard({
   quoteInvalid,
   canAsk,
   askDisabledReason,
+  canPreview,
+  previewing,
   canContinue,
   canDelete,
   onSelect,
   onAsk,
+  onPreview,
   onContinue,
   onFocus,
   onDelete,
@@ -152,6 +159,19 @@ export function MessageNodeCard({
                 }}
               >
                 <IconPlusOutline16 size={14} />
+              </button>
+            </CanvasTooltip>
+          )}
+          {canPreview && (
+            <CanvasTooltip label={labels.contextPreview.title}>
+              <button
+                type="button"
+                className={css.iconButton}
+                aria-label={labels.contextPreview.title}
+                aria-pressed={previewing}
+                onClick={(event) => { stop(event); onPreview() }}
+              >
+                <IconInspectOutline12 size={14} />
               </button>
             </CanvasTooltip>
           )}
