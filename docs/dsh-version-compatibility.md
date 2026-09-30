@@ -5,7 +5,7 @@
 | Exact DSH target | Plugin source | Policy |
 | --- | --- | --- |
 | `0.1.0-rc.7` through `0.1.1-rc.2` | npm `dsh-nested-followups@0.2.2` | Existing published artifact |
-| `0.2.0-rc.2` | `compat/dsh-0.2` | Git source only; package version remains `0.2.2` |
+| `0.2.0-rc.2` | `dsh-0.2` | Git source only; package version remains `0.2.2` |
 | `0.1.2-alpha.4` | Earlier `compat/dsh-0.1.2-alpha` branch | Historical preview; not the current development target |
 
 The npm artifact is **not** replaced by pulling a source branch. No new npm
@@ -86,7 +86,7 @@ the plugin's metadata does not make a newer DSH log readable by an older host.
 ## 中文摘要
 
 - 老版 DSH 继续用已发布的 npm `0.2.2`；当前 `0.2.0-rc.2` 用
-  `compat/dsh-0.2` 源码，不发布新包、不改主分支。
+  `dsh-0.2` 源码，不发布新包、不改主分支。
 - 桌面端不需要重新实现界面，但要用其自带 CLI 装进 `desktop` Profile；
   普通 `web` 安装不会自动带过去。
 - 同一份源码已通过新版和 `0.1.1-rc.2` 的完整检查。桌面安装包尚未做端到端验证。

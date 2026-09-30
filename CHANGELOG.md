@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Added source-only DSH `0.2.0-rc.2` compatibility on `compat/dsh-0.2`, including
+- Added source-only DSH `0.2.0-rc.2` compatibility on `dsh-0.2`, including
   read-only persistence handles, native assistant-stream frames, updated tool
   result correlation, strict-codec factories, and renamed UI primitives.
 - Added official Desktop installation instructions for the separate `desktop`

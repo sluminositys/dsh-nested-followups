@@ -37,7 +37,7 @@ Choose the install path that matches your DeepSeek Harness line:
 | DeepSeek Harness | Plugin source | Status |
 | --- | --- | --- |
 | `0.1.0-rc.7` through `0.1.1-rc.2` | npm `dsh-nested-followups@0.2.2` | Stable plugin track |
-| `0.2.0-rc.2` Web / official Desktop | Git branch `compat/dsh-0.2` | Source-only compatibility track |
+| `0.2.0-rc.2` Web / official Desktop | Git branch `dsh-0.2` | Source-only compatibility track |
 | `0.1.2-alpha.4` | Previous branch `compat/dsh-0.1.2-alpha` | Historical preview track |
 
 ### Stable DSH release candidates
@@ -56,7 +56,7 @@ it locally, and invoke the matching CLI so an older global
 `dsh` binary cannot install it into the wrong profile contract:
 
 ```sh
-git clone --branch compat/dsh-0.2 --single-branch https://github.com/sluminositys/dsh-nested-followups.git
+git clone --branch dsh-0.2 --single-branch https://github.com/sluminositys/dsh-nested-followups.git
 cd dsh-nested-followups
 corepack pnpm install --frozen-lockfile
 corepack pnpm run check

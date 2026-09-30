@@ -33,7 +33,7 @@ Session 都是真实的，后期只添加了说明字幕和鼠标指针。_
 | DeepSeek Harness | 插件来源 | 状态 |
 | --- | --- | --- |
 | `0.1.0-rc.7` 至 `0.1.1-rc.2` | npm `dsh-nested-followups@0.2.2` | 稳定插件路线 |
-| `0.2.0-rc.2` Web / 官方桌面端 | Git 分支 `compat/dsh-0.2` | 新版适配，暂时只提供源码安装 |
+| `0.2.0-rc.2` Web / 官方桌面端 | Git 分支 `dsh-0.2` | 新版适配，暂时只提供源码安装 |
 | `0.1.2-alpha.4` | 旧分支 `compat/dsh-0.1.2-alpha` | 保留的历史预览版本 |
 
 ### DSH 稳定 RC 版本
@@ -51,7 +51,7 @@ dsh plugin --profile web add dsh-nested-followups@0.2.2
 CLI，避免电脑里旧的全局 `dsh` 把插件装进错误的 Profile 契约：
 
 ```sh
-git clone --branch compat/dsh-0.2 --single-branch https://github.com/sluminositys/dsh-nested-followups.git
+git clone --branch dsh-0.2 --single-branch https://github.com/sluminositys/dsh-nested-followups.git
 cd dsh-nested-followups
 corepack pnpm install --frozen-lockfile
 corepack pnpm run check
