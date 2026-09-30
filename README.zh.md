@@ -10,8 +10,8 @@
 同一操作，需要多少级就分多少级。每一级只继承自己的祖先链，主任务始终是一条干净的线。
 
 [![npm](https://img.shields.io/npm/v/dsh-nested-followups.svg)](https://www.npmjs.com/package/dsh-nested-followups)
-[![测试：156 项通过](https://img.shields.io/badge/tests-156%20passing-brightgreen.svg)](tests)
-[![DeepSeek Harness：0.1.x](https://img.shields.io/badge/DeepSeek%20Harness-0.1.x-orange.svg)](https://github.com/deepseek-ai/deepseek-harness)
+[![检查通过](https://img.shields.io/badge/check-passing-brightgreen.svg)](docs/dsh-version-compatibility.md)
+[![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-0.1.1%20%2F%200.2%20RC-orange.svg)](docs/dsh-version-compatibility.md)
 [![许可证：MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ![在真实 DeepSeek Harness 会话中从不同层级的回答持续创建多级隔离分支](assets/demo.gif)
@@ -28,25 +28,61 @@ Session 都是真实的，后期只添加了说明字幕和鼠标指针。_
 
 ## 安装
 
+请先按自己的 DeepSeek Harness 版本选择安装方式：
+
+| DeepSeek Harness | 插件来源 | 状态 |
+| --- | --- | --- |
+| `0.1.0-rc.7` 至 `0.1.1-rc.2` | npm `dsh-nested-followups@0.2.2` | 稳定插件路线 |
+| `0.2.0-rc.2` Web / 官方桌面端 | Git 分支 `compat/dsh-0.2` | 新版适配，暂时只提供源码安装 |
+| `0.1.2-alpha.4` | 旧分支 `compat/dsh-0.1.2-alpha` | 保留的历史预览版本 |
+
+### DSH 稳定 RC 版本
+
 ```sh
-dsh plugin --profile web add dsh-nested-followups
+dsh plugin --profile web add dsh-nested-followups@0.2.2
 ```
 
 如果 Web Profile 已经在运行，请重启一次。随后照常打开会话，点击顶栏的
 **Tree View**。
 
-<details>
-<summary>从源码安装</summary>
+### DSH 0.2 Web
+
+新版适配暂时不发布 npm 包，只从兼容分支安装源码。下面显式调用对应版本的
+CLI，避免电脑里旧的全局 `dsh` 把插件装进错误的 Profile 契约：
 
 ```sh
-git clone https://github.com/sluminositys/dsh-nested-followups.git
+git clone --branch compat/dsh-0.2 --single-branch https://github.com/sluminositys/dsh-nested-followups.git
 cd dsh-nested-followups
-pnpm install
-pnpm run check
-dsh plugin --profile web add .
+corepack pnpm install --frozen-lockfile
+corepack pnpm run check
+corepack pnpm dlx @deepseek-ai/dsh@0.2.0-rc.2 plugin --profile web add .
+corepack pnpm dlx @deepseek-ai/dsh@0.2.0-rc.2 web
 ```
 
-</details>
+安装后，Profile 里记录的是指向当前源码目录的 `link:`。以后拉取更新，需要重新运行
+`corepack pnpm run check` 并重启 Web Profile。不要把 npm `0.2.2` 直接装进
+DSH 0.2：它是旧版 RC 路线的发布产物，不包含这个兼容分支。
+
+### 官方桌面端
+
+桌面端沿用 DSH 的 Web 界面，不需要重写画布或增加 Electron 扩展。但桌面端的
+插件安装在独立的 **`desktop` Profile**，装在 `web` 里的插件不会自动启用。
+
+1. 先启动一次 DSH Desktop `0.2.0-rc.2`。在应用菜单的 **Manage dsh Command… →
+   Install** 中安装桌面端自带的命令。
+2. 按上一节的前四条命令克隆源码并构建。
+3. **完全退出桌面端**，不要只关闭窗口。在源码目录使用桌面端自带的 `dsh` 执行：
+
+   ```sh
+   dsh plugin --profile desktop add .
+   ```
+
+4. 重新打开桌面端，在会话顶栏点击 **Tree View**。
+
+不要用 npm 安装的 `dsh` 或 `pnpm dlx` 操作 `desktop` Profile，只有桌面端自带的
+命令能管理它。电脑上已有的全局命令可能抢先被找到，安装前请检查 `dsh --version`
+及命令所在路径。编译本插件源码仍需要 Node 和 pnpm；桌面端运行插件则使用自带环境。
+具体机制见 [官方桌面端说明](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.0-rc.2/apps/desktop/README.md#bundled-command-runtime)。
 
 ## 为什么不新开对话或做普通侧栏？
 
@@ -138,15 +174,23 @@ _图中画出两层嵌套后以省略号继续：后续每一级的每条回答�
 
 | 项目 | 版本 |
 | --- | --- |
-| DeepSeek Harness | `0.1.x`（已在 `0.1.0-rc.7`、`0.1.0-rc.8` 和 `0.1.1-rc.2` 上验证） |
-| Node.js | 22.19 及以上 |
-| 包管理器 | pnpm |
+| DeepSeek Harness | 旧版 npm 路线：`0.1.0-rc.7` 至 `0.1.1-rc.2`；当前源码路线：`0.2.0-rc.2` |
+| Node.js（编译源码 / Web） | `^22.19.0` 或 `>=24.0.0` |
+| 包管理器（编译源码） | pnpm |
 
 ## 兼容性说明
 
-当前版本已在未经修改的 `@deepseek-ai/dsh` `0.1.1-rc.2` 上验证，并继续以
-`0.1.0-rc.7` 作为兼容下限。DeepSeek Harness 仍处于开发者预览阶段，后续预发布
-版本可能需要更新适配器。
+当前源码适配旧版 RC 和新版 0.2 的会话快照、继承历史、持久化只读句柄、实时回答事件、
+工具结果、原生图标及消息渲染。它不修改 DSH，不改写会话日志。分叉仍以已完成回合
+为边界，不使用新版宿主允许从未完成回合分叉的能力。
+
+自动化检查和运行验证的范围分别记录；桌面端使用相同的 Web 插件机制，但 Web 启动
+通过不等于已经完成桌面安装包的端到端测试。
+具体契约映射与维护者验证流程见 [DSH 版本兼容说明](docs/dsh-version-compatibility.md)。
+
+DSH `0.2.0-rc.2` 仍是候选版本。因此本分支继续保留插件版本 `0.2.2`，不发布 npm。
+等 DSH 正式契约落地后，再针对那个确切版本复核适配器，随后升级插件版本并发布新的
+npm 包。
 
 **分支目前不能在原生 Chat 里续聊。** DSH 会拒绝从普通对话界面向 subagent-origin
 Session 发送用户消息，因此分支的阅读和续聊都在 Tree View 中完成。插件已经预留对
@@ -171,7 +215,7 @@ pnpm install
 pnpm run check
 ```
 
-`pnpm run check` 会执行静态检查、宿主端与浏览器端类型检查、156 项单元与集成测试、
+`pnpm run check` 会执行静态检查、宿主端与浏览器端类型检查、单元与集成测试、
 生产构建、冒烟测试和发布包校验。
 
 | 命令 | 用途 |

@@ -26,8 +26,11 @@ Restart the web profile afterwards.
 
 - Node.js 22.19 or later
 - pnpm
-- DeepSeek Harness `0.1.x` (the development suite currently validates
-  `0.1.1-rc.2` and keeps `0.1.0-rc.7` as its compatibility floor)
+- DeepSeek Harness `0.2.0-rc.2` on this branch; retain regression checks against
+  legacy `0.1.1-rc.2` (`0.1.0-rc.7` remains the older npm artifact's floor)
+- For preview-host work, use the source-only compatibility track described in
+  [DSH version compatibility](docs/dsh-version-compatibility.md). Do not bump
+  the plugin version or publish npm artifacts before release approval.
 
 ## Making a change
 

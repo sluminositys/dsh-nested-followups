@@ -8,17 +8,15 @@ import {
   type FormEvent,
   type PointerEvent,
   type WheelEvent,
+  type ComponentType,
 } from 'react'
 import { createPortal } from 'react-dom'
 import {
   Button,
-  IconChevronUpOutline14,
-  IconCloseOutline16,
-  IconSearchOutline16,
   MarkdownText,
-  MessageText,
   Modal,
 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconChevronUpOutline14, IconCloseOutline16, IconSearchOutline16, MessageText } from '../primitives-compat.tsx'
 import {
   composeQuotedQuestion,
   locateQuoteRange,
@@ -70,6 +68,20 @@ import {
 } from './state.ts'
 import { TreeMinimap } from './TreeMinimap.tsx'
 import css from './ConversationTreeCanvas.module.css'
+
+interface CompatibleMarkdownTextProps {
+  readonly text: string
+  readonly streaming?: boolean
+  /** rc.7–rc.2 localized code-fence labels. */
+  readonly codeLabels?: { readonly copyLabel: string; readonly copiedLabel: string }
+  /** 0.1.2 localized code-fence and footnote labels. */
+  readonly labels?: {
+    readonly code: { readonly copyLabel: string; readonly copiedLabel: string }
+    readonly footnotes: string
+  }
+}
+
+const CompatibleMarkdownText = MarkdownText as unknown as ComponentType<CompatibleMarkdownTextProps>
 
 const MINIMAP_SIZE: Size = { width: 190, height: 128 }
 
@@ -247,7 +259,21 @@ function MessageDetails({
         )}
         {quoteInvalid && <p className={css.invalidQuote} role="status">{labels.quoteInvalid}</p>}
         {node.role === 'assistant'
-          ? <MarkdownText text={node.text} streaming={node.state === 'streaming'} />
+          ? <CompatibleMarkdownText
+              text={node.text}
+              streaming={node.state === 'streaming'}
+              codeLabels={{
+                copyLabel: labels.markdownCopy,
+                copiedLabel: labels.markdownCopied,
+              }}
+              labels={{
+                code: {
+                  copyLabel: labels.markdownCopy,
+                  copiedLabel: labels.markdownCopied,
+                },
+                footnotes: labels.markdownFootnotes,
+              }}
+            />
           : <MessageText text={node.text} />}
       </div>
       {capture !== null && typeof document !== 'undefined' && createPortal(

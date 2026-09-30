@@ -1,12 +1,9 @@
 import type { CSSProperties, KeyboardEvent, MouseEvent } from 'react'
 import {
-  IconChevronDownOutline14,
-  IconInspectOutline12,
-  IconPlusOutline16,
-  IconTrashOutline16,
   StateDot,
   type StateDotState,
 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconChevronDownOutline14, IconInspectOutline12, IconPlusOutline16, IconTrashOutline16 } from '../primitives-compat.tsx'
 import { CanvasTooltip } from './CanvasTooltip.tsx'
 import { displayLabelOf } from '../../shared/labels.ts'
 import type { MessageNodeView } from '../../shared/types.ts'

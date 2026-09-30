@@ -283,7 +283,7 @@ describe('conversation tree projection', () => {
       rootEvents[0]!,
       pluginContext(1, 'workspace instructions'),
       ...rootEvents.slice(1).map((event, index) => ({ ...event, seq: index + 2 })),
-    ]
+    ] as unknown as import('@deepseek-ai/dsh-session/types').SessionEvent[]
     const projection = projectConversationTree(
       tree,
       [],
@@ -435,6 +435,25 @@ describe('conversation tree projection', () => {
     expect(diagnosticsFor(toolRound('write', 'call-denied', true, 18))).toEqual([])
     // A write that actually ran means the guard failed to hold.
     expect(diagnosticsFor(toolRound('write', 'call-escaped', false, 18))).toContainEqual(
+      expect.objectContaining({ code: 'branch-tool-event', branchId: branchOne.branchId }),
+    )
+
+    // 0.2 moves correlation and error state out of the first content block.
+    const nativeRound = (isError: boolean) => toolRound('write', 'native-call', isError, 18).map(event =>
+      event.type !== 'tool/result' ? event : sessionEvent({
+        ...event,
+        data: {
+          ...event.data,
+          message: {
+            id: 'native-result', role: 'tool', toolCallId: 'native-call', isError,
+            source: { kind: 'tool', callId: 'native-call' },
+            content: [{ type: 'text', text: 'tool result' }],
+          },
+        },
+      }),
+    ) as typeof branchOneEvents
+    expect(diagnosticsFor(nativeRound(true))).toEqual([])
+    expect(diagnosticsFor(nativeRound(false))).toContainEqual(
       expect.objectContaining({ code: 'branch-tool-event', branchId: branchOne.branchId }),
     )
 

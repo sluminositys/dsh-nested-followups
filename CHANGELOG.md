@@ -9,6 +9,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Added source-only DSH `0.2.0-rc.2` compatibility on `compat/dsh-0.2`, including
+  read-only persistence handles, native assistant-stream frames, updated tool
+  result correlation, strict-codec factories, and renamed UI primitives.
+- Added official Desktop installation instructions for the separate `desktop`
+  profile and its bundled CLI; the plugin still uses the shared Web UI.
+- Added a dual-contract compatibility layer for the stable DSH rc line and
+  the `0.1.2-alpha` line, including session event snapshots, seeded-session
+  lineage, fork-equivalent creation metadata, and the renamed browser view
+  store contract.
+- Added a version-by-version installation and maintainer verification guide.
 - Added a 13.5-second demo recorded from a real DeepSeek Harness session. It
   shows a side question, a follow-up on that side answer, recursive isolation,
   collapse, and the untouched main chat.
@@ -18,6 +28,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Moved this compatibility branch's development dependency set to DSH
+  `0.2.0-rc.2` and Cordis `4.0.4`. Kept the plugin version at `0.2.2`, with no
+  npm publication or changes to the legacy main branch.
+- Retained completed-turn fork boundaries even though newer DSH also permits
+  open-tail forks. Branch isolation and execution-only read guards are unchanged.
+- Verified the current source against DSH `0.1.1-rc.2` and `0.2.0-rc.2`: both
+  full checks pass 220 tests in 33 files. Confirmed view switching, fixture
+  history, the follow-up composer, and page-reload restoration in 0.2 Web.
+- Kept npm `0.2.2` as the stable rc artifact. DSH `0.1.2-alpha` support is
+  source-only on `compat/dsh-0.1.2-alpha`; a new plugin version and npm release
+  are deferred until DSH publishes the stable replacement contract.
+- The earlier alpha track verified `0.1.1-rc.2` and `0.1.2-alpha.4` with 162
+  tests, including a source-linked alpha Web boot.
 - Rebuilt the English and Chinese README introductions around the project's
   defining behavior: every answer at every depth can become another isolated
   fork point, with no plugin-defined nesting limit.

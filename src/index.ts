@@ -32,6 +32,7 @@ export {
 export {
   applyReadOnlyScopeRc7,
   createReadOnlyBranchSetup,
+  createReadOnlyForkAgent,
   createReadOnlyForkAgentRc7,
   probeReadOnlyCapabilityRc7,
   readOnlyBranchGuard,
@@ -51,14 +52,24 @@ export {
   probeNativeContinuationCapability,
 } from './host/adapter/native-continuation.ts'
 export {
+  createSubagentFork,
   createSubagentForkRc7,
   selectForkSeedRc7,
 } from './host/adapter/session-fork.ts'
 export {
   HIDDEN_BRANCH_ORIGIN,
+  hiddenBranchCreation,
   hiddenBranchMetaRc7,
+  probeBranchVisibility,
   probeBranchVisibilityRc7,
 } from './host/adapter/visibility.ts'
+export {
+  persistedSeedLength,
+  readPersistedSessionFrom,
+  sessionSeedLength,
+  snapshotSessionEvents,
+  usesInheritedEventCount,
+} from './host/adapter/session-compat.ts'
 export {
   createSessionCleanupAdapter,
   SESSION_ARCHIVE_METHOD,

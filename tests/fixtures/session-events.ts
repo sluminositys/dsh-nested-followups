@@ -46,6 +46,7 @@ export function textTurn(
       data: {
         turn,
         step: 1,
+        stream: [],
         message: {
           id: assistantMessageId,
           role: 'assistant',
@@ -86,6 +87,7 @@ export function toolTurn(): SessionEvent[] {
       data: {
         turn: 1,
         step: 1,
+        stream: [],
         message: {
           id: 'a-prelude',
           role: 'assistant',
@@ -121,6 +123,7 @@ export function toolTurn(): SessionEvent[] {
       data: {
         turn: 1,
         step: 2,
+        stream: [],
         message: {
           id: 'a-final',
           role: 'assistant',

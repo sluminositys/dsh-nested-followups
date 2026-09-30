@@ -10,6 +10,7 @@ import type {
 import type { AnchorRange, BranchRecord, MessageNodeState, MessageNodeView, TreeRecord } from '../shared/types.ts'
 import { extractAnchoredQuestion } from '../shared/anchored-question.ts'
 import { isBranchExecutableTool } from '../shared/tool-policy.ts'
+import { legacyAssistantChunk, type LiveAssistantText } from './adapter/assistant-stream.ts'
 
 export { displayLabelOf } from '../shared/labels.ts'
 export type {
@@ -42,11 +43,18 @@ function findSucceededWriteCall(
       continue
     }
     if (event.type !== 'tool/result') continue
-    const block = event.data.message.content[0]
-    const pending = attempted.get(String(block.toolCallId))
+    const message = event.data.message as unknown as {
+      readonly toolCallId?: string
+      readonly isError?: boolean
+      readonly content: readonly { readonly toolCallId?: string; readonly isError?: boolean }[]
+    }
+    const result = message.toolCallId === undefined ? message.content[0] : message
+    const callId = result?.toolCallId
+    if (callId === undefined) continue
+    const pending = attempted.get(String(callId))
     if (pending === undefined) continue
-    attempted.delete(String(block.toolCallId))
-    if (block.isError !== true) return pending
+    attempted.delete(String(callId))
+    if (result?.isError !== true) return pending
   }
   return undefined
 }
@@ -56,6 +64,8 @@ export interface SessionLogSnapshot {
   events: readonly SessionEvent[]
   /** Durable header value. Used to detect stale branch metadata. */
   seedLength?: number
+  /** Transient 0.2 stream; not an event and never persisted. */
+  liveAssistant?: LiveAssistantText
 }
 
 interface VisibleMessage {
@@ -119,7 +129,7 @@ function turnState(
   return kind === 'completed' || kind === 'max-tokens' ? 'complete' : 'error'
 }
 
-function visibleMessages(events: readonly SessionEvent[], minimumSeq: number): VisibleMessage[] {
+function visibleMessages(events: readonly SessionEvent[], minimumSeq: number, liveAssistant?: LiveAssistantText): VisibleMessage[] {
   const ordered = [...events].sort(eventOrder)
   const endings = new Map<number, SessionEvent<'turn/end'>>()
   const turnAtUserEvent = new Map<number, number>()
@@ -156,18 +166,19 @@ function visibleMessages(events: readonly SessionEvent[], minimumSeq: number): V
         assembler: new BlockAssembler(),
       })
     }
-    if (event.type === 'assistant/chunk') {
-      const key = `${event.data.turn}:${event.data.step}`
+    const chunk = legacyAssistantChunk(event)
+    if (chunk !== undefined) {
+      const key = `${chunk.turn}:${chunk.step}`
       const current = streamingSteps.get(key) ?? {
-        turn: event.data.turn,
-        step: event.data.step,
+        turn: chunk.turn,
+        step: chunk.step,
         seq: event.seq,
         time: event.time,
         chunks: 0,
         assembler: new BlockAssembler(),
       }
       try {
-        current.assembler.push(event.data.chunk)
+        current.assembler.push(chunk.chunk)
       } catch {
         // A corrupted or future chunk kind must not make the entire tree
         // unreadable. The durable assistant/message remains authoritative.
@@ -246,6 +257,9 @@ function visibleMessages(events: readonly SessionEvent[], minimumSeq: number): V
       // A malformed or future block kind remains an empty live placeholder;
       // the durable final assistant/message is still authoritative.
     }
+    const live = liveAssistant?.turn === partial.turn && liveAssistant.step === partial.step
+      ? liveAssistant : undefined
+    if (live !== undefined) text = live.text
     messages.push({
       role: 'assistant',
       messageId: `stream-${partial.turn}-${partial.step}`,
@@ -255,7 +269,7 @@ function visibleMessages(events: readonly SessionEvent[], minimumSeq: number): V
       text,
       state: endings.has(partial.turn)
         ? 'error'
-        : partial.chunks === 0
+        : (live?.chunks ?? partial.chunks) === 0
           ? 'queued'
           : 'streaming',
     })
@@ -271,7 +285,7 @@ function nodesForSession(
   log: SessionLogSnapshot,
   minimumSeq: number,
 ): MessageNodeView[] {
-  const messages = visibleMessages(log.events, minimumSeq)
+  const messages = visibleMessages(log.events, minimumSeq, log.liveAssistant)
   const localTurns = new Map<number, number>()
   let nextLocalTurn = 1
   for (const message of messages) {

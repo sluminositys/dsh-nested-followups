@@ -12,8 +12,8 @@ many levels as the question needs. Every level inherits only its ancestor path,
 while the main task stays linear and untouched.
 
 [![npm](https://img.shields.io/npm/v/dsh-nested-followups.svg)](https://www.npmjs.com/package/dsh-nested-followups)
-[![Tests: 156 passing](https://img.shields.io/badge/tests-156%20passing-brightgreen.svg)](tests)
-[![DeepSeek Harness: 0.1.x](https://img.shields.io/badge/DeepSeek%20Harness-0.1.x-orange.svg)](https://github.com/deepseek-ai/deepseek-harness)
+[![Tests](https://img.shields.io/badge/check-passing-brightgreen.svg)](docs/dsh-version-compatibility.md)
+[![DeepSeek Harness](https://img.shields.io/badge/DeepSeek%20Harness-0.1.1%20%2F%200.2%20RC-orange.svg)](docs/dsh-version-compatibility.md)
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 
 ![A real DeepSeek Harness session branching repeatedly from answers at multiple depths](assets/demo.gif)
@@ -32,25 +32,66 @@ and sessions are real; the captions and cursor are added in post._
 
 ## Install
 
+Choose the install path that matches your DeepSeek Harness line:
+
+| DeepSeek Harness | Plugin source | Status |
+| --- | --- | --- |
+| `0.1.0-rc.7` through `0.1.1-rc.2` | npm `dsh-nested-followups@0.2.2` | Stable plugin track |
+| `0.2.0-rc.2` Web / official Desktop | Git branch `compat/dsh-0.2` | Source-only compatibility track |
+| `0.1.2-alpha.4` | Previous branch `compat/dsh-0.1.2-alpha` | Historical preview track |
+
+### Stable DSH release candidates
+
 ```sh
-dsh plugin --profile web add dsh-nested-followups
+dsh plugin --profile web add dsh-nested-followups@0.2.2
 ```
 
 Restart the DeepSeek Harness web profile if it is already running, open a
 conversation, and select **Tree View**.
 
-<details>
-<summary>Install from source</summary>
+### DSH 0.2 Web
+
+The new compatibility track is not published to npm. Clone the branch, build
+it locally, and invoke the matching CLI so an older global
+`dsh` binary cannot install it into the wrong profile contract:
 
 ```sh
-git clone https://github.com/sluminositys/dsh-nested-followups.git
+git clone --branch compat/dsh-0.2 --single-branch https://github.com/sluminositys/dsh-nested-followups.git
 cd dsh-nested-followups
-pnpm install
-pnpm run check
-dsh plugin --profile web add .
+corepack pnpm install --frozen-lockfile
+corepack pnpm run check
+corepack pnpm dlx @deepseek-ai/dsh@0.2.0-rc.2 plugin --profile web add .
+corepack pnpm dlx @deepseek-ai/dsh@0.2.0-rc.2 web
 ```
 
-</details>
+This creates a `link:` installation to the checkout. After pulling an update,
+run `corepack pnpm run check` again and restart the web profile. Do not
+install npm `0.2.2` into DSH 0.2; it is the legacy-rc artifact and does
+not contain this compatibility branch.
+
+### Official Desktop
+
+Desktop uses the same Web UI, so the plugin does not need a separate canvas or
+an Electron extension. Its plugins belong to the **`desktop` profile**, not
+`web`; installing into one does not enable it in the other.
+
+1. Launch DSH Desktop `0.2.0-rc.2` once. Use **Manage dsh Command… → Install**
+   in its application menu to install the bundled CLI.
+2. Clone and build the source branch using the first four commands above.
+3. **Fully quit Desktop** (closing its window may only hide it), then run the
+   following command from the checkout using Desktop's bundled `dsh`:
+
+   ```sh
+   dsh plugin --profile desktop add .
+   ```
+
+4. Reopen Desktop and select **Tree View** in a conversation.
+
+Do not use npm's `dsh` or `pnpm dlx` for the `desktop` profile: only the bundled
+command can manage it. Existing global installations can shadow that command;
+check `dsh --version` and your shell's command path first. Source builds still
+need Node and pnpm; Desktop itself supplies the runtime for plugin activation.
+See the [official Desktop instructions](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.0-rc.2/apps/desktop/README.md#bundled-command-runtime).
 
 ## Why not a new chat or a sidebar thread?
 
@@ -161,16 +202,28 @@ inherited conversation again.
 
 | Requirement | Version |
 | --- | --- |
-| DeepSeek Harness | `0.1.x` (verified on `0.1.0-rc.7`, `0.1.0-rc.8`, and `0.1.1-rc.2`) |
-| Node.js | 22.19 or later |
-| Package manager | pnpm |
+| DeepSeek Harness | Legacy npm track: `0.1.0-rc.7` through `0.1.1-rc.2`; current source track: `0.2.0-rc.2` |
+| Node.js (source build / Web) | `^22.19.0` or `>=24.0.0` |
+| Package manager (source build) | pnpm |
 
 ## Compatibility notes
 
-This release is verified against an unmodified `@deepseek-ai/dsh`
-`0.1.1-rc.2` and keeps `0.1.0-rc.7` as its compatibility floor. DeepSeek
-Harness is still in developer preview, so later prereleases may require an
-adapter update.
+The source branch bridges both legacy rc and current 0.2 contracts: Session
+snapshots, inherited history, read-only persistence handles, process-local
+assistant streaming, tool results, native icons, and message rendering. It
+does not patch DSH or rewrite its logs. Forks still stop at completed turns;
+the newer host's ability to fork an open turn is deliberately not used.
+
+Automated validation and the exact runtime checks are recorded separately.
+Desktop shares the Web plugin mechanism; a Web boot is not a packaged Desktop
+end-to-end test.
+See [DSH version compatibility](docs/dsh-version-compatibility.md) for the
+contract mapping and maintainer verification procedure.
+
+DSH `0.2.0-rc.2` is a release candidate. This branch deliberately keeps
+the plugin version at `0.2.2` and is not published to npm. Once DSH publishes a
+stable contract, the adapter will be rechecked against that exact release,
+then the plugin will receive its next version and npm release.
 
 **Branches cannot be continued from the standard chat view.** DSH currently
 rejects user messages sent from the normal chat UI to a subagent-origin
@@ -200,7 +253,7 @@ pnpm install
 pnpm run check
 ```
 
-`pnpm run check` runs linting, host and browser type checking, 156 unit and
+`pnpm run check` runs linting, host and browser type checking, unit and
 integration tests, a production build, a smoke test, and package validation.
 
 | Command | Purpose |
