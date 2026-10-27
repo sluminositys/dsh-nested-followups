@@ -6,9 +6,7 @@ import SessionStore, {
   type SessionHeader,
 } from '@deepseek-ai/dsh-session'
 import {
-  SessionPersistence,
   type SessionInspection,
-  type SessionLocation,
   type SessionPersistenceSnapshot,
 } from '@deepseek-ai/dsh-session-persistence'
 import type { KvTable } from '@deepseek-ai/dsh-storage-domain'
@@ -16,6 +14,8 @@ import { describe, expect, it } from 'vitest'
 
 import { TreeMetadataRepository } from '../src/host/storage.ts'
 import { NestedFollowupsService } from '../src/host/tree-service.ts'
+import { sessionSeedLength, snapshotSessionEvents } from '../src/host/adapter/session-compat.ts'
+import { hiddenBranchCreation } from '../src/host/adapter/visibility.ts'
 import type { BranchRecord, TreeRecord } from '../src/shared/types.ts'
 import { textTurn } from './fixtures/session-events.ts'
 
@@ -37,34 +37,51 @@ class MemoryTable<V> implements KvTable<string, V> {
   }
 }
 
-class MemoryPersistence extends SessionPersistence {
-  private readonly records = new Map<SessionId, SessionInspection>()
+class MemoryPersistence extends Service {
+  constructor(ctx: Context) { super(ctx, 'sessionPersistence') }
+  private readonly records = new Map<SessionId, SessionInspection & {
+    readonly inheritedEventCount: number
+  }>()
   readonly readFromIds: SessionId[] = []
   readonly supportsRawArtifacts = false
 
   store(session: Session): void {
-    this.records.set(session.id, { meta: session.header, events: session.events })
+    this.records.set(session.id, {
+      meta: session.header,
+      events: snapshotSessionEvents(session),
+      inheritedEventCount: sessionSeedLength(session) ?? 0,
+    } as SessionInspection & { readonly inheritedEventCount: number })
   }
 
-  locate(_meta: SessionHeader): SessionLocation | undefined { return undefined }
   async create(_meta: SessionHeader): Promise<void> {}
   async append(_id: SessionId, _events: readonly SessionEvent[]): Promise<void> {}
-  async load(id: SessionId): Promise<SessionInspection> {
+  async load(id: SessionId): Promise<SessionInspection & { readonly inheritedEventCount: number }> {
     const stored = this.records.get(id)
     if (stored === undefined) throw new Error('not persisted')
     return stored
   }
-  async inspect(id: SessionId, _signal?: AbortSignal): Promise<SessionInspection> {
+  async inspect(
+    id: SessionId,
+    _signal?: AbortSignal,
+  ): Promise<SessionInspection & { readonly inheritedEventCount: number }> {
     return this.load(id)
+  }
+  async borrowSession(_id: SessionId, _signal?: AbortSignal): Promise<never> {
+    throw new Error('borrow is not used by the tree read model')
   }
   async readFrom(
     id: SessionId,
     fromSeq: number,
     _signal?: AbortSignal,
-  ): Promise<{ meta: SessionHeader; events: SessionEvent[] }> {
+  ) {
     this.readFromIds.push(id)
     const stored = await this.load(id)
-    return { meta: stored.meta, events: stored.events.filter(event => event.seq >= fromSeq) }
+    return {
+      meta: stored.meta,
+      inheritedEventCount: stored.inheritedEventCount,
+      fromSeq: fromSeq as never,
+      events: stored.events.filter(event => event.seq >= fromSeq),
+    }
   }
   async list(_signal?: AbortSignal): Promise<SessionHeader[]> {
     return [...this.records.values()].map(record => record.meta)
@@ -77,8 +94,68 @@ class MemoryPersistence extends SessionPersistence {
   }
 }
 
+interface CompatibleSessionStatic {
+  create(
+    id: SessionId,
+    seed: readonly SessionEvent[],
+    header: Record<string, unknown>,
+    inheritedEventCount?: number,
+  ): Session
+}
+
+function constructorSeed(events: readonly SessionEvent[], version: number, cut?: number): readonly SessionEvent[] {
+  if (version < 4 || cut === undefined || events.length <= cut) return events
+  return [
+    ...events.slice(0, cut),
+    { type: 'session/end-seed', seq: cut, time: events[cut]?.time ?? 1, data: { inherited: true } } as unknown as SessionEvent,
+    ...events.slice(cut).map(event => ({ ...event, seq: event.seq + 1 } as SessionEvent)),
+  ]
+}
+
+function detachedSession(
+  id: SessionId,
+  events: readonly SessionEvent[],
+  createdAt: number,
+  lineage?: { readonly parentSession: SessionId; readonly seedLength: number },
+): Session {
+  const generation = Session.create(SessionId(`generation-probe-${id}`)).header as unknown as {
+    readonly version: number
+    readonly isSeeded?: boolean
+  }
+  const alpha = typeof generation.isSeeded === 'boolean'
+  return (Session as unknown as CompatibleSessionStatic).create(id, constructorSeed(events, generation.version, lineage?.seedLength), {
+    version: generation.version,
+    id,
+    createdAt,
+    ...(lineage === undefined ? {} : { parentSession: lineage.parentSession, origin: 'subagent' }),
+    ...(alpha
+      ? { isSeeded: lineage !== undefined }
+      : lineage === undefined ? {} : { seedLength: lineage.seedLength }),
+  }, alpha ? lineage?.seedLength ?? 0 : undefined)
+}
+
+function liveBranchSession(
+  ctx: Context,
+  id: SessionId,
+  events: readonly SessionEvent[],
+  source: Session,
+  seedLength: number,
+): Session {
+  const creation = hiddenBranchCreation(source.header, seedLength)
+  return (ctx.sessions as unknown as {
+    create(id: SessionId, options: Record<string, unknown>): Session
+  }).create(id, {
+    seed: constructorSeed(events, source.header.version, seedLength),
+    meta: creation.meta,
+    ...(creation.inheritedEventCount === undefined
+      ? {}
+      : { inheritedEventCount: creation.inheritedEventCount }),
+  })
+}
+
 async function setup(options: { branches?: boolean; cold?: boolean; deletion?: boolean } = {}): Promise<{
   dispose: () => Promise<void>
+  ctx: Context
   service: NestedFollowupsService
   root: ReturnType<SessionStore['create']>
   repository: TreeMetadataRepository
@@ -182,31 +259,16 @@ async function setup(options: { branches?: boolean; cold?: boolean; deletion?: b
     ...textTurn(6, 2, 'branch-q1', 'branch-a1', 'follow-up', 'isolated answer'),
   ]
   const root = options.cold === true
-    ? Session.create(SessionId('root'), rootEvents, {
-      version: 0,
-      id: SessionId('root'),
-      createdAt: 1,
-    })
+    ? detachedSession(SessionId('root'), rootEvents, 1)
     : ctx.sessions.create(SessionId('root'), { seed: rootEvents })
   const branchSession = options.cold === true
-    ? Session.create(SessionId('branch-session'), branchEvents, {
-      version: 0,
-      id: SessionId('branch-session'),
-      createdAt: 2,
+    ? detachedSession(SessionId('branch-session'), branchEvents, 2, {
       parentSession: root.id,
       seedLength: 6,
-      origin: 'subagent',
     })
-    : ctx.sessions.create(SessionId('branch-session'), {
-      seed: branchEvents,
-      meta: {
-        parentSession: root.id,
-        seedLength: 6,
-        origin: 'subagent',
-      },
-    })
+    : liveBranchSession(ctx, SessionId('branch-session'), branchEvents, root, 6)
   if (options.cold === true) {
-    const persistence = ctx.sessionPersistence as MemoryPersistence
+    const persistence = ctx.sessionPersistence as unknown as MemoryPersistence
     persistence.store(root)
     persistence.store(branchSession)
   }
@@ -214,13 +276,14 @@ async function setup(options: { branches?: boolean; cold?: boolean; deletion?: b
   fibers.push(serviceFiber)
   await serviceFiber
   return {
+    ctx,
     dispose: async () => {
       for (const fiber of fibers.reverse()) await fiber.dispose()
     },
     service: ctx.nestedFollowups,
     root,
     repository,
-    persistence: ctx.sessionPersistence as MemoryPersistence,
+    persistence: ctx.sessionPersistence as unknown as MemoryPersistence,
     deletionCalls,
   }
 }
@@ -331,17 +394,17 @@ describe('tree projection Remote service', () => {
   })
 
   it('coalesces high-frequency assistant chunks into one bounded revision', async () => {
-    const { dispose, service, root } = await setup()
+    const { dispose, service, root, ctx } = await setup()
     try {
       const initial = await service.readTree({ sessionId: 'root' })
       if (!initial.ok) throw new Error('root projection missing')
 
       for (const text of ['one', ' two', ' three']) {
-        root.append('assistant/chunk', {
-          turn: 2,
-          step: 1,
-          chunk: { type: 'text-delta', index: 0, text },
-        })
+        // Legacy rc hosts publish durable chunks through session/event.
+        ctx.emit('session/event', root, {
+          type: 'assistant/chunk', seq: 6, time: 100,
+          data: { turn: 2, step: 1, chunk: { type: 'text-delta', index: 0, text } },
+        } as unknown as SessionEvent)
       }
       const immediate = await service.readTree({ sessionId: 'root' })
       expect(immediate.ok && immediate.value.revision).toBe(initial.value.revision)
@@ -364,6 +427,39 @@ describe('tree projection Remote service', () => {
     } finally {
       await dispose()
     }
+  })
+
+  it('projects 0.2 live frames and replaces them with the committed answer without writing chunks', async () => {
+    const { dispose, service, root, ctx } = await setup()
+    try {
+      root.append('turn/start', { turn: 2 })
+      root.append('step/start', { turn: 2, step: 1 })
+      const before = snapshotSessionEvents(root)
+      const emit = ctx as unknown as { emit(name: string, payload: unknown): void }
+      emit.emit('agent/assistant-stream', { agent: { id: root.id }, frame: {
+        type: 'start', revision: 1, attemptId: 'live', turn: 2, step: 1,
+      } })
+      emit.emit('agent/assistant-stream', { agent: { id: root.id }, frame: {
+        type: 'chunk', revision: 2, attemptId: 'live', index: 0, time: 100,
+        chunk: { type: 'text-delta', index: 0, text: 'Live answer' },
+      } })
+      const live = await service.readTree({ sessionId: 'root' })
+      expect(live.ok && live.value.projection.nodes.find(node => node.messageId === 'stream-2-1'))
+        .toMatchObject({ text: 'Live answer', state: 'streaming' })
+      expect(snapshotSessionEvents(root)).toEqual(before)
+      const settled = textTurn(before.length - 3, 2, 'unused', 'a-live', 'unused', 'Final answer')[3]
+      if (settled?.type !== 'assistant/message') throw new Error('missing fixture')
+      root.append('assistant/message', settled.data, { surfaceOp: 'append' })
+      emit.emit('agent/assistant-stream', { agent: { id: root.id }, frame: {
+        type: 'end', revision: 3, attemptId: 'live', index: 1,
+      } })
+      root.append('step/end', { turn: 2, step: 1 })
+      root.append('turn/end', { turn: 2, reason: { kind: 'completed' } })
+      const final = await service.readTree({ sessionId: 'root' })
+      expect(final.ok && final.value.projection.nodes.find(node => node.messageId === 'a-live'))
+        .toMatchObject({ text: 'Final answer', state: 'complete' })
+      expect(final.ok && final.value.projection.nodes.some(node => node.messageId === 'stream-2-1')).toBe(false)
+    } finally { await dispose() }
   })
 
   it('routes deletion through the Host service with projection-derived message counts', async () => {

@@ -31,7 +31,7 @@ describe('package contract', () => {
     })
   })
 
-  it('declares the verified rc.7 through rc.2 DSH compatibility window', async () => {
+  it('declares legacy rc and the 0.2 compatibility line', async () => {
     const manifest = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')) as {
       peerDependencies?: Record<string, string>
       devDependencies?: Record<string, string>
@@ -44,9 +44,12 @@ describe('package contract', () => {
       .map(([, version]) => version)
 
     expect(new Set(dshPeers)).toEqual(new Set([
-      '>=0.1.0-rc.7 <0.1.1 || >=0.1.1-rc.1 <0.2.0',
+      '>=0.1.0-rc.7 <0.1.1 || >=0.1.1-rc.1 <0.1.2 || >=0.1.2-alpha.1 <0.2.0 || >=0.2.0-rc.2 <0.3.0',
     ]))
-    expect(new Set(dshValidationTargets)).toEqual(new Set(['0.1.1-rc.2']))
+    const validationVersions = [...new Set(dshValidationTargets)]
+    expect(validationVersions).toHaveLength(1)
+    expect(['0.1.1-rc.2', '0.1.2-alpha.4', '0.2.0-rc.2']).toContain(validationVersions[0])
+    expect(manifest.peerDependencies).not.toHaveProperty('@deepseek-ai/dsh-client-runtime')
   })
 
   it('inserts one removable Cordis bundle row', async () => {

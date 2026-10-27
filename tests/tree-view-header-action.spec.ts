@@ -1,5 +1,4 @@
 import type { ButtonHTMLAttributes, ReactElement, ReactNode } from 'react'
-import type { ChatStoreState } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('@deepseek-ai/dsh-client-ui-primitives', async () => {
@@ -18,6 +17,7 @@ vi.mock('@deepseek-ai/dsh-client-ui-primitives', async () => {
 })
 
 import { TreeViewHeaderAction } from '../src/client/TreeViewHeaderAction.tsx'
+import type { ConversationViewState } from '../src/client/compat.ts'
 import { CHAT_VIEW_ID, TREE_VIEW_ID } from '../src/client/view-ids.ts'
 
 const translations: Record<string, string> = {
@@ -28,11 +28,8 @@ const translations: Record<string, string> = {
 
 function renderAction(view: string | null, setView: (next: string) => void): ReactElement {
   return TreeViewHeaderAction({
-    useStore: <S,>(selector: (state: ChatStoreState) => S): S => selector({
-      selection: null,
-      draft: '',
+    useStore: <S,>(selector: (state: ConversationViewState) => S): S => selector({
       view,
-      inspect: null,
     }),
     actions: { setView },
     t: (key: string): string => translations[key] ?? key,

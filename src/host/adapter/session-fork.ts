@@ -6,7 +6,29 @@ import {
   type SessionId,
   type SessionStore,
 } from '@deepseek-ai/dsh-session'
-import { hiddenBranchMetaRc7 } from './visibility.ts'
+import { snapshotSessionEvents } from './session-compat.ts'
+import { hiddenBranchCreation } from './visibility.ts'
+
+interface CompatibleSessionStore {
+  create(
+    id?: SessionId,
+    options?: {
+      readonly seed?: readonly SessionEvent[]
+      readonly inheritedEventCount?: number
+      readonly meta?: Record<string, unknown>
+    },
+  ): Session
+}
+
+/** Older DSH exposes this code; newer DSH allows open-tail forks instead.
+ * Follow-ups deliberately retain the stricter completed-turn boundary. */
+export class OpenTurnForkError extends Error {
+  readonly code = 'OPEN_TURN'
+  constructor(message: string) {
+    super(message)
+    this.name = 'OpenTurnForkError'
+  }
+}
 
 /**
  * rc.7 equivalent of SessionStore's private `_forkSeed` method. Keep this
@@ -50,9 +72,8 @@ export function selectForkSeedRc7(
   const lastTurnBoundary = events.slice(0, boundary + 1)
     .findLast(event => event.type === 'turn/start' || event.type === 'turn/end')
   if (lastTurnBoundary?.type === 'turn/start') {
-    throw new SessionForkError(
+    throw new OpenTurnForkError(
       `fork boundary ${boundary} in session "${sessionId}" ends inside open turn ${lastTurnBoundary.data.turn}`,
-      'OPEN_TURN',
     )
   }
 
@@ -88,7 +109,7 @@ function resolveLiveSourceRc7(
  * Create a fork-equivalent child whose immutable header is classified as a
  * subagent. SessionStore.fork cannot carry `origin` in rc.7.
  */
-export function createSubagentForkRc7(
+export function createSubagentFork(
   sessions: SessionStore,
   source: SessionForkSource,
   boundary?: number,
@@ -101,9 +122,16 @@ export function createSubagentForkRc7(
     )
   }
   const liveSource = resolveLiveSourceRc7(sessions, source)
-  const seed = selectForkSeedRc7(liveSource.id, liveSource.events, boundary)
-  return sessions.create(childSessionId, {
+  const seed = selectForkSeedRc7(liveSource.id, snapshotSessionEvents(liveSource), boundary)
+  const creation = hiddenBranchCreation(liveSource.header, seed.length)
+  return (sessions as unknown as CompatibleSessionStore).create(childSessionId, {
     seed,
-    meta: hiddenBranchMetaRc7(liveSource.header, seed.length),
+    meta: creation.meta as unknown as Record<string, unknown>,
+    ...(creation.inheritedEventCount === undefined
+      ? {}
+      : { inheritedEventCount: creation.inheritedEventCount }),
   })
 }
+
+/** @deprecated Use {@link createSubagentFork}; retained for API compatibility. */
+export const createSubagentForkRc7 = createSubagentFork

@@ -35,7 +35,7 @@ export function ConversationTreeView({
   deleteBranch,
   t,
 }: ConversationTreeViewProps) {
-  const view = useTreeProjection(state => state)
+  const view = useTreeProjection((state: TreeProjectionView) => state)
   const [optimisticMutations, setOptimisticMutations] = useState<readonly OptimisticMutation[]>([])
   const labels = useMemo(() => labelsFrom(t), [t])
   useEffect(() => { void ensure() }, [ensure])

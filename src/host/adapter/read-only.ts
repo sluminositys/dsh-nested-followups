@@ -10,7 +10,7 @@ import {
 import type {} from '@deepseek-ai/dsh-system-prompt'
 import type { ToolExecution } from '@deepseek-ai/dsh-tools'
 import { isBranchExecutableTool } from '../../shared/tool-policy.ts'
-import { hiddenBranchMetaRc7 } from './visibility.ts'
+import { hiddenBranchCreation } from './visibility.ts'
 
 /** Stable compatibility failure used when rc.7 cannot gate branch tool execution. */
 export class ReadOnlyCapabilityError extends Error {
@@ -40,6 +40,19 @@ export interface ReadOnlyResumeInput {
 }
 
 export type BranchAgentRegistry = Pick<AgentRegistry, 'get' | 'create' | 'resume'>
+
+interface CompatibleCreateAgentOptions {
+  readonly sessionId: SessionId
+  readonly seed: readonly SessionEvent[]
+  readonly meta: Record<string, unknown>
+  readonly inheritedEventCount?: number
+  readonly agentOptions: AgentOptions
+  readonly setup: (agentCtx: Context) => Promise<void>
+}
+
+interface CompatibleBranchAgentRegistry {
+  create(options: CompatibleCreateAgentOptions): Promise<AgentHandle>
+}
 
 const DENIAL = 'Nested follow-up branches are read-only: this tool would change state outside the branch. '
   + 'Answer from the conversation and any files you have read instead.'
@@ -153,20 +166,27 @@ export function createReadOnlyBranchSetup(
 }
 
 /** Create one fork-seeded, origin-classified Agent without using apiproxy. */
-export function createReadOnlyForkAgentRc7(
+export function createReadOnlyForkAgent(
   ctx: Context,
   agents: BranchAgentRegistry,
   input: ReadOnlyForkInput,
 ): Promise<AgentHandle> {
   const presetId = resolveSourcePresetRc7(input.sourceHeader, input.seed)
-  return agents.create({
+  const creation = hiddenBranchCreation(input.sourceHeader, input.seed.length, presetId)
+  return (agents as unknown as CompatibleBranchAgentRegistry).create({
     sessionId: input.sessionId,
     seed: input.seed,
-    meta: hiddenBranchMetaRc7(input.sourceHeader, input.seed.length, presetId),
+    meta: creation.meta as unknown as Record<string, unknown>,
+    ...(creation.inheritedEventCount === undefined
+      ? {}
+      : { inheritedEventCount: creation.inheritedEventCount }),
     agentOptions: resolveBranchAgentOptionsRc7(input.seed, input.fallbackAgentOptions),
     setup: createReadOnlyBranchSetup(ctx, presetId),
   })
 }
+
+/** @deprecated Use {@link createReadOnlyForkAgent}; retained for API compatibility. */
+export const createReadOnlyForkAgentRc7 = createReadOnlyForkAgent
 
 /** Resume a cold branch through the same composition it was born under. */
 export function resumeReadOnlyBranchAgentRc7(

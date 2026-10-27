@@ -22,6 +22,14 @@ import type { NestedFollowupsBranchService } from './branch-service.ts'
 import type { NestedFollowupsDeleteService } from './delete-service.ts'
 import type { NestedFollowupsMetadataService } from './metadata-service.ts'
 import { isDirectlyDeleted, projectConversationTree, type SessionLogSnapshot } from './projection.ts'
+import {
+  listPersistedSessions,
+  persistedSeedLength,
+  readPersistedSessionFrom,
+  sessionSeedLength,
+  snapshotSessionEvents,
+} from './adapter/session-compat.ts'
+import { FollowupAssistantStream, legacyAssistantChunk, type FollowupStreamFrame } from './adapter/assistant-stream.ts'
 
 const WATCH_TIMEOUT_MS = 15_000
 const STREAM_TOUCH_INTERVAL_MS = 50
@@ -95,11 +103,27 @@ export class NestedFollowupsService extends TypertRemoteService {
   private readonly waiters = new Map<string, Set<RevisionWaiter>>()
   private readonly pendingStreamTouches = new Map<string, ReturnType<typeof setTimeout>>()
   private disposed = false
+  private readonly assistantStreams = new Map<string, FollowupAssistantStream>()
 
   constructor(ctx: Context) {
     super(ctx, 'nestedFollowups')
     ctx.on('session/event', (session, event) => {
       this.onSessionEvent(String(session.id), event)
+    }, { global: true })
+    // This event is absent on older rc hosts. Cordis can safely subscribe even
+    // there; legacy assistant/chunk events remain the fallback.
+    const streams = ctx as unknown as {
+      on(name: 'agent/assistant-stream', callback: (payload: {
+        readonly agent: { readonly id: string }
+        readonly frame: FollowupStreamFrame
+      }) => void, options: { global: true }): void
+    }
+    streams.on('agent/assistant-stream', ({ agent, frame }) => {
+      const sessionId = String(agent.id)
+      const stream = this.assistantStreams.get(sessionId) ?? new FollowupAssistantStream()
+      stream.accept(frame)
+      this.assistantStreams.set(sessionId, stream)
+      this.scheduleStreamTouch(this.rootSessionIdFor(sessionId))
     }, { global: true })
     ctx.on('nested-followups/change', (rootSessionId) => {
       this.touchRoot(rootSessionId)
@@ -112,6 +136,7 @@ export class NestedFollowupsService extends TypertRemoteService {
       this.waiters.clear()
       for (const timer of this.pendingStreamTouches.values()) clearTimeout(timer)
       this.pendingStreamTouches.clear()
+      this.assistantStreams.clear()
     }, 'nested-followups.tree-watch')
   }
 
@@ -128,7 +153,7 @@ export class NestedFollowupsService extends TypertRemoteService {
 
   private onSessionEvent(sessionId: string, event: SessionEvent): void {
     const rootSessionId = this.rootSessionIdFor(sessionId)
-    if (event.type !== 'assistant/chunk') {
+    if (legacyAssistantChunk(event) === undefined) {
       const pending = this.pendingStreamTouches.get(rootSessionId)
       if (pending !== undefined) {
         clearTimeout(pending)
@@ -137,6 +162,10 @@ export class NestedFollowupsService extends TypertRemoteService {
       this.touchRoot(rootSessionId)
       return
     }
+    this.scheduleStreamTouch(rootSessionId)
+  }
+
+  private scheduleStreamTouch(rootSessionId: string): void {
     if (this.pendingStreamTouches.has(rootSessionId)) return
     const timer = setTimeout(() => {
       this.pendingStreamTouches.delete(rootSessionId)
@@ -148,7 +177,7 @@ export class NestedFollowupsService extends TypertRemoteService {
   /** Read a complete, de-duplicated projection without attaching cold Agents. */
   async readTree(request: TreeReadRequest): Promise<TreeReadResult> {
     const ownership = this.resolveOwnership(request.sessionId)
-    const persisted = await this.ctx.sessionPersistence.listSnapshots()
+    const persisted = await listPersistedSessions(this.ctx.sessionPersistence)
     const persistedHeaders = snapshotHeaderMap(persisted)
     const requestedHeader = this.headerFor(request.sessionId, persistedHeaders)
     if (requestedHeader === undefined) return sessionNotFound(request.sessionId)
@@ -285,18 +314,26 @@ export class NestedFollowupsService extends TypertRemoteService {
   ): Promise<SessionLogSnapshot | undefined> {
     const live = this.liveSession(sessionId)
     if (live !== undefined) {
+      const seedLength = sessionSeedLength(live)
+      const liveAssistant = this.assistantStreams.get(sessionId)?.snapshot()
       return {
         sessionId,
-        events: live.events.filter(event => event.seq >= fromSeq),
-        ...(live.header.seedLength === undefined ? {} : { seedLength: live.header.seedLength }),
+        events: snapshotSessionEvents(live).filter(event => event.seq >= fromSeq),
+        ...(seedLength === undefined ? {} : { seedLength }),
+        ...(liveAssistant === undefined ? {} : { liveAssistant }),
       }
     }
     if (!persistedHeaders.has(sessionId)) return undefined
-    const stored = await this.ctx.sessionPersistence.readFrom(sessionId as SessionId, fromSeq)
+    const stored = await readPersistedSessionFrom(
+      this.ctx.sessionPersistence,
+      sessionId as SessionId,
+      fromSeq,
+    )
+    const seedLength = persistedSeedLength(stored)
     return {
       sessionId,
       events: stored.events,
-      ...(stored.meta.seedLength === undefined ? {} : { seedLength: stored.meta.seedLength }),
+      ...(seedLength === undefined ? {} : { seedLength }),
     }
   }
 

@@ -1,11 +1,10 @@
 import { Context, type Fiber } from '@deepseek-ai/cordis'
 import AgentRegistry from '@deepseek-ai/dsh-agent'
-import { createApiRemoteAgentResolver } from '@deepseek-ai/dsh-api-remotes'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import { describe, expect, it } from 'vitest'
 
-describe('rc.7 native Chat ownership fence', () => {
-  it('returns the visible agent-busy error for an origin-classified branch', async () => {
+describe('native Chat ownership fence', () => {
+  it('retains the origin marker consumed by both native fence generations', async () => {
     const ctx = new Context()
     const fibers: Fiber[] = []
     try {
@@ -21,7 +20,24 @@ describe('rc.7 native Chat ownership fence', () => {
           origin: 'subagent',
         },
       })
-      const resolve = createApiRemoteAgentResolver(ctx, {})
+      const remotes = await import('@deepseek-ai/dsh-api-remotes') as unknown as {
+        readonly createApiRemoteAgentResolver?: (
+          owner: Context,
+          options: Record<string, unknown>,
+        ) => (id: SessionId) => Promise<unknown>
+      }
+      const createResolver = remotes.createApiRemoteAgentResolver
+      if (createResolver === undefined) {
+        // DSH 0.1.2 moved this fence into session-controller. Its public input
+        // remains the same immutable marker; the controller itself is an
+        // upstream integration rather than a plugin dependency.
+        expect(branch.header).toMatchObject({
+          parentSession: SessionId('root-session'),
+          origin: 'subagent',
+        })
+        return
+      }
+      const resolve = createResolver(ctx, {})
 
       await expect(resolve(branch.id)).resolves.toEqual({
         error: {
@@ -35,4 +51,3 @@ describe('rc.7 native Chat ownership fence', () => {
     }
   })
 })
-

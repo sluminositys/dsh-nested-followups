@@ -1,4 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
+import type { RemoteFailure } from '@deepseek-ai/dsh-typert-protocol'
 
 import { TreeProjectionController } from '../src/client/projection-controller.ts'
 import type { NestedFollowupsRemoteNamespace } from '../src/client/remote.ts'
@@ -29,6 +30,14 @@ function deferred<T>(): { promise: Promise<T>; resolve: (value: T) => void } {
   let resolve!: (value: T) => void
   const promise = new Promise<T>((settle) => { resolve = settle })
   return { promise, resolve }
+}
+
+function remoteFailure(message: string): RemoteFailure {
+  return Object.assign(new Error(message), {
+    code: 'gateway/internal' as const,
+    details: {},
+    isDSHRemoteError: true as const,
+  })
 }
 
 describe('tree projection controller', () => {
@@ -76,7 +85,7 @@ describe('tree projection controller', () => {
 
     firstWatch.resolve({
       ok: false,
-      error: { code: 'disconnected', message: 'connection reset', details: {} },
+      error: remoteFailure('connection reset'),
     })
     await vi.waitFor(() => { expect(controller.getSnapshot().status).toBe('error') })
     expect(controller.getSnapshot().snapshot?.revision).toBe(4)

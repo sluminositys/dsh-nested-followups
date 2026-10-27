@@ -90,6 +90,9 @@ export interface TreeViewLabels {
   readonly saveQuote: string
   readonly removeQuote: string
   readonly quoteNotePlaceholder: string
+  readonly markdownCopy: string
+  readonly markdownCopied: string
+  readonly markdownFootnotes: string
   readonly snapToTurnTail: (label: string) => string
   readonly send: string
   readonly cancel: string
@@ -173,6 +176,9 @@ export const DEFAULT_TREE_VIEW_LABELS: TreeViewLabels = Object.freeze({
   saveQuote: 'Save quote',
   removeQuote: 'Remove quote',
   quoteNotePlaceholder: 'Add an optional comment, Enter saves the quote',
+  markdownCopy: 'Copy code',
+  markdownCopied: 'Copied',
+  markdownFootnotes: 'Footnotes',
   snapToTurnTail: (label: string) => `Context will include the completed turn through ${label}.`,
   send: 'Send',
   cancel: 'Cancel',

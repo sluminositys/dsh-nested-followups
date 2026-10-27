@@ -1,8 +1,9 @@
-import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
-import type { ChatStore } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type { SessionId } from '@deepseek-ai/dsh-session'
 
+import { conversationViewStore } from './compat.ts'
 import { ConversationTreeView, type ConversationTreeViewInjected } from './ConversationTreeView.tsx'
 import { en, NS, zh } from './locales.ts'
 import { TreeProjectionController } from './projection-controller.ts'
@@ -22,19 +23,6 @@ export const inject = ['slots', 'remote', 'locale']
 
 function commandError(error: { code: string; message?: string }): Error {
   return new Error(error.message === undefined ? error.code : `${error.code}: ${error.message}`)
-}
-
-/**
- * Resolve the native conversation header's shared Chat store. Reusing this
- * official store seat lets a header utility call the same `setView` action as
- * the built-in tabs without reaching into the DOM or duplicating view state.
- */
-function conversationChatStore(ctx: ClientContext): ChatStore | undefined {
-  const store = ctx.slots.entriesOfSlot('conversation.session.header')[0]?.store
-  if (store === undefined || typeof store === 'function') return undefined
-  if (typeof store.create !== 'function') return undefined
-  if (typeof store.spec?.actions?.setView !== 'function') return undefined
-  return store as ChatStore
 }
 
 export async function apply(ctx: ClientContext): Promise<() => Promise<void>> {
@@ -121,14 +109,14 @@ function installTreeUi(ctx: ClientContext): void {
   }, ConversationTreeView))
 
   ctx.slots.inject('conversation.session.header.utilities', () => {
-    const chatStore = conversationChatStore(ctx)
-    if (chatStore === undefined) return () => {}
+    const viewStore = conversationViewStore(ctx)
+    if (viewStore === undefined) return () => {}
     return ctx.slots.register({
       name: 'conversation.session.header.utilities',
       id: 'nested-followups-tree-toggle',
       order: 20,
       locale: NS,
-      store: chatStore,
+      store: viewStore,
     }, TreeViewHeaderAction)
   })
 
