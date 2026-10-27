@@ -37,7 +37,7 @@ Choose the install path that matches your DeepSeek Harness line:
 | DeepSeek Harness | Plugin source | Status |
 | --- | --- | --- |
 | `0.1.0-rc.7` through `0.1.1-rc.2` | npm `dsh-nested-followups@0.2.2` | Stable plugin track |
-| `0.2.0-rc.2` Web / official Desktop | Git branch `dsh-0.2` | Source-only compatibility track |
+| `0.2.0-rc.2`, `0.2.1-rc.2` Web / official Desktop | Git branch `dsh-0.2` | Source-only compatibility track |
 | `0.1.2-alpha.4` | Previous branch `compat/dsh-0.1.2-alpha` | Historical preview track |
 
 ### Stable DSH release candidates
@@ -68,6 +68,28 @@ This creates a `link:` installation to the checkout. After pulling an update,
 run `corepack pnpm run check` again and restart the web profile. Do not
 install npm `0.2.2` into DSH 0.2; it is the legacy-rc artifact and does
 not contain this compatibility branch.
+
+#### Installing from a Git URL instead of a checkout
+
+Installing the branch directly by URL builds it through its `prepare` script.
+pnpm refuses that until the exact package key is allowlisted, so the first
+attempt fails with `ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED` and prints the key
+to use. Add that key to the profile's `pnpm-workspace.yaml`, then repeat the
+same command:
+
+```sh
+dsh plugin --profile web add git+https://github.com/sluminositys/dsh-nested-followups.git#dsh-0.2
+```
+
+```yaml
+# ~/.dsh/profiles/web/pnpm-workspace.yaml
+allowBuilds:
+  'dsh-nested-followups@https://codeload.github.com/sluminositys/dsh-nested-followups/tar.gz/<commit>': true
+```
+
+The key embeds the resolved commit, so it must be replaced whenever the branch
+moves. A local `link:` installation from a checkout avoids this entirely and is
+the path the instructions above use.
 
 ### Official Desktop
 
@@ -202,7 +224,7 @@ inherited conversation again.
 
 | Requirement | Version |
 | --- | --- |
-| DeepSeek Harness | Legacy npm track: `0.1.0-rc.7` through `0.1.1-rc.2`; current source track: `0.2.0-rc.2` |
+| DeepSeek Harness | Legacy npm track: `0.1.0-rc.7` through `0.1.1-rc.2`; current source track: `0.2.0-rc.2` and `0.2.1-rc.2` |
 | Node.js (source build / Web) | `^22.19.0` or `>=24.0.0` |
 | Package manager (source build) | pnpm |
 
@@ -213,6 +235,13 @@ snapshots, inherited history, read-only persistence handles, process-local
 assistant streaming, tool results, native icons, and message rendering. It
 does not patch DSH or rewrite its logs. Forks still stop at completed turns;
 the newer host's ability to fork an open turn is deliberately not used.
+
+Installing the legacy npm artifact into DSH 0.2 does not fail loudly at install
+time. The profile boots, then `typert-loader` reports that this plugin's remote
+invocation codecs "ha[ve] no create() factory", the plugin stays inactive, and
+its Tree View never appears. If you see that message, the npm artifact is
+installed into the wrong host line: replace it with the `dsh-0.2` source
+installation above. The codec `create()` factories exist only on this branch.
 
 Automated validation and the exact runtime checks are recorded separately.
 Desktop shares the Web plugin mechanism; a Web boot is not a packaged Desktop

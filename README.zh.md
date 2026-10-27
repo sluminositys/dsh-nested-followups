@@ -33,7 +33,7 @@ Session 都是真实的，后期只添加了说明字幕和鼠标指针。_
 | DeepSeek Harness | 插件来源 | 状态 |
 | --- | --- | --- |
 | `0.1.0-rc.7` 至 `0.1.1-rc.2` | npm `dsh-nested-followups@0.2.2` | 稳定插件路线 |
-| `0.2.0-rc.2` Web / 官方桌面端 | Git 分支 `dsh-0.2` | 新版适配，暂时只提供源码安装 |
+| `0.2.0-rc.2`、`0.2.1-rc.2` Web / 官方桌面端 | Git 分支 `dsh-0.2` | 新版适配，暂时只提供源码安装 |
 | `0.1.2-alpha.4` | 旧分支 `compat/dsh-0.1.2-alpha` | 保留的历史预览版本 |
 
 ### DSH 稳定 RC 版本
@@ -62,6 +62,25 @@ corepack pnpm dlx @deepseek-ai/dsh@0.2.0-rc.2 web
 安装后，Profile 里记录的是指向当前源码目录的 `link:`。以后拉取更新，需要重新运行
 `corepack pnpm run check` 并重启 Web Profile。不要把 npm `0.2.2` 直接装进
 DSH 0.2：它是旧版 RC 路线的发布产物，不包含这个兼容分支。
+
+#### 直接用 Git 地址安装（不克隆源码）
+
+直接按地址安装会通过包的 `prepare` 脚本现场构建。pnpm 在放行之前会拒绝执行，第一次
+尝试会以 `ERR_PNPM_GIT_DEP_PREPARE_NOT_ALLOWED` 失败，并在错误信息里打印需要放行的
+准确键值。把该键值加到 Profile 的 `pnpm-workspace.yaml`，再执行一次同样的命令即可：
+
+```sh
+dsh plugin --profile web add git+https://github.com/sluminositys/dsh-nested-followups.git#dsh-0.2
+```
+
+```yaml
+# ~/.dsh/profiles/web/pnpm-workspace.yaml
+allowBuilds:
+  'dsh-nested-followups@https://codeload.github.com/sluminositys/dsh-nested-followups/tar.gz/<commit>': true
+```
+
+这个键里包含解析出的具体 commit，分支一更新就必须重新替换。上面的说明用 `link:` 方式
+从本地源码目录安装，不存在这一步。
 
 ### 官方桌面端
 
@@ -183,6 +202,11 @@ _图中画出两层嵌套后以省略号继续：后续每一级的每条回答�
 当前源码适配旧版 RC 和新版 0.2 的会话快照、继承历史、持久化只读句柄、实时回答事件、
 工具结果、原生图标及消息渲染。它不修改 DSH，不改写会话日志。分叉仍以已完成回合
 为边界，不使用新版宿主允许从未完成回合分叉的能力。
+
+把旧版 npm 产物装进 DSH 0.2 时，安装阶段本身不会报错。Profile 启动后
+`typert-loader` 会报告本插件的远程调用编解码器没有 `create()` 工厂，插件保持未激活，
+Tree View 也不会出现。看到这条信息即说明装错了版本线：请按上面的说明改用 `dsh-0.2`
+源码安装。`create()` 工厂只存在于本分支。
 
 自动化检查和运行验证的范围分别记录；桌面端使用相同的 Web 插件机制，但 Web 启动
 通过不等于已经完成桌面安装包的端到端测试。

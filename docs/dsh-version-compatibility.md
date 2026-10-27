@@ -5,7 +5,7 @@
 | Exact DSH target | Plugin source | Policy |
 | --- | --- | --- |
 | `0.1.0-rc.7` through `0.1.1-rc.2` | npm `dsh-nested-followups@0.2.2` | Existing published artifact |
-| `0.2.0-rc.2` | `dsh-0.2` | Git source only; package version remains `0.2.2` |
+| `0.2.0-rc.2`, `0.2.1-rc.2` | `dsh-0.2` | Git source only; package version remains `0.2.2` |
 | `0.1.2-alpha.4` | Earlier `compat/dsh-0.1.2-alpha` branch | Historical preview; not the current development target |
 
 The npm artifact is **not** replaced by pulling a source branch. No new npm
@@ -73,6 +73,41 @@ rewritten. Read-only restrictions remain execution-time guards.
   Sharing the Web renderer is architectural evidence, not a substitute for
   testing its installed runtime and native window.
 
+## Reproduced failure with the npm artifact on DSH 0.2 (2026-10-23)
+
+Installing the published npm artifact `dsh-nested-followups@0.2.2` into a fresh
+isolated `0.2.0-rc.2` Web profile does **not** fail during install. The profile
+then boots with the plugin inactive and reports:
+
+```
+typert-loader: dsh-nested-followups invocation
+"dsh-nested-followups#nestedFollowups/readTree" parameter codec has no
+create() factory
+```
+
+The strict-codec `create()` factories required by the 0.2 loader exist only on
+this branch, which is why the npm artifact cannot be installed into 0.2 and the
+source track must be used instead.
+
+## Additional verification (2026-10-23, isolated profiles)
+
+Three independent `DSH_HOME` directories were used; the user's regular profile
+was never touched.
+
+| Install form | Host | Result |
+| --- | --- | --- |
+| npm `0.2.2` | `0.2.0-rc.2` | Reproduces the inactive-plugin error above |
+| `link:` to a checkout | `0.2.0-rc.2` | Boots clean, plugin entry and client bundle served |
+| `git+https://…#dsh-0.2` | `0.2.0-rc.2` | Boots clean after allowlisting the printed `allowBuilds` key |
+| `link:` to a checkout | `0.2.1-rc.2` | Boots clean, plugin entry and client bundle served |
+
+The `git+` form additionally needs the exact `allowBuilds` key pnpm prints,
+because the branch builds through its `prepare` script; see the install section
+of the README. Pinning development dependencies to `0.2.1-rc.2` also passes
+`typecheck` and all 220 tests, so the `>=0.2.0-rc.2 <0.3.0` peer range covers
+the later rc. Only `0.2.0-rc.2` and `0.2.1-rc.2` were exercised for activation;
+other versions in that range are not individually verified.
+
 For maintenance, use disposable checkouts with all `@deepseek-ai/dsh-*`
 development dependencies pinned to one exact target. Do not mix host generations
 inside a profile, or test against the user's active sessions. Re-run the full
@@ -85,8 +120,12 @@ the plugin's metadata does not make a newer DSH log readable by an older host.
 
 ## 中文摘要
 
-- 老版 DSH 继续用已发布的 npm `0.2.2`；当前 `0.2.0-rc.2` 用
+- 老版 DSH 继续用已发布的 npm `0.2.2`；`0.2.0-rc.2` 与 `0.2.1-rc.2` 用
   `dsh-0.2` 源码，不发布新包、不改主分支。
+- 把旧版 npm `0.2.2` 装进 0.2 时，安装阶段不会失败，而是启动后由 `typert-loader`
+  报告编解码器没有 `create()` 工厂、插件未激活。该工厂只存在于本分支。
+- 用 Git 地址直接安装时，pnpm 会先拦截 `prepare` 构建，需要按报错里给出的键值在
+  Profile 的 `pnpm-workspace.yaml` 中放行；从本地源码目录用 `link:` 安装不受影响。
 - 桌面端不需要重新实现界面，但要用其自带 CLI 装进 `desktop` Profile；
   普通 `web` 安装不会自动带过去。
 - 同一份源码已通过新版和 `0.1.1-rc.2` 的完整检查。桌面安装包尚未做端到端验证。
