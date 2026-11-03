@@ -26,8 +26,12 @@ Restart the web profile afterwards.
 
 - Node.js 22.19 or later
 - pnpm
-- DeepSeek Harness `0.2.0-rc.2` on this branch; retain regression checks against
-  legacy `0.1.1-rc.2` (`0.1.0-rc.7` remains the older npm artifact's floor)
+- DeepSeek Harness `0.2.1-rc.5` as the development target; retain regression checks
+  against `0.1.1-rc.2`, `0.2.1-alpha.1`, and `0.2.2-alpha.2`
+- The `0.2.2-alpha.2` test composition also needs its matching
+  `@deepseek-ai/dsh-tool-executor-native` dev dependency and Node.js >=24.9.
+  Production branches inherit the source preset's executor; never add it to
+  the plugin's hard dependencies or change the source tool presentation.
 - For preview-host work, use the source-only compatibility track described in
   [DSH version compatibility](docs/dsh-version-compatibility.md). Do not bump
   the plugin version or publish npm artifacts before release approval.

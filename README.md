@@ -37,8 +37,8 @@ Choose the install path that matches your DeepSeek Harness line:
 | DeepSeek Harness | Plugin source | Status |
 | --- | --- | --- |
 | `0.1.0-rc.7` through `0.1.1-rc.2` | npm `dsh-nested-followups@0.2.2` | Stable plugin track |
-| `0.2.0-rc.2` Web / official Desktop | Git branch `dsh-0.2` | Source-only compatibility track |
-| `0.1.2-alpha.4` | Previous branch `compat/dsh-0.1.2-alpha` | Historical preview track |
+| `0.2.1-rc.5` Web / official Desktop | Git `main` or `dsh-0.2` | Current source; not published to npm |
+| `0.2.1-alpha.1`, `0.2.2-alpha.2` | Same source | Additional verified preview targets |
 
 ### Stable DSH release candidates
 
@@ -51,23 +51,30 @@ conversation, and select **Tree View**.
 
 ### DSH 0.2 Web
 
-The new compatibility track is not published to npm. Clone the branch, build
+The current source is not published to npm. Clone the repository, build
 it locally, and invoke the matching CLI so an older global
 `dsh` binary cannot install it into the wrong profile contract:
 
 ```sh
-git clone --branch dsh-0.2 --single-branch https://github.com/sluminositys/dsh-nested-followups.git
+git clone --branch main --single-branch https://github.com/sluminositys/dsh-nested-followups.git
 cd dsh-nested-followups
 corepack pnpm install --frozen-lockfile
 corepack pnpm run check
-corepack pnpm dlx @deepseek-ai/dsh@0.2.0-rc.2 plugin --profile web add .
-corepack pnpm dlx @deepseek-ai/dsh@0.2.0-rc.2 web
+corepack pnpm dlx @deepseek-ai/dsh@0.2.1-rc.5 plugin --profile web add .
+corepack pnpm dlx @deepseek-ai/dsh@0.2.1-rc.5 web
 ```
 
 This creates a `link:` installation to the checkout. After pulling an update,
 run `corepack pnpm run check` again and restart the web profile. Do not
 install npm `0.2.2` into DSH 0.2; it is the legacy-rc artifact and does
-not contain this compatibility branch.
+not contain these source fixes. The checkout keeps version `0.2.2`; that does
+not replace the published artifact with the same version.
+
+**If installation fails:** a direct `git+https://...` install runs this package's
+`prepare` script, which pnpm requires you to approve. Clone/build/link using
+the commands above instead; the plugin never changes your script allowlist.
+An error saying npm `0.2.2` is incompatible with DSH `0.2.x` refers to the old
+npm artifact. Updating Git source does not update npm's `latest` tag.
 
 ### Official Desktop
 
@@ -75,7 +82,7 @@ Desktop uses the same Web UI, so the plugin does not need a separate canvas or
 an Electron extension. Its plugins belong to the **`desktop` profile**, not
 `web`; installing into one does not enable it in the other.
 
-1. Launch DSH Desktop `0.2.0-rc.2` once. Use **Manage dsh Command… → Install**
+1. Launch a supported DSH Desktop version once. Use **Manage dsh Command… → Install**
    in its application menu to install the bundled CLI.
 2. Clone and build the source branch using the first four commands above.
 3. **Fully quit Desktop** (closing its window may only hide it), then run the
@@ -91,7 +98,7 @@ Do not use npm's `dsh` or `pnpm dlx` for the `desktop` profile: only the bundled
 command can manage it. Existing global installations can shadow that command;
 check `dsh --version` and your shell's command path first. Source builds still
 need Node and pnpm; Desktop itself supplies the runtime for plugin activation.
-See the [official Desktop instructions](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.0-rc.2/apps/desktop/README.md#bundled-command-runtime).
+See the [official Desktop instructions](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.1-rc.5/apps/desktop/README.md#bundled-command-runtime).
 
 ## Why not a new chat or a sidebar thread?
 
@@ -202,7 +209,7 @@ inherited conversation again.
 
 | Requirement | Version |
 | --- | --- |
-| DeepSeek Harness | Legacy npm track: `0.1.0-rc.7` through `0.1.1-rc.2`; current source track: `0.2.0-rc.2` |
+| DeepSeek Harness | Legacy npm track: `0.1.0-rc.7` through `0.1.1-rc.2`; current source target: `0.2.1-rc.5`, plus the two verified alpha versions above |
 | Node.js (source build / Web) | `^22.19.0` or `>=24.0.0` |
 | Package manager (source build) | pnpm |
 
@@ -220,10 +227,10 @@ end-to-end test.
 See [DSH version compatibility](docs/dsh-version-compatibility.md) for the
 contract mapping and maintainer verification procedure.
 
-DSH `0.2.0-rc.2` is a release candidate. This branch deliberately keeps
-the plugin version at `0.2.2` and is not published to npm. Once DSH publishes a
-stable contract, the adapter will be rechecked against that exact release,
-then the plugin will receive its next version and npm release.
+The current development target is DSH `0.2.1-rc.5`; the same source is also
+checked against `0.2.1-alpha.1`, `0.2.2-alpha.2`, and legacy `0.1.1-rc.2`.
+This update does not publish a new npm package. DSH `0.2.2-alpha.2` requires
+Node.js 24.9 or later; packaged Desktop supplies its own runtime.
 
 **Branches cannot be continued from the standard chat view.** DSH currently
 rejects user messages sent from the normal chat UI to a subagent-origin

@@ -7,8 +7,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserve explicitly selected reasoning effort when creating or resuming a
+  follow-up branch, without turning provider defaults into explicit settings.
+- Declare `engines.dsh` and align peer ranges with DSH's prerelease-aware
+  installer. Exclude unvalidated `0.2.0-rc.1` and future `0.3.0` previews.
+- Document the Git `prepare` authorization failure from issue #1 and the old
+  npm artifact rejection from issue #3. Keep lifecycle protection intact and
+  provide clone/build/link instructions for both Web and Desktop.
+
 ### Added
 
+- Extend the verified source matrix to DSH `0.2.1-rc.5`, `0.2.1-alpha.1`, and
+  `0.2.2-alpha.2`, retaining legacy `0.1.1-rc.2`. Each full gate passes 234 tests.
+- Cover the split 0.2.2 native executor with real read-only execution tests and
+  update storage test doubles for the batch-deletion contract.
 - Added source-only DSH `0.2.0-rc.2` compatibility on `dsh-0.2`, including
   read-only persistence handles, native assistant-stream frames, updated tool
   result correlation, strict-codec factories, and renamed UI primitives.
@@ -28,13 +42,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Moved this compatibility branch's development dependency set to DSH
-  `0.2.0-rc.2` and Cordis `4.0.4`. Kept the plugin version at `0.2.2`, with no
-  npm publication or changes to the legacy main branch.
+- Update development dependencies to DSH `0.2.1-rc.5`, Cordis `4.0.5`, and loader
+  `1.0.6`, and share current source with the default branch. Keep npm version
+  `0.2.2` unchanged; no npm publication or GitHub Release in this update.
+- The earlier September adaptation targeted DSH `0.2.0-rc.2` and Cordis
+  `4.0.4`, initially leaving main and npm on the legacy implementation.
 - Retained completed-turn fork boundaries even though newer DSH also permits
   open-tail forks. Branch isolation and execution-only read guards are unchanged.
-- Verified the current source against DSH `0.1.1-rc.2` and `0.2.0-rc.2`: both
-  full checks pass 220 tests in 33 files. Confirmed view switching, fixture
+- The September verification against DSH `0.1.1-rc.2` and `0.2.0-rc.2` passed
+  220 tests in 33 files at that point. Confirmed view switching, fixture
   history, the follow-up composer, and page-reload restoration in 0.2 Web.
 - Kept npm `0.2.2` as the stable rc artifact. DSH `0.1.2-alpha` support is
   source-only on `compat/dsh-0.1.2-alpha`; a new plugin version and npm release
