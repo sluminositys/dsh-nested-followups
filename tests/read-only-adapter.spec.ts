@@ -2,6 +2,7 @@ import type { Context } from '@deepseek-ai/cordis'
 import type {
   Agent,
   AgentHandle,
+  AgentOptions,
   CreateAgentOptions,
   ResumeAgentOptions,
 } from '@deepseek-ai/dsh-agent'
@@ -56,6 +57,36 @@ function readTool(name: string): ToolDefinition {
   }
 }
 
+/** 0.2.2 splits the real native executor from the registry; older hosts include it. */
+async function mountNativeExecutor(ctx: Context): Promise<() => Promise<void>> {
+  if (typeof (ctx.tools as unknown as { setExecutor?: unknown }).setExecutor !== 'function') {
+    return async () => {}
+  }
+  const specifier = '@deepseek-ai/dsh-tool-executor-native'
+  const native = await import(specifier) as { name: string; inject: string[]; apply(ctx: Context): void }
+  const fiber = ctx.plugin(native)
+  await fiber
+  return () => fiber.dispose()
+}
+
+/** Exercise the host's real execution path, not a fake guard or executor. */
+async function executeTool(ctx: Context, agent: Agent, name: string): Promise<{ content: readonly unknown[] }> {
+  type Outcome = { content: readonly unknown[] }
+  const tools = ctx.tools as unknown as {
+    setExecutor?: unknown
+    execute(input: unknown): Promise<Outcome | { results: readonly { result: Outcome }[] }>
+  }
+  const signal = new AbortController().signal
+  const callId = `${name}-call`
+  const result = await tools.execute(typeof tools.setExecutor === 'function'
+    ? { agent, signal, calls: [{ type: 'tool-call', id: callId, name, arguments: '{}' }] }
+    : { agent, signal, callId, name, arguments: {} })
+  if (!('results' in result)) return result
+  const first = result.results[0]
+  if (first === undefined) throw new Error('the native executor returned no tool result')
+  return first.result
+}
+
 function compatibleHeader(
   id: string,
   fields: Record<string, unknown> = {},
@@ -102,6 +133,7 @@ describe('rc.7 read-only branch adapter', () => {
     await systemPromptFiber
     const toolsFiber = ctx.plugin(ToolRuntime)
     await toolsFiber
+    const disposeExecutor = await mountNativeExecutor(ctx)
     ctx.tools.register(readTool('read'))
     ctx.tools.register(readTool('write'))
     ctx.systemPrompt.section({ name: 'tool:read', order: 100, text: 'Use the read tool.' })
@@ -128,18 +160,21 @@ describe('rc.7 read-only branch adapter', () => {
     await branchScope.dispose()
     await mainlineScope.dispose()
     await minter.dispose()
+    await disposeExecutor()
     await toolsFiber.dispose()
     await systemPromptFiber.dispose()
   })
 
-  it('executes a read tool and denies a mutating one on a real rc.7 runtime', async () => {
+  it('executes a read tool and denies a mutating one on the real host runtime', async () => {
     const ctx = new (await import('@deepseek-ai/cordis')).Context()
     const systemPromptFiber = ctx.plugin(SystemPrompt, { toolOrder: ['<unlisted-tools>'] })
     await systemPromptFiber
     const toolsFiber = ctx.plugin(ToolRuntime)
     await toolsFiber
+    const disposeExecutor = await mountNativeExecutor(ctx)
     ctx.tools.register(readTool('read'))
-    ctx.tools.register(readTool('write'))
+    const write = vi.fn(async () => 'write ran')
+    ctx.tools.register({ ...readTool('write'), execute: write })
 
     const key = { id: SessionId('read-only-agent') } as Agent
     let scope!: ReturnType<typeof createScope>
@@ -149,30 +184,20 @@ describe('rc.7 read-only branch adapter', () => {
     await minter
     applyReadOnlyScopeRc7(scope.ctx)
 
-    const allowed = await ctx.tools.execute({
-      signal: new AbortController().signal,
-      callId: 'read-call' as never,
-      name: 'read',
-      arguments: {},
-      agent: key,
-    })
+    const allowed = await executeTool(ctx, key, 'read')
     expect(allowed.content).toEqual([
       expect.objectContaining({ type: 'text', text: 'read ran' }),
     ])
 
-    const denied = await ctx.tools.execute({
-      signal: new AbortController().signal,
-      callId: 'write-call' as never,
-      name: 'write',
-      arguments: {},
-      agent: key,
-    })
+    const denied = await executeTool(ctx, key, 'write')
     expect(denied.content).toEqual([
       expect.objectContaining({ type: 'text', text: expect.stringContaining('read-only') }),
     ])
+    expect(write).not.toHaveBeenCalled()
 
     await scope.dispose()
     await minter.dispose()
+    await disposeExecutor()
     await toolsFiber.dispose()
     await systemPromptFiber.dispose()
   })
@@ -312,5 +337,23 @@ describe('rc.7 read-only branch adapter', () => {
       source: { kind: 'user' },
       content: [{ type: 'text', text: 'Explain this part of the answer.' }],
     }))
+  })
+
+  it('preserves explicit reasoning effort from legacy-history agent options', () => {
+    const options = { provider: 'p', model: 'm', reasoningEffort: 'high' } as AgentOptions
+    expect(resolveBranchAgentOptionsRc7([], options)).toEqual(options)
+  })
+
+  it.each([false, true])('preserves reasoning effort without freezing adapter defaults: %s', (defaulted) => {
+    const events = [{ seq: 0, time: 1, type: 'request/header', data: {
+      reason: 'initial',
+      header: {
+        config: { provider: 'p', model: 'm', reasoningEffort: 'high' },
+        ...(defaulted ? { adapterDefaults: { reasoningEffort: true } } : {}),
+      },
+    } }] as unknown as SessionEvent[]
+    expect(resolveBranchAgentOptionsRc7(events)).toEqual({
+      provider: 'p', model: 'm', ...(defaulted ? {} : { reasoningEffort: 'high' }),
+    })
   })
 })

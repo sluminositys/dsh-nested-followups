@@ -18,6 +18,11 @@ class MemoryTable<V> implements KvTable<string, V> {
   get size(): number { return this.records.size }
   async put(key: string, value: V): Promise<void> { this.records.set(key, value) }
   async delete(key: string): Promise<boolean> { return this.records.delete(key) }
+  async deleteMany(keys: Iterable<string>): Promise<number> {
+    let count = 0
+    for (const key of keys) if (this.records.delete(key)) count += 1
+    return count
+  }
   async update(key: string, fn: (current: V) => V): Promise<V> {
     const current = this.records.get(key)
     if (current === undefined) throw new Error('missing key')

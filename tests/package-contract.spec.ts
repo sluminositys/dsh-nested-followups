@@ -1,4 +1,5 @@
 import { readFile } from 'node:fs/promises'
+import { satisfies } from 'semver'
 import { describe, expect, it } from 'vitest'
 
 import { apply, name } from '../src/index.ts'
@@ -44,13 +45,36 @@ describe('package contract', () => {
       .map(([, version]) => version)
 
     expect(new Set(dshPeers)).toEqual(new Set([
-      '>=0.1.0-rc.7 <0.1.1 || >=0.1.1-rc.1 <0.1.2 || >=0.1.2-alpha.1 <0.2.0 || >=0.2.0-rc.2 <0.3.0',
+      '>=0.1.0-rc.7 <0.1.1-0 || >=0.1.1-rc.1 <0.1.2-0 || >=0.1.2-alpha.1 <0.2.0-0 || >=0.2.0-rc.2 <0.3.0-0',
     ]))
     const validationVersions = [...new Set(dshValidationTargets)]
     expect(validationVersions).toHaveLength(1)
-    expect(['0.1.1-rc.2', '0.1.2-alpha.4', '0.2.0-rc.2']).toContain(validationVersions[0])
+    expect(['0.1.1-rc.2', '0.1.2-alpha.4', '0.2.0-rc.2', '0.2.1-alpha.1', '0.2.1-rc.5', '0.2.2-alpha.2']).toContain(validationVersions[0])
     expect(manifest.peerDependencies).not.toHaveProperty('@deepseek-ai/dsh-client-runtime')
   })
+
+  it.each(['0.1.0-rc.7', '0.1.1-rc.2', '0.2.0-rc.2', '0.2.1-alpha.1', '0.2.1-rc.5', '0.2.2-alpha.2'])(
+    'passes the DSH install preflight for %s', async (version) => {
+      const manifest = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')) as {
+        engines: { dsh?: string }
+        peerDependencies: Record<string, string>
+      }
+      expect(manifest.engines.dsh).toBeTypeOf('string')
+      // DSH app-boot includes prereleases when evaluating engines.dsh and peers.
+      const ranges = [manifest.engines.dsh!, ...Object.entries(manifest.peerDependencies)
+        .filter(([name]) => name.startsWith('@deepseek-ai/dsh-')).map(([, range]) => range)]
+      for (const range of ranges) expect(satisfies(version, range, { includePrerelease: true })).toBe(true)
+    },
+  )
+
+  it.each(['0.1.0-rc.6', '0.2.0-rc.1', '0.3.0-alpha.1', '0.3.0', '1.0.0'])(
+    'does not opt into the unvalidated runtime %s', async (version) => {
+      const manifest = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')) as {
+        engines: { dsh: string }
+      }
+      expect(satisfies(version, manifest.engines.dsh, { includePrerelease: true })).toBe(false)
+    },
+  )
 
   it('inserts one removable Cordis bundle row', async () => {
     const patch = await readFile(new URL('../cordis.patch.yml', import.meta.url), 'utf8')

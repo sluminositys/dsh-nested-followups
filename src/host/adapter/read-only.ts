@@ -76,14 +76,22 @@ export function resolveBranchAgentOptionsRc7(
   fallback: AgentOptions = {},
 ): AgentOptions {
   const header = foldRequestHeader(events)
+  // reasoningEffort was added to AgentOptions after the original rc contract.
+  // Keep explicit choices, but let each provider recompute its own defaults.
+  const config = (header?.config ?? fallback) as AgentOptions & { readonly reasoningEffort?: string }
+  const defaults = header?.adapterDefaults as { readonly reasoningEffort?: boolean } | undefined
+  const reasoning = config.reasoningEffort === undefined || defaults?.reasoningEffort === true
+    ? {} : { reasoningEffort: config.reasoningEffort }
   if (header === undefined) {
     return {
+      ...reasoning,
       ...fallback.provider === undefined ? {} : { provider: fallback.provider },
       ...fallback.model === undefined ? {} : { model: fallback.model },
       ...fallback.maxTokens === undefined ? {} : { maxTokens: fallback.maxTokens },
     }
   }
   return {
+    ...reasoning,
     provider: header.config.provider,
     model: header.config.model,
     ...header.config.maxTokens === undefined || header.adapterDefaults?.maxTokens === true
