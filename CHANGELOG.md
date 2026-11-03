@@ -7,8 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.3] - 2026-11-03
+
 ### Fixed
 
+- Hide the unfinished Context Preview action until its reading panel is
+  implemented; existing nested follow-up and navigation controls are unchanged.
 - Preserve explicitly selected reasoning effort when creating or resuming a
   follow-up branch, without turning provider defaults into explicit settings.
 - Declare `engines.dsh` and align peer ranges with DSH's prerelease-aware
@@ -23,7 +27,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `0.2.2-alpha.2`, retaining legacy `0.1.1-rc.2`. Each full gate passes 234 tests.
 - Cover the split 0.2.2 native executor with real read-only execution tests and
   update storage test doubles for the batch-deletion contract.
-- Added source-only DSH `0.2.0-rc.2` compatibility on `dsh-0.2`, including
+- Added DSH `0.2` compatibility, including
   read-only persistence handles, native assistant-stream frames, updated tool
   result correlation, strict-codec factories, and renamed UI primitives.
 - Added official Desktop installation instructions for the separate `desktop`
@@ -43,8 +47,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Update development dependencies to DSH `0.2.1-rc.5`, Cordis `4.0.5`, and loader
-  `1.0.6`, and share current source with the default branch. Keep npm version
-  `0.2.2` unchanged; no npm publication or GitHub Release in this update.
+  `1.0.6`, and share current source with the default branch.
+- Publish the compatibility fixes as npm `0.2.3`, with matching Web and Desktop
+  installation commands and a corresponding GitHub Release.
 - The earlier September adaptation targeted DSH `0.2.0-rc.2` and Cordis
   `4.0.4`, initially leaving main and npm on the legacy implementation.
 - Retained completed-turn fork boundaries even though newer DSH also permits
@@ -52,9 +57,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - The September verification against DSH `0.1.1-rc.2` and `0.2.0-rc.2` passed
   220 tests in 33 files at that point. Confirmed view switching, fixture
   history, the follow-up composer, and page-reload restoration in 0.2 Web.
-- Kept npm `0.2.2` as the stable rc artifact. DSH `0.1.2-alpha` support is
-  source-only on `compat/dsh-0.1.2-alpha`; a new plugin version and npm release
-  are deferred until DSH publishes the stable replacement contract.
+- Keep the immutable npm `0.2.2` artifact available for legacy rollback;
+  `0.2.3` includes the newer host adapters as well as legacy compatibility.
 - The earlier alpha track verified `0.1.1-rc.2` and `0.1.2-alpha.4` with 162
   tests, including a source-linked alpha Web boot.
 - Rebuilt the English and Chinese README introductions around the project's

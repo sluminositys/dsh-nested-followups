@@ -32,22 +32,22 @@ Session 都是真实的，后期只添加了说明字幕和鼠标指针。_
 
 | DeepSeek Harness | 插件来源 | 状态 |
 | --- | --- | --- |
-| `0.1.0-rc.7` 至 `0.1.1-rc.2` | npm `dsh-nested-followups@0.2.2` | 稳定插件路线 |
-| `0.2.1-rc.5` Web / 官方桌面端 | Git `main` 或 `dsh-0.2` | 当前源码，尚未发布 npm |
-| `0.2.1-alpha.1`、`0.2.2-alpha.2` | 同一份源码 | 另外验证的预发布版本 |
+| `0.1.0-rc.7` 至 `0.1.1-rc.2` | npm `dsh-nested-followups@0.2.3` | 保留旧版宿主兼容性 |
+| `0.2.1-rc.5` Web / 官方桌面端 | npm `dsh-nested-followups@0.2.3` | 当前开发目标 |
+| `0.2.1-alpha.1`、`0.2.2-alpha.2` | 同一个包 | 另外验证的预发布版本 |
 
-### DSH 稳定 RC 版本
+### Web 安装
 
 ```sh
-dsh plugin --profile web add dsh-nested-followups@0.2.2
+dsh plugin --profile web add dsh-nested-followups@0.2.3
 ```
 
 如果 Web Profile 已经在运行，请重启一次。随后照常打开会话，点击顶栏的
 **Tree View**。
 
-### DSH 0.2 Web
+### 从源码构建（可选，DSH 0.2 Web）
 
-新版适配暂时不发布 npm 包，请克隆仓库后在本地构建。下面显式调用对应版本的
+正常使用直接安装 npm 包即可。开发插件时，可以克隆仓库后在本地构建。下面显式调用对应版本的
 CLI，避免电脑里旧的全局 `dsh` 把插件装进错误的 Profile 契约：
 
 ```sh
@@ -60,14 +60,12 @@ corepack pnpm dlx @deepseek-ai/dsh@0.2.1-rc.5 web
 ```
 
 安装后，Profile 里记录的是指向当前源码目录的 `link:`。以后拉取更新，需要重新运行
-`corepack pnpm run check` 并重启 Web Profile。不要把 npm `0.2.2` 直接装进
-DSH 0.2：它是旧版 RC 路线的发布产物，不包含这些源码修复。源码中的包版本暂时
-也保留为 `0.2.2`，不代表 npm 上的同版本已经更新。
+`corepack pnpm run check` 并重启 Web Profile。
 
 **如果安装失败：**直接安装 `git+https://...` 地址会执行本包的 `prepare` 构建脚本，
-pnpm 要求用户先授权。建议改用上面的“克隆、构建、安装本地目录”步骤；插件不会替你
+pnpm 要求用户先授权。可以直接安装 npm `0.2.3`，或使用上面的“克隆、构建、安装本地目录”步骤；插件不会替你
 修改脚本授权名单。若提示 npm `0.2.2` 与 DSH `0.2.x` 不兼容，指的是旧 npm 包，
-拉取 Git 源码不会更新 npm 的 `latest`。
+请明确安装 `0.2.3`。
 
 ### 官方桌面端
 
@@ -76,18 +74,19 @@ pnpm 要求用户先授权。建议改用上面的“克隆、构建、安装本
 
 1. 先启动一次受支持版本的 DSH Desktop。在应用菜单的 **Manage dsh Command… →
    Install** 中安装桌面端自带的命令。
-2. 按上一节的前四条命令克隆源码并构建。
-3. **完全退出桌面端**，不要只关闭窗口。在源码目录使用桌面端自带的 `dsh` 执行：
+2. **完全退出桌面端**，不要只关闭窗口。
+3. 使用桌面端自带的 `dsh` 执行：
 
    ```sh
-   dsh plugin --profile desktop add .
+   dsh plugin --profile desktop add dsh-nested-followups@0.2.3
    ```
 
-4. 重新打开桌面端，在会话顶栏点击 **Tree View**。
+4. 重新打开桌面端，在会话顶栏点击 **Tree View**。若安装本地源码，在构建后进入源码目录，
+   将上面的包名换成 `.`。
 
 不要用 npm 安装的 `dsh` 或 `pnpm dlx` 操作 `desktop` Profile，只有桌面端自带的
 命令能管理它。电脑上已有的全局命令可能抢先被找到，安装前请检查 `dsh --version`
-及命令所在路径。编译本插件源码仍需要 Node 和 pnpm；桌面端运行插件则使用自带环境。
+及命令所在路径。桌面端安装 npm 包使用自带环境；只有编译源码才需要另外安装 Node 和 pnpm。
 具体机制见 [官方桌面端说明](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.1-rc.5/apps/desktop/README.md#bundled-command-runtime)。
 
 ## 为什么不新开对话或做普通侧栏？
@@ -180,7 +179,7 @@ _图中画出两层嵌套后以省略号继续：后续每一级的每条回答�
 
 | 项目 | 版本 |
 | --- | --- |
-| DeepSeek Harness | 旧版 npm 路线：`0.1.0-rc.7` 至 `0.1.1-rc.2`；当前源码目标：`0.2.1-rc.5`，另验证两个 alpha 版本 |
+| DeepSeek Harness | `0.2.1-rc.5`，以及上表中已验证的 alpha 和旧版宿主 |
 | Node.js（编译源码 / Web） | `^22.19.0` 或 `>=24.0.0` |
 | 包管理器（编译源码） | pnpm |
 
@@ -195,7 +194,7 @@ _图中画出两层嵌套后以省略号继续：后续每一级的每条回答�
 具体契约映射与维护者验证流程见 [DSH 版本兼容说明](docs/dsh-version-compatibility.md)。
 
 当前开发目标是 DSH `0.2.1-rc.5`；同一份源码也检查了 `0.2.1-alpha.1`、
-`0.2.2-alpha.2` 和旧版 `0.1.1-rc.2`。本次不发布新 npm 包。
+`0.2.2-alpha.2` 和旧版 `0.1.1-rc.2`。上述适配已包含在 npm `0.2.3` 中。
 DSH `0.2.2-alpha.2` 要求 Node.js 24.9 及以上；桌面安装包自带运行环境。
 
 **分支目前不能在原生 Chat 里续聊。** DSH 会拒绝从普通对话界面向 subagent-origin

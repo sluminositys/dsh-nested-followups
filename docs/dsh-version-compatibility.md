@@ -4,15 +4,15 @@
 
 | Exact DSH target | Plugin source | Policy |
 | --- | --- | --- |
-| `0.1.0-rc.7` through `0.1.1-rc.2` | npm `dsh-nested-followups@0.2.2` | Existing published artifact |
-| `0.2.1-rc.5` | `main` or `dsh-0.2` | Current development target; source only |
-| `0.2.1-alpha.1` | Same source | Reporter runtime from issue #1 |
-| `0.2.2-alpha.2` | Same source | Additional alpha matrix; Node >=24.9 |
+| `0.1.0-rc.7` through `0.1.1-rc.2` | npm `dsh-nested-followups@0.2.3` | Legacy host support retained |
+| `0.2.1-rc.5` | npm `dsh-nested-followups@0.2.3` | Current development target |
+| `0.2.1-alpha.1` | Same package | Reporter runtime from issue #1 |
+| `0.2.2-alpha.2` | Same package | Additional alpha matrix; Node >=24.9 |
 
-The npm artifact is **not** replaced by pulling a source branch. No new npm
-version, tag, or GitHub Release is produced by this adaptation. Unlisted host
-versions are not individually verified just because a dependency range permits
-installation.
+Version `0.2.3` packages the current compatibility adapters for npm installation,
+with matching GitHub tag `v0.2.3`. The old npm `0.2.2` artifact is unchanged and
+remains available for legacy rollback. Unlisted host versions are not individually
+verified just because a dependency range permits installation.
 
 The manifest declares `engines.dsh` and matching DSH peer ranges. DSH's preflight
 uses `includePrerelease: true`; upper bounds therefore use `-0` to exclude the
@@ -33,8 +33,9 @@ next line's previews as well as its releases. In particular, `0.2.0-rc.1` and
   DSH `<0.2.0` and is rejected by `0.2.1-rc.5` before installation. The source
   manifest now declares the current host range; the source fixes are shared by
   `main` and `dsh-0.2` rather than being stranded on a non-default branch.
-  This does **not** update the immutable npm artifact or the registry's `latest`
-  tag. A separately approved npm release is still required for market users.
+  npm `0.2.3` includes those adapters and the corrected compatibility declaration.
+  Install `dsh-nested-followups@0.2.3` explicitly if a catalog still selects the
+  older `0.2.2` artifact.
 
 The two failure paths are reproduced in an isolated Windows Unicode-named
 DSH_HOME. A locally packed artifact of the fixed source installs successfully
@@ -48,14 +49,15 @@ packaged Desktop UI is exercised by this smoke check.
 Follow the [English installation instructions](../README.md#install) or
 [中文安装说明](../README.zh.md#安装).
 
-Web uses `dsh plugin --profile web add .`. Official Desktop uses the same Web
+Web uses `dsh plugin --profile web add dsh-nested-followups@0.2.3`. Official Desktop uses the same Web
 client plugin contract (`dsh.client.platform: "web"`), but a separate
 `desktop` profile. No native window, Electron IPC, or `dsh-app://` navigation
 is needed by this plugin.
 
 For a supported Desktop version, initialize the app once, install its bundled CLI with
 **Manage dsh Command…**, fully quit it, then run
-`dsh plugin --profile desktop add .` from the built checkout and reopen the app.
+`dsh plugin --profile desktop add dsh-nested-followups@0.2.3` and reopen the app.
+Use `.` from a built checkout only when installing local source.
 An npm-installed CLI cannot manage the Desktop profile. Web and Desktop share
 supported product data, not plugin installations, activation, or lockfiles.
 
@@ -114,6 +116,11 @@ These are automated compatibility checks and CLI installation checks, not a
 packaged Desktop or live-provider end-to-end demonstration. The earlier Web
 browser verification is recorded separately below.
 
+Release `0.2.3` keeps the unfinished Context Preview control hidden until its
+reading panel exists. Its data-model tests remain, but it is not a user-facing
+feature of this release. The published package contains prebuilt Host and client
+entries; normal npm installation does not compile the Git checkout.
+
 ## Verification record (2026-09-30)
 
 - DSH `0.2.0-rc.2` / Cordis `4.0.4`: full `pnpm run check` passed.
@@ -142,11 +149,11 @@ the plugin's metadata does not make a newer DSH log readable by an older host.
 
 ## 中文摘要
 
-- 老版 DSH 可继续用已发布的 npm `0.2.2`；当前 `0.2.1-rc.5` 及已验证的 alpha
-  版本用 `main` 或 `dsh-0.2` 源码。本次同步默认分支，不发布新包。
+- npm `0.2.3` 同时包含旧版宿主和当前 `0.2.1-rc.5`、已验证 alpha 版本的适配。
+  不再要求从 Git 安装；`0.2.2` 保留用于旧版回退。
 - 桌面端不需要重新实现界面，但要用其自带 CLI 装进 `desktop` Profile；
-  普通 `web` 安装不会自动带过去。
+  普通 `web` 安装不会自动带过去。使用桌面端自带命令安装 npm `0.2.3` 即可。
 - 同一份源码在上表四个版本中各通过 234 项测试及完整检查。桌面安装包尚未做端到端验证。
-- Git 直接安装受 pnpm 的构建脚本授权约束；推荐克隆、构建后安装本地目录。
-  npm `latest` 仍是旧包，必须另行发布才能修复市场中的 npm 安装路径。
+- 正常使用推荐安装 npm `0.2.3`。只有 Git 直接安装仍受 pnpm 的构建脚本授权约束；
+  开发时可以克隆、构建后安装本地目录，插件不会修改用户的授权名单。
 - 新版的会话格式由 DSH 负责迁移，插件不改写日志，也不负责降级。

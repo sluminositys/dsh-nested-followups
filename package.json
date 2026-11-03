@@ -1,6 +1,6 @@
 {
   "name": "dsh-nested-followups",
-  "version": "0.2.2",
+  "version": "0.2.3",
   "description": "Recursively isolated follow-ups for DeepSeek Harness: branch from any answer and keep branching at any depth without touching the main task.",
   "keywords": [
     "dsh-plugin",

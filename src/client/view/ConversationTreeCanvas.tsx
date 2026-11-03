@@ -29,7 +29,6 @@ import {
   type Point,
   type Size,
 } from '../tree/geometry.ts'
-import { deriveContextPreview } from '../tree/context-preview.ts'
 import { layoutConversationTree, type BranchCapsuleLayout } from '../tree/layout.ts'
 import {
   createMinimapModel,
@@ -999,8 +998,8 @@ export function ConversationTreeCanvas({
                         : branchTargetNode === undefined
                           ? labels.askUnavailable
                           : undefined
-                const canPreview = deriveContextPreview(projection, node.nodeId)
-                  ?.boundary.eligible === true
+                // Keep the action hidden until its Context Preview panel is implemented.
+                const canPreview = false
                 const cardStyle = {
                   ...nodeStyle(position.rect),
                   '--fold-card-delay': `${Math.max(0, position.depth - 1) * 260 + Math.max(0, branch?.nodeIds.indexOf(node.nodeId) ?? 0) * 60}ms`,

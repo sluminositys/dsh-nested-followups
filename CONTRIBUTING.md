@@ -32,7 +32,7 @@ Restart the web profile afterwards.
   `@deepseek-ai/dsh-tool-executor-native` dev dependency and Node.js >=24.9.
   Production branches inherit the source preset's executor; never add it to
   the plugin's hard dependencies or change the source tool presentation.
-- For preview-host work, use the source-only compatibility track described in
+- For preview-host work, follow the compatibility matrix described in
   [DSH version compatibility](docs/dsh-version-compatibility.md). Do not bump
   the plugin version or publish npm artifacts before release approval.
 
