@@ -36,6 +36,13 @@ Session 都是真实的，后期只添加了说明字幕和鼠标指针。_
 | `0.2.1-rc.5` Web / 官方桌面端 | npm `dsh-nested-followups@0.2.3` | 当前开发目标 |
 | `0.2.1-alpha.1`、`0.2.2-alpha.2` | 同一个包 | 另外验证的预发布版本 |
 
+**DSH `0.2.1-rc.5` 请使用下面明确指定插件版本的命令。** 如果插件市场提示
+`dsh-nested-followups@0.2.2` 不兼容，实际安装的仍是旧包，即使命令里写的是
+`@latest`。在 `0.2.3` 发布后，我们仍在全新的 rc.5 Profile 中复现了这种回退；
+明确指定 `@0.2.3` 可以安装成功。这是 pnpm 11 默认的
+[新包发布后等待一天](https://pnpm.io/blog/releases/11.0#security--build-defaults)策略在生效。
+不要给旧 `0.2.2` 添加兼容性豁免，也不需要关闭 Profile 的发布等待期保护。
+
 ### Web 安装
 
 ```sh

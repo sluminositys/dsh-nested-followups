@@ -96,6 +96,52 @@ the official native executor separately, then exercises its real batch API and
 the same read-only guard. Production continues to inherit its source preset;
 no executor is added as a hard plugin dependency or to the prompt schema.
 
+## rc.5 installation regression (2026-11-04)
+
+The target remains **DSH `0.2.1-rc.5`**, not the newer alpha channel. The npm
+`0.2.3` package already contains the rc.5 adapters; no host exemption, core patch,
+or another plugin version is required for this installation failure.
+
+Issue #3 can still reproduce immediately after publication, even when the npm
+`latest` tag points to the fixed version:
+
+| Official rc.5 CLI, isolated Web profile | Resolved package | Result |
+| --- | --- | --- |
+| `add dsh-nested-followups@latest` | `0.2.2` | Host rejects its old compatibility range and rolls back |
+| Same request, fresh profile, explicit official npm registry | `0.2.2` | Same rejection; not explained by a registry mirror alone |
+| `add dsh-nested-followups@0.2.3` | `0.2.3` | Installs without a host compatibility exemption |
+
+The test ran while `0.2.3` was less than a day old. pnpm 11 defaults to a
+1440-minute `minimumReleaseAge`; an explicit version request in its default
+non-strict mode adds a package-version-specific `minimumReleaseAgeExclude` entry.
+The successful install recorded exactly `dsh-nested-followups@0.2.3`. It did not
+turn off the profile's general supply-chain or lifecycle checks.
+As a control, reducing only the release-age threshold to one hour in another
+disposable test process made the same official-registry `@latest` request resolve
+to `0.2.3`. No user's profile or global setting was changed for that experiment.
+See the [pnpm 11 release notes](https://pnpm.io/blog/releases/11.0#security--build-defaults).
+
+Use the exact-version commands in the README. Do **not** use `allow-version` to
+force the old `0.2.2` package onto rc.5. The installer chooses the package before
+this plugin loads, so changing the plugin's runtime code cannot fix an earlier
+package-resolution decision. Likewise, a plugin-market page showing `0.2.2`
+does not by itself establish which package a subsequent install will resolve.
+
+The rc.5 client-entry tests now use real Cordis lifecycles and the public
+`SlotCore`, rather than only rendering the toggle component in isolation. They
+exercise Remote mount/namespace readiness, the shared conversation view store,
+late slot declarations, missing-store degradation, failed mounts, and cleanup of
+slots, dictionaries, controllers, connection handlers, and the Remote mount.
+The Remote transport and browser-only rendering primitives are test doubles;
+these tests do not claim to be a packaged Desktop end-to-end run.
+
+The rc.5 full gate passes **238 tests in 34 files**, including lint, TypeScript,
+build, package smoke checks, and publint. In a separate real Chromium run, the
+registry-installed `0.2.3` client opens Tree View and renders all six fixture
+messages, restores the six cards after a page reload, and switches back to native
+Chat. No page or console errors were recorded. No live model request is needed
+for that activation check; a packaged Desktop window was not exercised.
+
 ## Verification record (2026-11-03)
 
 The same source passes the full `pnpm run check` gate on all four matrices:

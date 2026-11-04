@@ -40,6 +40,14 @@ Choose the install path that matches your DeepSeek Harness line:
 | `0.2.1-rc.5` Web / official Desktop | npm `dsh-nested-followups@0.2.3` | Current development target |
 | `0.2.1-alpha.1`, `0.2.2-alpha.2` | Same package | Additional verified preview targets |
 
+**DSH `0.2.1-rc.5`: use the exact plugin version below.** If Plugin Hub reports
+that `dsh-nested-followups@0.2.2` is incompatible, it installed the old artifact,
+even if its command said `@latest`. A fresh rc.5 profile reproduced that fallback
+after `0.2.3` was published; explicitly requesting `@0.2.3` installs successfully.
+pnpm 11's default [one-day release-age window](https://pnpm.io/blog/releases/11.0#security--build-defaults)
+can cause this immediately after a release. Do not grant a compatibility
+exemption to `0.2.2` or disable the profile's release-age protection.
+
 ### Web
 
 ```sh

@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Document the rc.5 `@latest` installation fallback: pnpm 11 can select the old
+  incompatible `0.2.2` while `0.2.3` is inside its default one-day release-age
+  window. Keep Web and Desktop instructions pinned to `0.2.3`, without granting
+  a host compatibility exemption or disabling the profile's safety checks.
+
+### Added
+
+- Exercise the real client entry with Cordis and DSH's public SlotCore: Remote
+  readiness, shared header view store, delayed slot declarations, optional-store
+  degradation, mount failure, and lifecycle cleanup now have regression tests.
+
 ## [0.2.3] - 2026-11-03
 
 ### Fixed
