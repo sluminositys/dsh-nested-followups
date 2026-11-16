@@ -589,6 +589,10 @@
   color: var(--dsw-alias-brand-text);
 }
 
+.capsuleMain[aria-disabled='true'] {
+  cursor: default;
+}
+
 .branchMorph[data-mode='capsule']:hover,
 .branchMorph[data-mode='capsule']:focus-within {
   border-color: var(--dsw-alias-brand-primary);
@@ -676,6 +680,12 @@
 .capsuleDelete:focus-visible {
   color: var(--dsw-alias-label-error);
   background: var(--dsw-alias-interactive-bg-hover-danger);
+}
+
+.capsuleDelete[aria-disabled='true'] {
+  cursor: not-allowed;
+  color: var(--dsw-alias-label-tertiary);
+  background: var(--dsw-alias-bg-layer-1);
 }
 
 .collapseHotZone {

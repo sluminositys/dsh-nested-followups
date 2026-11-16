@@ -37,7 +37,8 @@ Choose the install path that matches your DeepSeek Harness line:
 | DeepSeek Harness | Plugin source | Status |
 | --- | --- | --- |
 | `0.1.0-rc.7` through `0.1.1-rc.2` | npm `dsh-nested-followups@0.2.3` | Legacy host support retained |
-| `0.2.1-rc.5` Web / official Desktop | npm `dsh-nested-followups@0.2.3` | Current development target |
+| `0.2.1-rc.5` Web / official Desktop | npm `dsh-nested-followups@0.2.3`, or source below | Previous development target |
+| `0.2.2-rc.3` Web / official Desktop | Build and install `main` below | Current development target; includes historical-session repair |
 | `0.2.1-alpha.1`, `0.2.2-alpha.2` | Same package | Additional verified preview targets |
 
 **DSH `0.2.1-rc.5`: use the exact plugin version below.** If Plugin Hub reports
@@ -57,9 +58,14 @@ dsh plugin --profile web add dsh-nested-followups@0.2.3
 Restart the DeepSeek Harness web profile if it is already running, open a
 conversation, and select **Tree View**.
 
-### Build from source (optional, DSH 0.2 Web)
+### Build from source (latest DSH and historical-session repair)
 
-Use npm for a normal installation. To develop the plugin, clone the repository,
+The historical-session repair is currently **source-only**; npm `0.2.3` has not
+been republished. If old branches show empty capsules after upgrading DSH, use
+this checkout rather than reinstalling the unchanged npm package. Do not delete
+the branches: their original logs and relationship records are preserved.
+
+Use Node.js 24.9 or later for the current DSH target. Clone the repository,
 build it locally, and invoke the matching CLI so an older global
 `dsh` binary cannot install it into the wrong profile contract:
 
@@ -68,8 +74,8 @@ git clone --branch main --single-branch https://github.com/sluminositys/dsh-nest
 cd dsh-nested-followups
 corepack pnpm install --frozen-lockfile
 corepack pnpm run check
-corepack pnpm dlx @deepseek-ai/dsh@0.2.1-rc.5 plugin --profile web add .
-corepack pnpm dlx @deepseek-ai/dsh@0.2.1-rc.5 web
+corepack pnpm dlx @deepseek-ai/dsh@0.2.2-rc.3 plugin --profile web add .
+corepack pnpm dlx @deepseek-ai/dsh@0.2.2-rc.3 web
 ```
 
 This creates a `link:` installation to the checkout. After pulling an update,
@@ -98,6 +104,10 @@ an Electron extension. Its plugins belong to the **`desktop` profile**, not
 
 4. Reopen Desktop and select **Tree View** in a conversation. For a built local
    checkout, substitute `.` for the package name and run from that checkout.
+
+To use the historical-session repair, build `main` first, fully quit Desktop,
+then run `dsh plugin --profile desktop add .` from the checkout using Desktop's
+bundled CLI. Reopen Desktop afterwards. This does not rewrite session logs.
 
 Do not use npm's `dsh` or `pnpm dlx` for the `desktop` profile: only the bundled
 command can manage it. Existing global installations can shadow that command;
@@ -214,8 +224,8 @@ inherited conversation again.
 
 | Requirement | Version |
 | --- | --- |
-| DeepSeek Harness | `0.2.1-rc.5`, plus the verified alpha and legacy host versions above |
-| Node.js (source build / Web) | `^22.19.0` or `>=24.0.0` |
+| DeepSeek Harness | `0.2.2-rc.3` source target; previous and legacy versions listed above |
+| Node.js (current source build / DSH 0.2.2 Web) | `>=24.9.0`; legacy hosts retain their own runtime requirements |
 | Package manager (source build) | pnpm |
 
 ## Compatibility notes
@@ -232,10 +242,12 @@ end-to-end test.
 See [DSH version compatibility](docs/dsh-version-compatibility.md) for the
 contract mapping and maintainer verification procedure.
 
-The current development target is DSH `0.2.1-rc.5`; the same source is also
-checked against `0.2.1-alpha.1`, `0.2.2-alpha.2`, and legacy `0.1.1-rc.2`.
-These adapters are included in npm `0.2.3`. DSH `0.2.2-alpha.2` requires
-Node.js 24.9 or later; packaged Desktop supplies its own runtime.
+The current source target is DSH `0.2.2-rc.3`; legacy support is retained.
+The previous `0.2.1-rc.5` and alpha adapters shipped in npm `0.2.3`, but the
+historical-session repair requires source until the next approved release.
+DSH `0.2.2` requires Node.js 24.9 or later; packaged Desktop supplies its runtime.
+The exact verified versions and the distinction between npm's `latest` and
+`next` tags are recorded in the compatibility guide.
 
 **Branches cannot be continued from the standard chat view.** DSH currently
 rejects user messages sent from the normal chat UI to a subagent-origin

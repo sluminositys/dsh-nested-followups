@@ -24,6 +24,7 @@ import {
 } from './adapter/read-only.ts'
 import {
   persistedSeedLength,
+  isMissingPersistedSession,
   readPersistedSessionFrom,
   sessionSeedLength,
   snapshotSessionEvents,
@@ -32,6 +33,7 @@ import { probeNativeContinuationCapability } from './adapter/native-continuation
 import { probeBranchVisibility } from './adapter/visibility.ts'
 import type { NestedFollowupsMetadataService } from './metadata-service.ts'
 import { resolveBranchBoundary } from './safe-boundary.ts'
+import { resolveBranchHistory } from './adapter/branch-history.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
@@ -265,7 +267,14 @@ export class NestedFollowupsBranchService extends Service {
       },
     )
     if (reservation.kind === 'existing') {
-      this.assertMatchingCreateRetry(reservation.branch, request, boundary, anchorRange)
+      let existing = reservation.branch
+      try {
+        const child = await this.readSession(existing.sessionId)
+        existing = await this.currentBranchRecord(existing, child, source)
+      } catch (error: unknown) {
+        if (!(error instanceof BranchCommandError) || error.code !== 'session-not-found') throw error
+      }
+      this.assertMatchingCreateRetry(existing, request, boundary, anchorRange, existing !== reservation.branch)
       return this.recoverExistingCreate(
         reservation.branch,
         source.header,
@@ -328,19 +337,20 @@ export class NestedFollowupsBranchService extends Service {
   }
 
   private async continueBranchChecked(request: ContinueBranchRequest): Promise<BranchCommandResult> {
-    const branch = this.metadata.repository.getBranch(request.branchId)
-    if (branch === undefined || branch.status === 'deleted' || branch.deletedAt !== undefined) {
+    const storedBranch = this.metadata.repository.getBranch(request.branchId)
+    if (storedBranch === undefined || storedBranch.status === 'deleted' || storedBranch.deletedAt !== undefined) {
       throw new BranchCommandError('branch-not-found', `branch '${request.branchId}' does not exist`)
     }
-    const tree = this.metadata.repository.getTree(branch.treeId)
+    const tree = this.metadata.repository.getTree(storedBranch.treeId)
     if (tree === undefined || !this.ownerBelongsToTree(request.ownerSessionId, tree)) {
       throw new BranchCommandError('tree-mismatch', 'the requested branch is not owned by this conversation tree')
     }
-    if (request.tail.sessionId !== branch.sessionId) {
+    if (request.tail.sessionId !== storedBranch.sessionId) {
       throw new BranchCommandError('branch-not-tail', 'Continue must target the current branch session')
     }
 
-    const snapshot = await this.readSession(branch.sessionId)
+    const snapshot = await this.readSession(storedBranch.sessionId)
+    const branch = await this.currentBranchRecord(storedBranch, snapshot)
     this.assertBranchLineage(branch, snapshot.header, snapshot.seedLength)
     const duplicate = userMessageById(snapshot.events, request.clientRequestId)
     if (duplicate !== undefined) {
@@ -403,7 +413,7 @@ export class NestedFollowupsBranchService extends Service {
       throw new BranchCommandError('branch-busy', 'wait for the current branch turn to finish before continuing')
     }
 
-    await this.metadata.repository.putBranch({ ...branch, status: 'running' })
+    await this.metadata.repository.putBranch({ ...storedBranch, status: 'running' })
     this.notify(tree.rootSessionId)
     try {
       const activityEpoch = this.beginActivity(handle)
@@ -416,7 +426,7 @@ export class NestedFollowupsBranchService extends Service {
         messageId,
       })
     } catch (error: unknown) {
-      await this.metadata.repository.putBranch({ ...branch, status: 'failed' })
+      await this.metadata.repository.putBranch({ ...storedBranch, status: 'failed' })
       this.notify(tree.rootSessionId)
       await this.releaseHandle(handle)
       throw new BranchCommandError(
@@ -446,9 +456,27 @@ export class NestedFollowupsBranchService extends Service {
         ...(seedLength === undefined ? {} : { seedLength }),
       }
     } catch (error: unknown) {
+      const missing = isMissingPersistedSession(error)
       throw new BranchCommandError(
-        'session-not-found',
-        `session '${sessionId}' could not be loaded`,
+        missing ? 'session-not-found' : 'compatibility',
+        `session '${sessionId}' could not be loaded: ${error instanceof Error ? error.message : String(error)}`,
+        { cause: error },
+      )
+    }
+  }
+
+  private async currentBranchRecord(
+    branch: BranchRecord,
+    snapshot: SessionSnapshot,
+    source?: SessionSnapshot,
+  ): Promise<BranchRecord> {
+    try {
+      const parent = source ?? await this.readSession(branch.parentSessionId)
+      return resolveBranchHistory(branch, snapshot, parent)
+    } catch (error: unknown) {
+      throw new BranchCommandError(
+        'tree-mismatch',
+        error instanceof Error ? error.message : 'The branch history could not be verified.',
         { cause: error },
       )
     }
@@ -478,6 +506,7 @@ export class NestedFollowupsBranchService extends Service {
     request: CreateBranchRequest,
     boundary: ReturnType<typeof resolveBranchBoundary>,
     anchorRange: AnchorRange | undefined,
+    migrated = false,
   ): void {
     const storedRange = existing.anchorRange
     const rangeMatches = storedRange === undefined
@@ -492,8 +521,8 @@ export class NestedFollowupsBranchService extends Service {
       || existing.anchorSessionId !== request.anchor.sessionId
       || existing.anchorMessageId !== boundary.anchorMessageId
       || existing.anchorSeq !== boundary.anchorSeq
-      || existing.forkBoundarySeq !== boundary.forkBoundarySeq
-      || existing.seedLength !== boundary.seedLength
+      || (!migrated && (existing.forkBoundarySeq !== boundary.forkBoundarySeq
+        || existing.seedLength !== boundary.seedLength))
       || !rangeMatches) {
       throw new BranchCommandError(
         'request-conflict',
@@ -510,6 +539,7 @@ export class NestedFollowupsBranchService extends Service {
     rootSessionId: string,
   ): Promise<BranchCommandResult> {
     let snapshot: SessionSnapshot | undefined
+    let currentBranch = branch
     try {
       snapshot = await this.readSession(branch.sessionId)
     } catch (error: unknown) {
@@ -517,7 +547,8 @@ export class NestedFollowupsBranchService extends Service {
     }
 
     if (snapshot !== undefined) {
-      this.assertBranchLineage(branch, snapshot.header, snapshot.seedLength)
+      currentBranch = await this.currentBranchRecord(branch, snapshot)
+      this.assertBranchLineage(currentBranch, snapshot.header, snapshot.seedLength)
       const duplicate = userMessageById(snapshot.events, branch.clientRequestId)
       if (duplicate !== undefined) {
         if (messageText(duplicate.data.content) !== prompt) {
@@ -534,7 +565,7 @@ export class NestedFollowupsBranchService extends Service {
         })
       }
       const otherLocalPrompt = snapshot.events.find(event =>
-        event.seq >= branch.seedLength
+        event.seq >= currentBranch.seedLength
         && event.type === 'user/message'
         && event.data.source.kind === 'user')
       if (otherLocalPrompt !== undefined) {
@@ -566,7 +597,7 @@ export class NestedFollowupsBranchService extends Service {
       handle = this.requireOwnedHandle(liveAgent)
     }
     const agent = handle.agent
-    this.assertBranchLineage(branch, agent.session.header, sessionSeedLength(agent.session))
+    this.assertBranchLineage(currentBranch, agent.session.header, sessionSeedLength(agent.session))
     if (agent.status !== 'idle') {
       throw new BranchCommandError('branch-busy', 'wait for the current branch turn to finish before retrying')
     }

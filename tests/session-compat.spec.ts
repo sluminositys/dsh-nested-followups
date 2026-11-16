@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 import {
   persistedSeedLength,
+  isMissingPersistedSession,
   listPersistedSessions,
   readPersistedSessionFrom,
   sessionSeedLength,
@@ -18,6 +19,14 @@ const event = Object.freeze({
 }) as SessionEvent
 
 describe('DSH Session compatibility boundary', () => {
+  it('distinguishes confirmed absence from corruption and permission errors', () => {
+    const missing = Object.assign(new Error('missing'), { code: 'ENOENT' })
+    const typed = Object.assign(new Error('missing'), { name: 'SessionPersistenceNotFoundError' })
+    expect(isMissingPersistedSession(missing)).toBe(true)
+    expect(isMissingPersistedSession(typed)).toBe(true)
+    expect(isMissingPersistedSession(Object.assign(new Error('denied'), { code: 'EACCES' }))).toBe(false)
+    expect(isMissingPersistedSession(new Error('corrupt historical record'))).toBe(false)
+  })
   it('reads the rc event snapshot and header seed length', () => {
     const session = {
       header: {

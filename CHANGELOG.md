@@ -9,12 +9,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Restore historical branches after DSH renumbers migrated session events.
+  Validate inherited history and relocate anchors by stable message identity,
+  without overwriting original logs or persisted branch coordinates. Use the
+  same validation for Continue and idempotent branch-creation retries.
+- Keep unreadable or loading branches visible after expansion, report an
+  unavailable history instead of a successful `+0`, and prevent deletion when
+  the affected subtree's message count is unknown.
+- Keep healthy branches readable if another branch log cannot be loaded.
+
 - Document the rc.5 `@latest` installation fallback: pnpm 11 can select the old
   incompatible `0.2.2` while `0.2.3` is inside its default one-day release-age
   window. Keep Web and Desktop instructions pinned to `0.2.3`, without granting
   a host compatibility exemption or disabling the profile's safety checks.
 
 ### Added
+
+- Target DSH `0.2.2-rc.3`, including its v4 historical log migration, while
+  retaining older-host adapters. These changes are source-only; no npm release
+  or plugin version change is included.
 
 - Exercise the real client entry with Cordis and DSH's public SlotCore: Remote
   readiness, shared header view store, delayed slot declarations, optional-store

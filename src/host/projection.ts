@@ -1,5 +1,5 @@
 import { BlockAssembler, type ContentBlock } from '@deepseek-ai/dsh-llm'
-import type { SessionEvent } from '@deepseek-ai/dsh-session/types'
+import type { SessionEvent, SessionHeader } from '@deepseek-ai/dsh-session/types'
 
 import type {
   BranchProjectionView,
@@ -11,6 +11,7 @@ import type { AnchorRange, BranchRecord, MessageNodeState, MessageNodeView, Tree
 import { extractAnchoredQuestion } from '../shared/anchored-question.ts'
 import { isBranchExecutableTool } from '../shared/tool-policy.ts'
 import { legacyAssistantChunk, type LiveAssistantText } from './adapter/assistant-stream.ts'
+import { resolveBranchHistory } from './adapter/branch-history.ts'
 
 export { displayLabelOf } from '../shared/labels.ts'
 export type {
@@ -61,6 +62,10 @@ function findSucceededWriteCall(
 
 export interface SessionLogSnapshot {
   sessionId: string
+  /** Current host header, used to reconcile migrated branch coordinates. */
+  header?: SessionHeader
+  /** Per-child read failure; never serialize it as successful empty history. */
+  readError?: string
   events: readonly SessionEvent[]
   /** Durable header value. Used to detect stale branch metadata. */
   seedLength?: number
@@ -359,9 +364,23 @@ export function projectConversationTree(
   const edges: TreeEdgeView[] = []
   const projections = new Map<string, BranchProjectionView>()
   const nodesByMessage = new Map<string, MessageNodeView>()
+  const unavailable = new Map<string, string>()
   const records = new Map(
     branchRecords
       .filter(branch => branch.treeId === tree.treeId)
+      .map(branch => {
+        if (isDirectlyDeleted(branch)) return branch
+        const child = sessionLogs.get(branch.sessionId)
+        const parent = sessionLogs.get(branch.parentSessionId)
+        if (child?.header === undefined) return branch
+        try {
+          return resolveBranchHistory(branch, { ...child, header: child.header },
+            parent?.header === undefined ? undefined : { ...parent, header: parent.header })
+        } catch (error: unknown) {
+          unavailable.set(branch.branchId, error instanceof Error ? error.message : String(error))
+          return branch
+        }
+      })
       .map(branch => [branch.branchId, branch] as const),
   )
 
@@ -446,14 +465,16 @@ export function projectConversationTree(
       ? [anchorNode?.localTurnIndex ?? 0]
       : [...(parentProjection?.branchPath ?? [0])]
     const branchPath = Object.freeze([...pathPrefix, branch.siblingOrdinal])
-    const log = sessionLogs.get(branch.sessionId)
+    const storedLog = sessionLogs.get(branch.sessionId)
+    const readError = unavailable.get(branch.branchId) ?? storedLog?.readError
+    const log = readError === undefined ? storedLog : undefined
     let branchNodes: MessageNodeView[] = []
     if (log === undefined) {
       diagnostics.push({
         code: 'branch-session-missing',
         branchId: branch.branchId,
         sessionId: branch.sessionId,
-        message: `branch session '${branch.sessionId}' is unavailable`,
+        message: readError ?? `branch session '${branch.sessionId}' is unavailable`,
       })
     } else {
       if (log.seedLength !== undefined && log.seedLength !== branch.seedLength) {

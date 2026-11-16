@@ -49,11 +49,11 @@ describe('package contract', () => {
     ]))
     const validationVersions = [...new Set(dshValidationTargets)]
     expect(validationVersions).toHaveLength(1)
-    expect(['0.1.1-rc.2', '0.1.2-alpha.4', '0.2.0-rc.2', '0.2.1-alpha.1', '0.2.1-rc.5', '0.2.2-alpha.2']).toContain(validationVersions[0])
+    expect(['0.1.0-rc.7', '0.1.1-rc.2', '0.1.2-alpha.4', '0.2.0-rc.2', '0.2.1-alpha.1', '0.2.1-rc.5', '0.2.2-alpha.2', '0.2.2-rc.1', '0.2.2-rc.3']).toContain(validationVersions[0])
     expect(manifest.peerDependencies).not.toHaveProperty('@deepseek-ai/dsh-client-runtime')
   })
 
-  it.each(['0.1.0-rc.7', '0.1.1-rc.2', '0.2.0-rc.2', '0.2.1-alpha.1', '0.2.1-rc.5', '0.2.2-alpha.2'])(
+  it.each(['0.1.0-rc.7', '0.1.1-rc.2', '0.2.0-rc.2', '0.2.1-alpha.1', '0.2.1-rc.5', '0.2.2-alpha.2', '0.2.2-rc.1', '0.2.2-rc.3'])(
     'passes the DSH install preflight for %s', async (version) => {
       const manifest = JSON.parse(await readFile(new URL('../package.json', import.meta.url), 'utf8')) as {
         engines: { dsh?: string }

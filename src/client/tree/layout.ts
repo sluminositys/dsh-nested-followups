@@ -5,6 +5,7 @@ import {
   deriveCollapseState,
   type AnchorGroupSummary,
   type CollapsedBranchSummary,
+  type BranchContentState,
   type FoldActivityState,
 } from './navigation.ts'
 
@@ -81,6 +82,7 @@ export interface BranchCapsuleLayout {
   hiddenNodeCount: number
   depth: number
   activity: FoldActivityState
+  contentState: BranchContentState
   rect: Rect
   start: Point
   end: Point

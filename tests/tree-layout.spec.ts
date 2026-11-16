@@ -99,6 +99,40 @@ describe('conversation tree layout', () => {
     expect(layout.anchorControls[0]?.rect).toMatchObject({ width: 28, height: 28 })
   })
 
+  it('does not mark an unavailable empty branch as successfully completed', () => {
+    const fixture = treeProjectionFixture()
+    const projection = {
+      ...fixture,
+      nodes: fixture.nodes.filter(node => node.branchId !== 'branch-1'),
+      branches: fixture.branches.map(branch => branch.record.branchId === 'branch-1'
+        ? { ...branch, nodeIds: [] } : branch),
+      diagnostics: [{ code: 'branch-session-missing' as const, branchId: 'branch-1', message: 'read failed' }],
+    }
+    expect(layoutConversationTree(projection, { collapsedBranchIds: new Set(['branch-1']) })
+      .branchCapsules.find(capsule => capsule.branchId === 'branch-1')).toMatchObject({
+      contentState: 'unavailable', activity: 'error',
+    })
+  })
+
+  it('retains an unavailable branch placeholder after expansion instead of making the branch disappear', () => {
+    const fixture = treeProjectionFixture()
+    const projection = {
+      ...fixture,
+      nodes: fixture.nodes.filter(node => node.branchId !== 'branch-1'),
+      branches: fixture.branches.map(branch => branch.record.branchId === 'branch-1'
+        ? { ...branch, nodeIds: [] } : branch),
+    }
+    const before = JSON.stringify(projection)
+    const expanded = layoutConversationTree(projection, { collapsedBranchIds: new Set() })
+    expect(expanded.branchCapsules.some(capsule => capsule.branchId === 'branch-1')).toBe(true)
+    expect(expanded.anchorControls.some(control => control.anchorNodeId === 'root-a2')).toBe(true)
+    expect(JSON.stringify(projection)).toBe(before)
+    const recovered = layoutConversationTree(fixture, { collapsedBranchIds: new Set() })
+    expect(recovered.nodes.filter(node => node.branchId === 'branch-1')).toHaveLength(2)
+    expect(recovered.branchRegions.some(region => region.branchId === 'branch-1')).toBe(true)
+    expect(recovered.branchCapsules.some(capsule => capsule.branchId === 'branch-1')).toBe(false)
+  })
+
   it('reserves one lane for a mixed card and capsule composition without overlap', () => {
     const layout = layoutConversationTree(treeProjectionFixture(), {
       collapsedBranchIds: new Set(['branch-2']),

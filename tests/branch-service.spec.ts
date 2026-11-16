@@ -115,6 +115,8 @@ class ToolsCapabilityStub extends Service {
 }
 
 class AgentsStub extends Service {
+  static inject = ['sessions']
+
   readonly setupRecords: ReadOnlySetupRecord[] = []
   readonly deliveredPrompts: string[] = []
   failNextCreate = false
@@ -266,6 +268,27 @@ function projection(
 }
 
 describe('Host branch commands', () => {
+  it('does not recreate or resend an existing branch when its cold history fails to read', async () => {
+    const runtime = await setup()
+    try {
+      const request = {
+        ownerSessionId: 'root', clientRequestId: 'unreadable-retry',
+        anchor: { sessionId: 'root', messageId: 'a1', seq: 3 }, question: 'send once',
+      }
+      const first = await runtime.service.createBranch(request)
+      expect(first.ok, JSON.stringify(first)).toBe(true)
+      if (!first.ok) return
+      const original = runtime.ctx.sessions.get.bind(runtime.ctx.sessions)
+      vi.spyOn(runtime.ctx.sessions, 'get').mockImplementation(id =>
+        String(id) === first.value.sessionId ? undefined : original(id))
+      const persistence = runtime.ctx.sessionPersistence as unknown as MemoryPersistence
+      persistence.readFrom = async () => { throw Object.assign(new Error('permission denied'), { code: 'EACCES' }) }
+      const retry = await runtime.service.createBranch(request)
+      expect(retry).toMatchObject({ ok: false, error: { code: 'compatibility' } })
+      expect(runtime.repository.listBranches('root')).toHaveLength(1)
+      expect(runtime.agents.deliveredPrompts).toEqual([request.clientRequestId])
+    } finally { await runtime.dispose() }
+  })
   it('persists a UTF-16 text anchor and sends its quote only to the branch', async () => {
     const runtime = await setup()
     try {
@@ -283,7 +306,7 @@ describe('Host branch commands', () => {
       } as const
 
       const created = await runtime.service.createBranch(request)
-      expect(created.ok).toBe(true)
+      expect(created.ok, JSON.stringify(created)).toBe(true)
       if (!created.ok) return
       const record = runtime.repository.getBranch(created.value.branchId)
       expect(record?.anchorRange).toEqual(request.anchor.range)

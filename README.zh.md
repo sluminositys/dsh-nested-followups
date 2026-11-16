@@ -33,7 +33,8 @@ Session 都是真实的，后期只添加了说明字幕和鼠标指针。_
 | DeepSeek Harness | 插件来源 | 状态 |
 | --- | --- | --- |
 | `0.1.0-rc.7` 至 `0.1.1-rc.2` | npm `dsh-nested-followups@0.2.3` | 保留旧版宿主兼容性 |
-| `0.2.1-rc.5` Web / 官方桌面端 | npm `dsh-nested-followups@0.2.3` | 当前开发目标 |
+| `0.2.1-rc.5` Web / 官方桌面端 | npm `dsh-nested-followups@0.2.3`，或下方源码 | 上一开发目标 |
+| `0.2.2-rc.3` Web / 官方桌面端 | 按下方步骤构建并安装 `main` | 当前开发目标，包含旧历史修复 |
 | `0.2.1-alpha.1`、`0.2.2-alpha.2` | 同一个包 | 另外验证的预发布版本 |
 
 **DSH `0.2.1-rc.5` 请使用下面明确指定插件版本的命令。** 如果插件市场提示
@@ -52,9 +53,13 @@ dsh plugin --profile web add dsh-nested-followups@0.2.3
 如果 Web Profile 已经在运行，请重启一次。随后照常打开会话，点击顶栏的
 **Tree View**。
 
-### 从源码构建（可选，DSH 0.2 Web）
+### 从源码构建（最新 DSH 与旧历史修复）
 
-正常使用直接安装 npm 包即可。开发插件时，可以克隆仓库后在本地构建。下面显式调用对应版本的
+本次旧历史修复目前**仅在源码中提供**，npm `0.2.3` 没有重新发布。如果升级 DSH 后
+旧分支变成空胶囊，请安装这里的源码，而不是重复安装未变更的 npm 包。不要删除分支，
+原始日志和分支关系记录会保留。
+
+当前源码目标请使用 Node.js 24.9 及以上，在本地构建。下面显式调用对应版本的
 CLI，避免电脑里旧的全局 `dsh` 把插件装进错误的 Profile 契约：
 
 ```sh
@@ -62,8 +67,8 @@ git clone --branch main --single-branch https://github.com/sluminositys/dsh-nest
 cd dsh-nested-followups
 corepack pnpm install --frozen-lockfile
 corepack pnpm run check
-corepack pnpm dlx @deepseek-ai/dsh@0.2.1-rc.5 plugin --profile web add .
-corepack pnpm dlx @deepseek-ai/dsh@0.2.1-rc.5 web
+corepack pnpm dlx @deepseek-ai/dsh@0.2.2-rc.3 plugin --profile web add .
+corepack pnpm dlx @deepseek-ai/dsh@0.2.2-rc.3 web
 ```
 
 安装后，Profile 里记录的是指向当前源码目录的 `link:`。以后拉取更新，需要重新运行
@@ -94,6 +99,8 @@ pnpm 要求用户先授权。可以直接安装 npm `0.2.3`，或使用上面的
 不要用 npm 安装的 `dsh` 或 `pnpm dlx` 操作 `desktop` Profile，只有桌面端自带的
 命令能管理它。电脑上已有的全局命令可能抢先被找到，安装前请检查 `dsh --version`
 及命令所在路径。桌面端安装 npm 包使用自带环境；只有编译源码才需要另外安装 Node 和 pnpm。
+使用本次旧历史修复时，请先构建 `main`、完全退出桌面端，再在源码目录用桌面端自带的 CLI
+运行 `dsh plugin --profile desktop add .`，然后重新打开桌面端。这个过程不改写会话日志。
 具体机制见 [官方桌面端说明](https://github.com/deepseek-ai/deepseek-harness/blob/dsh-v0.2.1-rc.5/apps/desktop/README.md#bundled-command-runtime)。
 
 ## 为什么不新开对话或做普通侧栏？
@@ -186,8 +193,8 @@ _图中画出两层嵌套后以省略号继续：后续每一级的每条回答�
 
 | 项目 | 版本 |
 | --- | --- |
-| DeepSeek Harness | `0.2.1-rc.5`，以及上表中已验证的 alpha 和旧版宿主 |
-| Node.js（编译源码 / Web） | `^22.19.0` 或 `>=24.0.0` |
+| DeepSeek Harness | 源码目标 `0.2.2-rc.3`，以及上表中的先前版本和旧版宿主 |
+| Node.js（当前源码构建 / DSH 0.2.2 Web） | `>=24.9.0`；旧版宿主仍按其自身要求运行 |
 | 包管理器（编译源码） | pnpm |
 
 ## 兼容性说明
@@ -200,9 +207,10 @@ _图中画出两层嵌套后以省略号继续：后续每一级的每条回答�
 通过不等于已经完成桌面安装包的端到端测试。
 具体契约映射与维护者验证流程见 [DSH 版本兼容说明](docs/dsh-version-compatibility.md)。
 
-当前开发目标是 DSH `0.2.1-rc.5`；同一份源码也检查了 `0.2.1-alpha.1`、
-`0.2.2-alpha.2` 和旧版 `0.1.1-rc.2`。上述适配已包含在 npm `0.2.3` 中。
-DSH `0.2.2-alpha.2` 要求 Node.js 24.9 及以上；桌面安装包自带运行环境。
+当前源码目标是 DSH `0.2.2-rc.3`，同时保留旧版支持。此前 `0.2.1-rc.5` 和 alpha
+版本的适配已包含在 npm `0.2.3` 中，但本次旧历史修复需安装源码，等待另行批准发布。
+DSH `0.2.2` 要求 Node.js 24.9 及以上；桌面安装包自带运行环境。
+具体已验证版本及 npm `latest`、`next` 标签的区别见兼容说明。
 
 **分支目前不能在原生 Chat 里续聊。** DSH 会拒绝从普通对话界面向 subagent-origin
 Session 发送用户消息，因此分支的阅读和续聊都在 Tree View 中完成。插件已经预留对

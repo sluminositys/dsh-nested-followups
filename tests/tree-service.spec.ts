@@ -375,6 +375,40 @@ describe('tree projection Remote service', () => {
     }
   })
 
+  it('keeps the root available when a cold branch log is unreadable', async () => {
+    const { dispose, service, persistence, repository } = await setup({ cold: true })
+    const original = persistence.readFrom.bind(persistence)
+    persistence.readFrom = async (id, fromSeq, signal) => {
+      if (String(id) === 'branch-session') throw new Error('unreadable historical log')
+      return original(id, fromSeq, signal)
+    }
+    const before = repository.getBranch('branch-1')
+    try {
+      const result = await service.readTree({ sessionId: 'root' })
+      expect(result.ok).toBe(true)
+      if (!result.ok) return
+      expect(result.value.projection.nodes.map(node => node.messageId)).toEqual(['q1', 'a1'])
+      expect(result.value.projection.diagnostics).toContainEqual(expect.objectContaining({
+        code: 'branch-session-missing', branchId: 'branch-1', message: 'unreadable historical log',
+      }))
+      expect(repository.getBranch('branch-1')).toBe(before)
+    } finally { await dispose() }
+  })
+
+  it('refuses deletion rather than confirming zero messages when branch history is unreadable', async () => {
+    const { dispose, service, persistence, deletionCalls } = await setup({ cold: true, deletion: true })
+    const original = persistence.readFrom.bind(persistence)
+    persistence.readFrom = async (id, fromSeq, signal) => {
+      if (String(id) === 'branch-session') throw new Error('unreadable historical log')
+      return original(id, fromSeq, signal)
+    }
+    try {
+      const result = await service.deleteBranch({ ownerSessionId: 'root', branchId: 'branch-1' })
+      expect(result.ok).toBe(false)
+      expect(deletionCalls).toEqual([])
+    } finally { await dispose() }
+  })
+
   it('wakes an outstanding revision watch when the root log changes', async () => {
     const { dispose, service, root } = await setup()
     try {

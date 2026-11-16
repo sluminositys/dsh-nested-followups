@@ -2,9 +2,11 @@ import { describe, expect, it } from 'vitest'
 
 import {
   anchorDotsToExpandForNode,
+  branchesWithUnknownMessageCounts,
   branchesToExpandForNode,
   childAnchorDotIdsForBranch,
   deepExpansionTargetsForAnchor,
+  deriveBranchContentStates,
   deriveCollapseState,
   deriveFocusState,
   searchTreeNodes,
@@ -12,6 +14,34 @@ import {
 import { treeProjectionFixture } from './fixtures/tree-projection.ts'
 
 describe('tree navigation state', () => {
+  it('does not trust a cascade count when a nested branch has no readable messages', () => {
+    const base = treeProjectionFixture()
+    const projection = {
+      ...base,
+      nodes: base.nodes.filter(node => node.branchId !== 'branch-1-1'),
+      branches: base.branches.map(branch => branch.record.branchId === 'branch-1-1'
+        ? { ...branch, nodeIds: [] } : branch),
+      diagnostics: [{ code: 'branch-session-missing' as const, branchId: 'branch-1-1', message: 'read failed' }],
+    }
+    expect(deriveBranchContentStates(projection).get('branch-1')).toBe('available')
+    expect(branchesWithUnknownMessageCounts(projection)).toEqual(new Set(['branch-1-1', 'branch-1']))
+    expect(branchesWithUnknownMessageCounts(base).size).toBe(0)
+  })
+
+  it('distinguishes a pending empty branch from unreadable completed history', () => {
+    const base = treeProjectionFixture()
+    const pending = {
+      ...base,
+      nodes: base.nodes.filter(node => node.branchId !== 'branch-2'),
+      branches: base.branches.map(branch => branch.record.branchId === 'branch-2'
+        ? { ...branch, nodeIds: [], record: { ...branch.record, status: 'running' as const } } : branch),
+    }
+    expect(deriveBranchContentStates(pending).get('branch-2')).toBe('loading')
+    expect(deriveCollapseState(pending, new Set()).summaries.find(summary => summary.branchId === 'branch-2'))
+      .toMatchObject({ contentState: 'loading', activity: 'running' })
+    expect(deriveBranchContentStates(base).get('branch-2')).toBe('available')
+  })
+
   it('focuses the exact ancestor path and descendants without including siblings', () => {
     const focus = deriveFocusState(treeProjectionFixture(), 'branch-1-a')
 

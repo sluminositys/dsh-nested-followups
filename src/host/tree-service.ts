@@ -196,8 +196,21 @@ export class NestedFollowupsService extends TypertRemoteService {
     // round trip during cascade deletion.
     await Promise.all(branches.map(async (branch) => {
       if (isDirectlyDeleted(branch)) return
-      const log = await this.readLog(branch.sessionId, branch.seedLength, persistedHeaders)
-      if (log !== undefined) logs.set(branch.sessionId, log)
+      try {
+        // DSH may renumber events while restoring historical log formats.
+        // Reading at the old plugin offset can discard the entire branch;
+        // keep the inherited prefix for stable-identity validation instead.
+        const log = await this.readLog(branch.sessionId, 0, persistedHeaders)
+        if (log !== undefined) logs.set(branch.sessionId, log)
+      } catch (error: unknown) {
+        // One unreadable child must not hide healthy siblings or the root.
+        // Retain the reason for the branch-session-missing diagnostic.
+        logs.set(branch.sessionId, {
+          sessionId: branch.sessionId,
+          events: [],
+          readError: error instanceof Error ? error.message : String(error),
+        })
+      }
     }))
 
     const mutationCapabilities = this.branches?.capabilities() ?? Object.freeze({
@@ -259,6 +272,25 @@ export class NestedFollowupsService extends TypertRemoteService {
         }),
       })
     }
+    const affected = new Set([request.branchId])
+    const children = new Map<string, string[]>()
+    for (const branch of read.value.projection.branches) {
+      const parent = branch.record.parentBranchId
+      if (parent === null) continue
+      const group = children.get(parent) ?? []
+      group.push(branch.record.branchId)
+      children.set(parent, group)
+    }
+    for (const id of affected) for (const child of children.get(id) ?? []) affected.add(child)
+    const unknownHistory = read.value.projection.diagnostics.some(diagnostic =>
+      diagnostic.branchId !== undefined && affected.has(diagnostic.branchId)
+      && (diagnostic.code === 'branch-session-missing'
+        || diagnostic.code === 'seed-length-mismatch'
+        || diagnostic.code === 'branch-cycle'
+        || diagnostic.code === 'branch-parent-missing'))
+    if (unknownHistory) {
+      return deletionUnavailable('Branch history is unavailable. Reload it before confirming deletion; the message count is unknown.')
+    }
     const visibleMessagesByBranch = new Map<string, number>()
     for (const node of read.value.projection.nodes) {
       if (node.branchId === null) continue
@@ -318,6 +350,7 @@ export class NestedFollowupsService extends TypertRemoteService {
       const liveAssistant = this.assistantStreams.get(sessionId)?.snapshot()
       return {
         sessionId,
+        header: live.header,
         events: snapshotSessionEvents(live).filter(event => event.seq >= fromSeq),
         ...(seedLength === undefined ? {} : { seedLength }),
         ...(liveAssistant === undefined ? {} : { liveAssistant }),
@@ -332,6 +365,7 @@ export class NestedFollowupsService extends TypertRemoteService {
     const seedLength = persistedSeedLength(stored)
     return {
       sessionId,
+      header: stored.meta,
       events: stored.events,
       ...(seedLength === undefined ? {} : { seedLength }),
     }

@@ -105,6 +105,12 @@ export interface TreeViewLabels {
   readonly readonly: string
   readonly nodeCount: (count: number) => string
   readonly collapsedCount: (count: number) => string
+  readonly branchMessagesLoading: string
+  readonly branchMessagesUnavailable: string
+  readonly branchMessageCountUnknown: string
+  readonly branchDeleteUnavailable: string
+  readonly expandAnchorGroupUnknown: (branches: number) => string
+  readonly collapseAnchorGroupUnknown: (branches: number) => string
   readonly expandAnchorGroup: (branches: number, messages: number) => string
   readonly collapseAnchorGroup: (branches: number, messages: number) => string
   readonly expandBranchPath: (path: string) => string
@@ -191,6 +197,12 @@ export const DEFAULT_TREE_VIEW_LABELS: TreeViewLabels = Object.freeze({
   readonly: 'Tree View is read-only',
   nodeCount: (count: number) => `${count} messages`,
   collapsedCount: (count: number) => `+${count} nodes`,
+  branchMessagesLoading: 'Loading branch messages…',
+  branchMessagesUnavailable: 'Branch messages could not be loaded. This branch has not been deleted.',
+  branchMessageCountUnknown: 'Message count unavailable',
+  branchDeleteUnavailable: 'Cannot delete this branch until its messages and nested branches are loaded.',
+  expandAnchorGroupUnknown: (branches: number) => `Expand ${branches} branches · message count unavailable`,
+  collapseAnchorGroupUnknown: (branches: number) => `Collapse whole group: ${branches} branches · message count unavailable`,
   expandAnchorGroup: (branches: number, messages: number) =>
     `Expand ${branches} branches · +${messages} messages`,
   collapseAnchorGroup: (branches: number, messages: number) =>

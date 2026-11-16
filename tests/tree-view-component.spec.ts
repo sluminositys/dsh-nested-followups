@@ -250,6 +250,42 @@ describe('conversation tree canvas', () => {
     expect(firstVisit).not.toContain('data-mode="expanded"')
   })
 
+  it('keeps unreadable branches visible without fake zero counts or an enabled deletion action', () => {
+    const base = treeProjectionFixture()
+    const projection = {
+      ...base,
+      nodes: base.nodes.filter(node => node.branchId === null),
+      branches: base.branches.map(branch => ({ ...branch, nodeIds: [] })),
+      diagnostics: base.branches.map(branch => ({
+        code: 'branch-session-missing' as const, branchId: branch.record.branchId, message: 'read failed',
+      })),
+    }
+    const onDeleteBranch = vi.fn(async () => {})
+    const markup = renderWithViewState(viewState([], []), projection, { onDeleteBranch })
+    expect(count(markup, 'data-mode="capsule"')).toBe(2)
+    expect(markup).toContain('Branch messages could not be loaded.')
+    expect(markup).not.toContain('+0')
+    expect(markup).not.toContain('· Complete')
+    expect(markup).toContain('Cannot delete this branch until its messages and nested branches are loaded.')
+    expect([...markup.matchAll(/<button[^>]*aria-label="Delete branch"[^>]*aria-disabled="true"/gu)])
+      .toHaveLength(2)
+    expect(onDeleteBranch).not.toHaveBeenCalled()
+  })
+
+  it('shows a pending empty branch as loading without a fake zero or a success state', () => {
+    const base = treeProjectionFixture()
+    const projection = {
+      ...base,
+      nodes: base.nodes.filter(node => node.branchId !== 'branch-2'),
+      branches: base.branches.map(branch => branch.record.branchId === 'branch-2'
+        ? { ...branch, nodeIds: [], record: { ...branch.record, status: 'creating' as const } } : branch),
+    }
+    const markup = renderWithViewState(viewState([], []), projection)
+    expect(markup).toContain('Loading branch messages…')
+    expect(markup).toContain('data-content-state="loading"')
+    expect(markup).not.toContain('+0')
+  })
+
   it('has no collapse button on cards; folding belongs to the region hot zone', () => {
     const markup = renderWithViewState(viewState([], []))
 

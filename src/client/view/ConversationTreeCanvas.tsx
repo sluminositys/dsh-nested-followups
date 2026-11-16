@@ -35,6 +35,7 @@ import {
   navigateFromMinimap,
 } from '../tree/minimap.ts'
 import {
+  branchesWithUnknownMessageCounts,
   childAnchorDotIdsForBranch,
   deepExpansionTargetsForAnchor,
   deepExpansionTargetsForBranch,
@@ -551,6 +552,10 @@ export function ConversationTreeCanvas({
     () => new Map(projection.branches.map(branch => [branch.record.branchId, branch] as const)),
     [projection.branches],
   )
+  const unknownMessageCounts = useMemo(
+    () => branchesWithUnknownMessageCounts(projection),
+    [projection],
+  )
   const branchRegions = useMemo(
     () => new Map(layout.branchRegions.map(region => [region.branchId, region] as const)),
     [layout.branchRegions],
@@ -723,6 +728,10 @@ export function ConversationTreeCanvas({
 
   const confirmDelete = (): void => {
     if (deleteRequest === null || onDeleteBranch === undefined) return
+    if (unknownMessageCounts.has(deleteRequest.branchId)) {
+      setDeleteFailure(labels.branchDeleteUnavailable)
+      return
+    }
     setDeletePending(true)
     setDeleteFailure(null)
     void onDeleteBranch(deleteRequest).then(() => {
@@ -735,6 +744,7 @@ export function ConversationTreeCanvas({
   }
 
   const requestBranchDelete = (branchId: string): void => {
+    if (unknownMessageCounts.has(branchId)) return
     const impact = branchDeleteImpact(projection, branchId)
     setDeleteRequest({ branchId, ...impact })
   }
@@ -1030,6 +1040,7 @@ export function ConversationTreeCanvas({
                       && branchTailNodeIds.has(node.nodeId)}
                     canDelete={firstInBranch
                       && node.branchId !== null
+                      && !unknownMessageCounts.has(node.branchId)
                       && onDeleteBranch !== undefined}
                     onSelect={() => { selectNode(node.nodeId) }}
                     onAsk={() => {
@@ -1058,6 +1069,10 @@ export function ConversationTreeCanvas({
                 const region = branchRegions.get(branchId)
                 if (capsule === undefined && region === undefined) return null
                 const collapsed = capsule !== undefined
+                const messagesAvailable = capsule?.contentState === 'available'
+                const historyLabel = capsule?.contentState === 'loading'
+                  ? labels.branchMessagesLoading : labels.branchMessagesUnavailable
+                const deleteUnavailable = unknownMessageCounts.has(branchId)
                 const rect = capsule?.rect ?? region!.rect
                 const pathLabel = branch.branchPath.join('.')
                 const dimmed = focus.active && !focus.highlightedBranchIds.has(branchId)
@@ -1073,6 +1088,7 @@ export function ConversationTreeCanvas({
                     data-mode={collapsed ? 'capsule' : 'expanded'}
                     data-dimmed={dimmed || undefined}
                     data-activity={capsule?.activity}
+                    data-content-state={capsule?.contentState}
                     data-from-cards={collapsed && collapsingToCapsuleIds.has(branchId) || undefined}
                   >
                     {capsule !== undefined
@@ -1081,8 +1097,13 @@ export function ConversationTreeCanvas({
                           <button
                             type="button"
                             className={css.capsuleMain}
-                            aria-label={`${labels.expandBranchPath(capsule.pathLabel)} · ${labels.collapsedCount(capsule.messageCount)} · ${activityLabel(capsule.activity)}`}
+                            aria-label={messagesAvailable
+                              ? `${labels.expandBranchPath(capsule.pathLabel)} · ${labels.collapsedCount(capsule.messageCount)} · ${activityLabel(capsule.activity)}`
+                              : `${capsule.pathLabel} · ${historyLabel}`}
+                            aria-disabled={!messagesAvailable || undefined}
+                            title={messagesAvailable ? undefined : historyLabel}
                             onClick={(event) => {
+                              if (!messagesAvailable) return
                               noteManualViewportChange()
                               startCapsuleMorph(capsule)
                               if (event.altKey) {
@@ -1108,7 +1129,9 @@ export function ConversationTreeCanvas({
                               />
                             )}
                             <span className={css.capsulePath}>{capsule.pathLabel}</span>
-                            <span className={css.capsuleSummary}>{capsule.firstQuestionSummary}</span>
+                            <span className={css.capsuleSummary}>
+                              {messagesAvailable ? capsule.firstQuestionSummary : historyLabel}
+                            </span>
                             {capsule.childBranchCount > 0 && (
                               <span
                                 className={css.capsuleChildren}
@@ -1117,14 +1140,19 @@ export function ConversationTreeCanvas({
                                 {labels.childBranchCount(capsule.childBranchCount)}
                               </span>
                             )}
-                            <span className={css.capsuleCount}>+{capsule.messageCount}</span>
-                            <span className={css.capsuleArrow} aria-hidden="true">›</span>
+                            <span className={css.capsuleCount}
+                              aria-label={messagesAvailable ? undefined : labels.branchMessageCountUnknown}>
+                              {messagesAvailable ? `+${capsule.messageCount}` : '—'}
+                            </span>
+                            {messagesAvailable && <span className={css.capsuleArrow} aria-hidden="true">›</span>}
                           </button>
                           {onDeleteBranch !== undefined && (
                             <button
                               type="button"
                               className={css.capsuleDelete}
                               aria-label={labels.deleteBranch}
+                              aria-disabled={deleteUnavailable || undefined}
+                              title={deleteUnavailable ? labels.branchDeleteUnavailable : undefined}
                               onClick={(event) => {
                                 event.stopPropagation()
                                 requestBranchDelete(branchId)
@@ -1171,9 +1199,14 @@ export function ConversationTreeCanvas({
                 )
               })}
               {layout.anchorControls.map(control => {
-                const actionLabel = control.open
-                  ? labels.collapseAnchorGroup(control.branchCount, control.messageCount)
-                  : labels.expandAnchorGroup(control.branchCount, control.messageCount)
+                const countUnknown = control.branchIds.some(id => unknownMessageCounts.has(id))
+                const actionLabel = countUnknown
+                  ? control.open
+                    ? labels.collapseAnchorGroupUnknown(control.branchCount)
+                    : labels.expandAnchorGroupUnknown(control.branchCount)
+                  : control.open
+                    ? labels.collapseAnchorGroup(control.branchCount, control.messageCount)
+                    : labels.expandAnchorGroup(control.branchCount, control.messageCount)
                 const dimmed = focus.active
                   && !control.branchIds.some(branchId => focus.highlightedBranchIds.has(branchId))
                 return (
@@ -1350,14 +1383,17 @@ export function ConversationTreeCanvas({
         title={labels.deleteTitle}
         closeLabel={labels.close}
         {...deleteRequest === null ? {} : {
-          description: deletionConfirmationDescription(labels, deleteRequest, deletionMode),
+          description: unknownMessageCounts.has(deleteRequest.branchId)
+            ? labels.branchDeleteUnavailable
+            : deletionConfirmationDescription(labels, deleteRequest, deletionMode),
         }}
         footer={(
           <>
             <Button variant="ghost" disabled={deletePending} onClick={() => { setDeleteRequest(null) }}>
               {labels.cancel}
             </Button>
-            <Button variant="primary" disabled={deletePending} onClick={confirmDelete}>
+            <Button variant="primary" disabled={deletePending
+              || deleteRequest !== null && unknownMessageCounts.has(deleteRequest.branchId)} onClick={confirmDelete}>
               {deletePending ? labels.deletePending : labels.deleteConfirm}
             </Button>
           </>

@@ -4,6 +4,7 @@ import type { MessageNodeView } from '../../shared/types.ts'
 import { getProjectionGraphIndex } from './projection-graph.ts'
 
 export type FoldActivityState = 'running' | 'error' | 'complete'
+export type BranchContentState = 'available' | 'loading' | 'unavailable'
 
 export interface AnchorGroupSummary {
   readonly anchorDotId: string
@@ -29,6 +30,7 @@ export interface CollapsedBranchSummary {
   readonly hiddenNodeCount: number
   readonly depth: number
   readonly activity: FoldActivityState
+  readonly contentState: BranchContentState
 }
 
 export interface CollapseState {
@@ -66,6 +68,46 @@ export interface TreeSearchResult {
 
 function branchMap(projection: ConversationTreeProjection): Map<string, BranchProjectionView> {
   return new Map(projection.branches.map(branch => [branch.record.branchId, branch] as const))
+}
+
+/** Empty/unreadable history is not evidence that an existing branch has no messages. */
+export function deriveBranchContentStates(
+  projection: ConversationTreeProjection,
+): ReadonlyMap<string, BranchContentState> {
+  const nodes = new Map(projection.nodes.map(node => [node.nodeId, node] as const))
+  const missing = new Set(projection.diagnostics
+    .filter(diagnostic => diagnostic.code === 'branch-session-missing')
+    .map(diagnostic => diagnostic.branchId))
+  return new Map(projection.branches.map(branch => {
+    const id = branch.record.branchId
+    let state: BranchContentState = 'available'
+    if (missing.has(id) || branch.record.status === 'missing'
+      || branch.nodeIds.some(nodeId => nodes.get(nodeId)?.branchId !== id)) {
+      state = 'unavailable'
+    } else if (branch.nodeIds.length === 0) {
+      state = branch.record.status === 'creating' || branch.record.status === 'running'
+        ? 'loading' : 'unavailable'
+    }
+    return [id, state] as const
+  }))
+}
+
+/** A cascade's message total is unknown if any member's history is unreadable. */
+export function branchesWithUnknownMessageCounts(
+  projection: ConversationTreeProjection,
+): ReadonlySet<string> {
+  const states = deriveBranchContentStates(projection)
+  const branches = branchMap(projection)
+  const unknown = new Set<string>()
+  for (const [id, state] of states) {
+    if (state === 'available') continue
+    let current: string | null = id
+    while (current !== null && !unknown.has(current)) {
+      unknown.add(current)
+      current = branches.get(current)?.record.parentBranchId ?? null
+    }
+  }
+  return unknown
 }
 
 function childBranchMap(
@@ -138,11 +180,14 @@ function activityForBranches(
   ids: readonly string[],
   branches: ReadonlyMap<string, BranchProjectionView>,
   nodes: ReadonlyMap<string, MessageNodeView>,
+  contentStates: ReadonlyMap<string, BranchContentState>,
 ): FoldActivityState {
   let running = false
   for (const branchId of ids) {
     const branch = branches.get(branchId)
     if (branch === undefined) continue
+    if (contentStates.get(branchId) === 'unavailable') return 'error'
+    if (contentStates.get(branchId) === 'loading') running = true
     if (branch.record.status === 'failed' || branch.record.status === 'missing') return 'error'
     if (branch.record.status === 'creating' || branch.record.status === 'running') running = true
     for (const nodeId of branch.nodeIds) {
@@ -166,6 +211,7 @@ function branchSummary(
   branches: ReadonlyMap<string, BranchProjectionView>,
   children: ReadonlyMap<string, readonly BranchProjectionView[]>,
   nodes: ReadonlyMap<string, MessageNodeView>,
+  contentStates: ReadonlyMap<string, BranchContentState>,
 ): CollapsedBranchSummary | undefined {
   if (branch.anchorNodeId === undefined) return undefined
   const subtreeIds = subtreeBranchIds(branch.record.branchId, children)
@@ -186,7 +232,8 @@ function branchSummary(
     messageCount: branch.nodeIds.length,
     hiddenNodeCount: subtreeNodes.length,
     depth,
-    activity: activityForBranches(subtreeIds, branches, nodes),
+    activity: activityForBranches(subtreeIds, branches, nodes, contentStates),
+    contentState: contentStates.get(branch.record.branchId) ?? 'unavailable',
   }
 }
 
@@ -270,6 +317,7 @@ export function deriveCollapseState(
   const branches = branchMap(projection)
   const children = childBranchMap(projection)
   const nodes = new Map(projection.nodes.map(node => [node.nodeId, node] as const))
+  const contentStates = deriveBranchContentStates(projection)
   const groupsByAnchorNodeId = new Map<string, BranchProjectionView[]>()
   for (const branch of projection.branches) {
     if (branch.anchorNodeId === undefined) continue
@@ -315,7 +363,7 @@ export function deriveCollapseState(
       ),
       depth: Math.min(...group.map(branch => branchDepth(branch, branches))),
       open,
-      activity: activityForBranches(subtreeIds, branches, nodes),
+      activity: activityForBranches(subtreeIds, branches, nodes, contentStates),
     })
 
     for (const branch of group) {
@@ -323,7 +371,10 @@ export function deriveCollapseState(
         hideSubtree(branch)
         continue
       }
-      if (collapsedBranchIds.has(branch.record.branchId)) {
+      // Keep a stable, explanatory placeholder even when a saved ViewState or
+      // Alt-expand requests cards whose history has not actually been read.
+      if (collapsedBranchIds.has(branch.record.branchId)
+        || contentStates.get(branch.record.branchId) !== 'available') {
         hideSubtree(branch)
         const summary = branchSummary(
           branch,
@@ -331,6 +382,7 @@ export function deriveCollapseState(
           branches,
           children,
           nodes,
+          contentStates,
         )
         if (summary !== undefined) summaries.push(summary)
         continue

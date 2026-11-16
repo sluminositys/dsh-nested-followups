@@ -24,11 +24,11 @@ Restart the web profile afterwards.
 
 ## Requirements
 
-- Node.js 22.19 or later
+- Node.js 24.9 or later for the current development target
 - pnpm
-- DeepSeek Harness `0.2.1-rc.5` as the development target; retain regression checks
+- DeepSeek Harness `0.2.2-rc.3` as the development target; retain regression checks
   against `0.1.1-rc.2`, `0.2.1-alpha.1`, and `0.2.2-alpha.2`
-- The `0.2.2-alpha.2` test composition also needs its matching
+- The current `0.2.2` test composition also needs its matching
   `@deepseek-ai/dsh-tool-executor-native` dev dependency and Node.js >=24.9.
   Production branches inherit the source preset's executor; never add it to
   the plugin's hard dependencies or change the source tool presentation.

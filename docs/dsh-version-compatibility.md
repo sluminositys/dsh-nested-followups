@@ -5,9 +5,75 @@
 | Exact DSH target | Plugin source | Policy |
 | --- | --- | --- |
 | `0.1.0-rc.7` through `0.1.1-rc.2` | npm `dsh-nested-followups@0.2.3` | Legacy host support retained |
-| `0.2.1-rc.5` | npm `dsh-nested-followups@0.2.3` | Current development target |
+| `0.2.1-rc.5` | npm `dsh-nested-followups@0.2.3`, or source | Previous development target |
 | `0.2.1-alpha.1` | Same package | Reporter runtime from issue #1 |
 | `0.2.2-alpha.2` | Same package | Additional alpha matrix; Node >=24.9 |
+| `0.2.2-rc.3` | Build `main` from source | Current target; historical-session repair not yet published to npm |
+
+## Current source update (2026-11-16)
+
+The development target is **DSH `0.2.2-rc.3`**, with Cordis `4.1.0` and loader
+`1.1.0`. On the verification date, the official npm tags resolve to
+`latest=0.2.2-rc.1`, `next=0.2.2-rc.3`, and `alpha=0.2.2-alpha.3`. Here,
+"latest preview" means the newer published RC, not an assumption that the npm
+`latest` tag selects it. Use the exact CLI version in the README for Web;
+Desktop uses its own bundled CLI and `desktop` profile.
+
+This update keeps the plugin version at `0.2.3` and does not publish a new npm
+artifact. The fixes below require a built `main` checkout. Installing the
+unchanged npm `0.2.3` again will not install these fixes.
+
+### Historical branch compatibility
+
+DSH's historical log migration can consume old `assistant/chunk` records and
+renumber events. A plugin BranchRecord created before that migration still
+contains the old numeric `seedLength`, `anchorSeq`, and `forkBoundarySeq`.
+Applying that old offset to the migrated log can yield zero branch messages.
+
+The Host now reads the history before selecting its suffix, uses the actual
+inherited count reported by the running DSH, and relocates the anchor through
+its stable message identity. A changed cut is accepted only after validating
+the immutable child lineage, completed anchor and inherited conversation
+prefix. It is not repaired with a fixed subtraction or a guessed turn count.
+Continue and creation retries use the same checks.
+
+Reconciled coordinates are an in-memory read model. Reads do not rewrite
+session logs or overwrite the original plugin coordinates; ordinary status
+updates also retain them. DSH remains responsible for its own format migration.
+This preservation does not promise that an older DSH can read a newer format
+that DSH itself has written.
+
+If one branch cannot be read or verified, healthy siblings and the root remain
+readable. The unavailable branch keeps a visible status capsule instead of
+showing a successful `+0` and disappearing on expansion. The client and Host
+refuse subtree deletion while a history error makes its message count unknown.
+
+Regression fixtures contain synthetic messages, not copied user conversations.
+They exercise official historical-format restoration, nested branches, reload,
+Continue, creation retries, new children and unchanged source records. Existing
+legacy-host tests remain part of compatibility verification.
+
+### Verification record (2026-11-16)
+
+| Exact DSH runtime | Tests | Verification |
+| --- | --- | --- |
+| `0.2.2-rc.3` | 262 passed, 36 files | Full `pnpm run check`: lint, all TypeScript targets, tests, build, smoke and publint |
+| `0.2.2-rc.1` | 262 passed, 36 files | Isolated runtime tests and current build loading smoke |
+| `0.2.1-rc.5` | 262 passed, 36 files | Isolated runtime tests and current build loading smoke |
+| `0.1.1-rc.2` | 257 passed, 5 skipped | Isolated runtime tests and current build loading smoke |
+| `0.1.0-rc.7` | 257 passed, 5 skipped | Isolated runtime tests and current build loading smoke |
+
+The five skipped tests need the later historical-format catalog; unchanged
+legacy lineage, branch creation, Continue and read-only checks still run.
+The legacy matrices verify execution, not recompilation against every old SDK:
+those declarations have incompatible Zod and historical event types. No full
+old-SDK TypeScript gate is claimed.
+
+A separate read-only replay of existing local history restored 13 branches
+across two old trees with the current v4 catalog and no projection diagnostics.
+Hashes of all 15 inspected session files and plugin storage were unchanged.
+Private logs were not copied into the repository. This is not a live-model or
+packaged Desktop UI end-to-end test, and the user's active profile was not changed.
 
 Version `0.2.3` packages the current compatibility adapters for npm installation,
 with matching GitHub tag `v0.2.3`. The old npm `0.2.2` artifact is unchanged and
@@ -98,7 +164,7 @@ no executor is added as a hard plugin dependency or to the prompt schema.
 
 ## rc.5 installation regression (2026-11-04)
 
-The target remains **DSH `0.2.1-rc.5`**, not the newer alpha channel. The npm
+At the time of this check, the target was **DSH `0.2.1-rc.5`**, not the newer alpha channel. The npm
 `0.2.3` package already contains the rc.5 adapters; no host exemption, core patch,
 or another plugin version is required for this installation failure.
 

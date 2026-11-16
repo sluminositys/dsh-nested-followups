@@ -63,6 +63,12 @@ export type NestedFollowupsLocaleKey =
   | 'tree.readonlyReason'
   | 'tree.nodeCount'
   | 'tree.collapsedCount'
+  | 'tree.branchMessagesLoading'
+  | 'tree.branchMessagesUnavailable'
+  | 'tree.branchMessageCountUnknown'
+  | 'tree.branchDeleteUnavailable'
+  | 'tree.expandAnchorGroupUnknown'
+  | 'tree.collapseAnchorGroupUnknown'
   | 'tree.expandAnchorGroup'
   | 'tree.collapseAnchorGroup'
   | 'tree.expandBranchPath'
@@ -155,6 +161,12 @@ export const en: Record<NestedFollowupsLocaleKey, string> = {
   'tree.readonlyReason': 'This Host cannot gate branch tool execution. Update DeepSeek Harness to create follow-up branches.',
   'tree.nodeCount': '{count} messages',
   'tree.collapsedCount': '+{count} messages',
+  'tree.branchMessagesLoading': 'Loading branch messages…',
+  'tree.branchMessagesUnavailable': 'Branch messages could not be loaded. This branch has not been deleted.',
+  'tree.branchMessageCountUnknown': 'Message count unavailable',
+  'tree.branchDeleteUnavailable': 'Cannot delete this branch until its messages and nested branches are loaded.',
+  'tree.expandAnchorGroupUnknown': 'Expand {branches} branches · message count unavailable',
+  'tree.collapseAnchorGroupUnknown': 'Collapse whole group: {branches} branches · message count unavailable',
   'tree.expandAnchorGroup': 'Expand {branches} branches · +{messages} messages',
   'tree.collapseAnchorGroup': 'Collapse whole group: {branches} branches · +{messages} messages',
   'tree.expandBranchPath': 'Expand branch {path}',
@@ -242,6 +254,12 @@ export const zh: Record<NestedFollowupsLocaleKey, string> = {
   'tree.readonlyReason': '当前 Host 无法限制分支的工具执行。请升级 DeepSeek Harness 后再创建追问分支。',
   'tree.nodeCount': '{count} 条消息',
   'tree.collapsedCount': '+{count} 条消息',
+  'tree.branchMessagesLoading': '正在加载分支消息…',
+  'tree.branchMessagesUnavailable': '分支消息暂时无法读取，分支并未删除。',
+  'tree.branchMessageCountUnknown': '消息数量暂时无法确认',
+  'tree.branchDeleteUnavailable': '请等待该分支及其子分支的消息加载完成后再删除。',
+  'tree.expandAnchorGroupUnknown': '展开 {branches} 条分支 · 消息数量暂时无法确认',
+  'tree.collapseAnchorGroupUnknown': '收起整组 {branches} 条分支 · 消息数量暂时无法确认',
   'tree.expandAnchorGroup': '展开 {branches} 条分支 · 共 +{messages} 条消息',
   'tree.collapseAnchorGroup': '收回整组：{branches} 条分支 · 共 +{messages} 条消息',
   'tree.expandBranchPath': '展开分支 {path}',
@@ -349,6 +367,12 @@ export function labelsFrom(t: TranslateNS<typeof NS>): TreeViewLabels {
     readonly: t('tree.readonly'),
     nodeCount: count => t('tree.nodeCount', { count }),
     collapsedCount: count => t('tree.collapsedCount', { count }),
+    branchMessagesLoading: t('tree.branchMessagesLoading'),
+    branchMessagesUnavailable: t('tree.branchMessagesUnavailable'),
+    branchMessageCountUnknown: t('tree.branchMessageCountUnknown'),
+    branchDeleteUnavailable: t('tree.branchDeleteUnavailable'),
+    expandAnchorGroupUnknown: branches => t('tree.expandAnchorGroupUnknown', { branches }),
+    collapseAnchorGroupUnknown: branches => t('tree.collapseAnchorGroupUnknown', { branches }),
     expandAnchorGroup: (branches, messages) => t('tree.expandAnchorGroup', { branches, messages }),
     collapseAnchorGroup: (branches, messages) => t('tree.collapseAnchorGroup', { branches, messages }),
     expandBranchPath: path => t('tree.expandBranchPath', { path }),

@@ -50,6 +50,15 @@ function safeCount(value: unknown, label: string): number {
   return value as number
 }
 
+/** Do not mistake corruption, permission or transient I/O failures for absence. */
+export function isMissingPersistedSession(error: unknown): boolean {
+  if (!(error instanceof Error)) return false
+  const code = (error as Error & { readonly code?: unknown }).code
+  return error.name === 'SessionPersistenceNotFoundError'
+    || error.name === 'SessionNotFoundError'
+    || code === 'ENOENT' || code === 'SESSION_NOT_FOUND'
+}
+
 /** Return a detached event snapshot on either supported Session API. */
 export function snapshotSessionEvents(session: Session): readonly SessionEvent[] {
   const compatible = session as unknown as SnapshotSessionShape
